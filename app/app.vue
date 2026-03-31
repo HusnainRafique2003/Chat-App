@@ -12,7 +12,9 @@ useHead({
 </script>
 
 <template>
-  <UApp :locale="locales[locale]">
-    <NuxtPage />
-  </UApp>
+<NuxtLayout>
+    <UApp :locale="locales[locale]">
+      <NuxtPage />
+    </UApp>
+  </NuxtLayout>
 </template>
