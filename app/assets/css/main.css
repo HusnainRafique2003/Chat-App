@@ -1,0 +1,72 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+:root {
+  /* Light mode colors */
+  --ui-bg: #ffffff;
+  --ui-bg-muted: #f4f4f5;
+  --ui-bg-elevated: #e4e4e7;
+  --ui-bg-accented: #d4d4d8;
+
+  --ui-text: #18181b;
+  --ui-text-muted: #71717a;
+  --ui-text-dimmed: #a1a1aa;
+  --ui-text-highlighted: #09090b;
+
+  --ui-border: #e4e4e7;
+  --ui-border-muted: #f4f4f5;
+  --ui-border-accented: #d4d4d8;
+
+  --ui-primary: #6366f1;        /* indigo */
+  --ui-primary-foreground: #ffffff;
+
+  --ui-secondary: #8b5cf6;      /* violet */
+  --ui-secondary-foreground: #ffffff;
+
+  --ui-success: #22c55e;
+  --ui-success-foreground: #ffffff;
+
+  --ui-warning: #f59e0b;
+  --ui-warning-foreground: #ffffff;
+
+  --ui-error: #ef4444;
+  --ui-error-foreground: #ffffff;
+
+  --ui-neutral: #71717a;
+  --ui-neutral-foreground: #ffffff;
+}
+
+.dark {
+  /* Dark mode colors */
+  --ui-bg: #09090b;
+  --ui-bg-muted: #18181b;
+  --ui-bg-elevated: #27272a;
+  --ui-bg-accented: #3f3f46;
+
+  --ui-text: #fafafa;
+  --ui-text-muted: #a1a1aa;
+  --ui-text-dimmed: #71717a;
+  --ui-text-highlighted: #ffffff;
+
+  --ui-border: #27272a;
+  --ui-border-muted: #18181b;
+  --ui-border-accented: #3f3f46;
+
+  --ui-primary: #818cf8;        /* lighter indigo for dark bg */
+  --ui-primary-foreground: #09090b;
+
+  --ui-secondary: #a78bfa;      /* lighter violet */
+  --ui-secondary-foreground: #09090b;
+
+  --ui-success: #4ade80;
+  --ui-success-foreground: #09090b;
+
+  --ui-warning: #fbbf24;
+  --ui-warning-foreground: #09090b;
+
+  --ui-error: #f87171;
+  --ui-error-foreground: #09090b;
+
+  --ui-neutral: #a1a1aa;
+  --ui-neutral-foreground: #09090b;
+}
