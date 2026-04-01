@@ -1,4 +1,4 @@
-import type { AxiosRequestConfig, AxiosResponse } from 'axios'
+import type { AxiosRequestConfig } from 'axios'
 import axios from 'axios'
 import { useUserStore } from '~/stores/useUserStore'
 
@@ -72,14 +72,14 @@ const messagesApiClient = axios.create({
 })
 
 messagesApiClient.interceptors.request.use((config) => {
-  if (process.client) {
-    const userStore = useUserStore()
-    const token = userStore.token
+  const userStore = useUserStore()
+  const token = userStore.token
 
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-      config.headers.token = token
-    }
+  if (token) {
+    // Primary: token header (as per API spec)
+    config.headers.token = token
+    // Secondary: Authorization header (standard)
+    config.headers.Authorization = `Bearer ${token}`
   }
 
   return config
@@ -245,3 +245,4 @@ export async function downloadMessageFile(path: string) {
 }
 
 export { messagesApiClient }
+

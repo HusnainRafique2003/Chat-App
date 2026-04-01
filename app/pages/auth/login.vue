@@ -48,7 +48,9 @@ async function handleSubmit() {
     return
   }
 
-await navigateTo('/dashboard', { redirectCode: 302 })
+  // Wait a moment for store to persist before navigating
+  await new Promise(resolve => setTimeout(resolve, 100))
+  await navigateTo('/dashboard', { redirectCode: 302 })
 }
 
 function handleEmailBlur() {

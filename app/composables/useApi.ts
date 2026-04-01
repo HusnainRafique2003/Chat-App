@@ -16,8 +16,10 @@ apiClient.interceptors.request.use((config) => {
   const token = userStore.token
 
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+    // Primary: token header (as per API spec)
     config.headers.token = token
+    // Secondary: Authorization header (standard)
+    config.headers.Authorization = `Bearer ${token}`
   }
 
   return config

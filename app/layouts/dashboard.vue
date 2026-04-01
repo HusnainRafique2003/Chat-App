@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
 import { navigateTo } from '#app'
+import { onMounted, watch } from 'vue'
 import AppSidebar from '~/components/AppSidebar.vue'
 import { useUserStore } from '~/stores/useUserStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
@@ -14,8 +14,23 @@ async function handleLogout() {
 }
 
 onMounted(() => {
-  if (userStore.user) {
+  // Wait for store to be hydrated from localStorage
+  if (userStore.token && userStore.user) {
+    console.log('Dashboard - Token available, fetching workspaces')
     workspaceStore.fetchWorkspaces()
+  } else {
+    console.log('Dashboard - No token yet, waiting...')
+    // Watch for token to become available
+    const unwatch = watch(
+      () => userStore.token,
+      (token) => {
+        if (token) {
+          console.log('Dashboard - Token now available, fetching workspaces')
+          workspaceStore.fetchWorkspaces()
+          unwatch()
+        }
+      }
+    )
   }
 })
 </script>
@@ -28,7 +43,7 @@ onMounted(() => {
           <div class="border-b border-[var(--ui-border)] px-6 py-5">
             <NuxtLink to="/dashboard" class="flex items-center gap-3">
               <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)]">
-                <Icon name="i-mdi-message-draw" class="h-5 w-5" />
+                <UIcon name="i-mdi-message-draw" class="h-5 w-5" />
               </div>
               <div>
                 <p class="font-black text-[var(--ui-text-highlighted)]">ChatSphere</p>

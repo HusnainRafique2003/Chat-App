@@ -68,7 +68,13 @@ export const useUserStore = defineStore('user', {
           return { success: false, error: payload.message || 'Login failed' }
         }
 
+        console.log('Login response user:', payload.data.user)
+        console.log('Login response token:', payload.data.user.access_token ? `${payload.data.user.access_token.slice(0, 20)}...` : 'NO TOKEN')
+
         this.setAuth(payload.data.user)
+
+        console.log('After setAuth - Store token:', this.token ? `${this.token.slice(0, 20)}...` : 'NO TOKEN')
+
         return { success: true, message: payload.message || 'Login successful' }
       } catch (error) {
         return { success: false, error: extractMessage(error, 'Login failed') }

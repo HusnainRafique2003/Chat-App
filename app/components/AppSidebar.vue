@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import WorkspaceModal from '~/components/modals/WorkspaceModal.vue'
+import { computed } from 'vue'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
 const workspaceStore = useWorkspaceStore()
-const openCreateModal = ref<boolean>(false)
 
-const workspaceItems = computed(() => 
+const workspaceItems = computed(() =>
   workspaceStore.workspaces.map(w => ({
     id: w.id,
     label: w.name.slice(0,2).toUpperCase(),
@@ -24,7 +22,6 @@ interface SidebarItem {
 
 const channelItems: SidebarItem[] = []
 const directMessages: SidebarItem[] = []
-
 </script>
 
 <template>
@@ -46,13 +43,6 @@ const directMessages: SidebarItem[] = []
             : 'bg-[var(--ui-bg-muted)] text-[var(--ui-text)] hover:bg-[var(--ui-bg-elevated)]'"
         >
           {{ workspace.label }}
-        </button>
-        <button
-          @click="openCreateModal = true"
-          class="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--ui-bg-muted)] text-[var(--ui-text-dimmed)] hover:bg-[var(--ui-bg-elevated)] hover:text-[var(--ui-text)] transition-all"
-          title="Create workspace"
-        >
-          <UIcon name="i-lucide-plus" class="h-5 w-5" />
         </button>
       </div>
     </div>
@@ -113,23 +103,4 @@ const directMessages: SidebarItem[] = []
       </div>
     </div>
   </aside>
-
-  <WorkspaceModal 
-    v-model:open="openCreateModal"
-    mode="create"
-    @submit="(payload) => {
-      const { name, description } = payload
-      workspaceStore.createWorkspace({ name, description }).then((result) => {
-        if (result?.success) {
-          console.log('Workspace created:', result)
-          openCreateModal.value = false
-        } else {
-          console.error('Create error:', result?.error)
-        }
-      })
-    }"
-    @cancel="openCreateModal = false"
-  />
-
 </template>
-
