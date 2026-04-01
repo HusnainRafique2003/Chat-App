@@ -70,6 +70,7 @@
    DARK MODE
    ============================================================ */
 .dark {
+  /* Dark mode colors (Kept intact from your scaffold) */
   --ui-bg: #09090b;
   --ui-bg-muted: #18181b;
   --ui-bg-elevated: #27272a;
@@ -86,6 +87,7 @@
 
   --ui-primary: #818cf8;
   --ui-primary-foreground: #09090b;
+
   --ui-secondary: #a78bfa;
   --ui-secondary-foreground: #09090b;
   --ui-success: #4ade80;

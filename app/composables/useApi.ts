@@ -1,5 +1,7 @@
 import type { AxiosRequestConfig, AxiosResponse } from 'axios'
 import axios from 'axios'
+import type { AxiosRequestConfig } from 'axios'
+import { ref, onUnmounted } from 'vue'
 
 const API_BASE = 'http://178.104.58.236/api/auth'
 
@@ -39,6 +41,19 @@ export function useApi<T = unknown>(url: string, config?: AxiosRequestConfig) {
     data.value = null
 
     try {
+      // ✅ Use axios.request to support POST, PUT, DELETE and request bodies
+      // Inside useApi.ts fetch function
+const response = await axios.request<T>({
+  url: overrideUrl ?? url,
+  method: overrideConfig?.method || config?.method || 'GET',
+  params: overrideConfig?.params || config?.params, // <-- ADD THIS LINE
+  data: overrideConfig?.data || config?.data,
+  headers: {
+    ...config?.headers,
+    ...overrideConfig?.headers
+  },
+  signal: controller.signal,
+})
       const response = await axios.get<T>(overrideUrl ?? url, {
         ...config,
         ...overrideConfig,
@@ -51,6 +66,7 @@ export function useApi<T = unknown>(url: string, config?: AxiosRequestConfig) {
         error.value = 'Request was cancelled.'
       }
       else if (axios.isAxiosError(err)) {
+        // Correctly handle backend error messages [cite: 199]
         error.value = err.response?.data?.message ?? err.message ?? 'Request failed.'
       }
       else {
@@ -69,6 +85,7 @@ export function useApi<T = unknown>(url: string, config?: AxiosRequestConfig) {
     }
   }
 
+  // Auto-abort if the component using this unmounts mid-request [cite: 200]
   onUnmounted(() => abort())
 
   return { data, error, loading, fetch, abort }

@@ -1,11 +1,19 @@
 import { defineStore } from 'pinia'
 import { postApi, type ApiEnvelope } from '~/composables/useApi'
 
+// Updated to match your backend auth response perfectly
+export interface UserInfo {
 export interface ApiUser {
   id: string
   name: string
   email: string
   is_active: boolean
+  access_token: string
+}
+
+interface UserState {
+  user: UserInfo | null
+  userList: UserInfo[]
   access_token: string | null
   created_at: string
   updated_at: string
@@ -32,6 +40,11 @@ function extractMessage(error: unknown, fallback: string) {
 export const useUserStore = defineStore('user', {
   state: (): UserState => ({
     user: null,
+    userList: [],
+  }),
+
+  getters: {
+    isLoggedIn: (state): boolean => !!state.user?.access_token,
     token: null,
     isLoading: false
   }),
@@ -43,6 +56,9 @@ export const useUserStore = defineStore('user', {
   persist: true,
 
   actions: {
+    // Call this when your login API request succeeds
+    login(info: UserInfo) {
+      this.user = info
     setAuth(user: ApiUser) {
       this.user = user
       this.token = user.access_token ?? null
@@ -50,6 +66,10 @@ export const useUserStore = defineStore('user', {
 
     clearAuth() {
       this.user = null
+    },
+    $reset() {
+      this.user = null
+      this.userList = []
       this.token = null
     },
 
@@ -102,6 +122,9 @@ export const useUserStore = defineStore('user', {
       }
     },
 
+  // This ensures the token survives page refreshes!
+  persist: true, 
+})
     async verifySignup(email: string, token: string) {
       this.isLoading = true
 
