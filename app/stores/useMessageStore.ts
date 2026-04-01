@@ -71,15 +71,17 @@ export const useMessageStore = defineStore('message', {
       this.searchResults = []
     },
 
-    async fetchMessages(channelId = this.currentChannelId, page = 1, perPage = 20) {
-      if (!channelId.trim()) {
+    async fetchMessages(channelId?: string, page = 1, perPage = 20) {
+      const resolvedChannelId = (channelId ?? this.currentChannelId).trim()
+
+      if (!resolvedChannelId) {
         this.error = 'Channel ID is required'
         return { success: false, error: this.error }
       }
 
       this.loading = true
       this.error = null
-      this.currentChannelId = channelId.trim()
+      this.currentChannelId = resolvedChannelId
 
       try {
         const response = await readMessages({
@@ -236,14 +238,16 @@ export const useMessageStore = defineStore('message', {
       }
     },
 
-    async markRead(messageIds: string[], channelId = this.currentChannelId) {
-      if (!channelId.trim() || !messageIds.length) {
+    async markRead(messageIds: string[], channelId?: string) {
+      const resolvedChannelId = (channelId ?? this.currentChannelId).trim()
+
+      if (!resolvedChannelId || !messageIds.length) {
         return { success: false, error: 'Channel ID and message IDs are required' }
       }
 
       try {
         await markMessagesAsRead({
-          channel_id: channelId,
+          channel_id: resolvedChannelId,
           message_ids: messageIds
         })
 

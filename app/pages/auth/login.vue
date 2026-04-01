@@ -48,7 +48,7 @@ async function handleSubmit() {
     return
   }
 
-  await navigateTo('/dashboard')
+await navigateTo('/dashboard', { redirectCode: 302 })
 }
 
 function handleEmailBlur() {

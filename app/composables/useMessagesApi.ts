@@ -57,7 +57,7 @@ export interface MessagePagination {
   last_page: number
 }
 
-export interface ApiEnvelope<T> {
+export interface MessagesApiEnvelope<T> {
   success: boolean
   message: string
   errors?: Record<string, string[]> | null
@@ -85,7 +85,7 @@ messagesApiClient.interceptors.request.use((config) => {
   return config
 })
 
-function extractError(error: unknown) {
+function extractError(error: unknown): never {
   if (axios.isAxiosError(error)) {
     const message = typeof error.response?.data?.message === 'string'
       ? error.response.data.message
@@ -126,7 +126,7 @@ export async function readMessages(params: {
   per_page?: number
 }) {
   try {
-    return await messagesApiClient.get<ApiEnvelope<{ messages: ChatMessage[]; pagination: MessagePagination }>>('/read', {
+    return await messagesApiClient.get<MessagesApiEnvelope<{ messages: ChatMessage[]; pagination: MessagePagination }>>('/read', {
       params
     })
   } catch (error) {
@@ -149,7 +149,7 @@ export async function createMessage(payload: {
     : undefined
 
   try {
-    return await messagesApiClient.post<ApiEnvelope<{ message: ChatMessage }>>('/create', data, config)
+    return await messagesApiClient.post<MessagesApiEnvelope<{ message: ChatMessage }>>('/create', data, config)
   } catch (error) {
     return extractError(error)
   }
@@ -171,7 +171,7 @@ export async function updateMessage(payload: {
     : undefined
 
   try {
-    return await messagesApiClient.patch<ApiEnvelope<{ message: ChatMessage }>>('/update', data, config)
+    return await messagesApiClient.patch<MessagesApiEnvelope<{ message: ChatMessage }>>('/update', data, config)
   } catch (error) {
     return extractError(error)
   }
@@ -182,7 +182,7 @@ export async function deleteMessage(payload: {
   message_id: string
 }) {
   try {
-    return await messagesApiClient.delete<ApiEnvelope<null>>('/delete', {
+    return await messagesApiClient.delete<MessagesApiEnvelope<null>>('/delete', {
       data: payload
     })
   } catch (error) {
@@ -198,7 +198,7 @@ export async function searchMessages(params: {
   per_page?: number
 }) {
   try {
-    return await messagesApiClient.get<ApiEnvelope<ChatMessage[]>>('/search', {
+    return await messagesApiClient.get<MessagesApiEnvelope<ChatMessage[]>>('/search', {
       params
     })
   } catch (error) {
@@ -211,7 +211,7 @@ export async function markMessagesAsRead(payload: {
   message_ids: string[]
 }) {
   try {
-    return await messagesApiClient.post<ApiEnvelope<{ updated: number }>>('/read-by', payload)
+    return await messagesApiClient.post<MessagesApiEnvelope<{ updated: number }>>('/read-by', payload)
   } catch (error) {
     return extractError(error)
   }
@@ -223,7 +223,7 @@ export async function reactToMessage(payload: {
   emoji: string
 }) {
   try {
-    return await messagesApiClient.post<ApiEnvelope<{ message: ChatMessage }>>('/react', payload)
+    return await messagesApiClient.post<MessagesApiEnvelope<{ message: ChatMessage }>>('/react', payload)
   } catch (error) {
     return extractError(error)
   }
@@ -236,7 +236,7 @@ export function getMessageDownloadUrl(path: string) {
 
 export async function downloadMessageFile(path: string) {
   try {
-    return await messagesApiClient.get(`/download?path=${encodeURIComponent(path)}`, {
+    return await messagesApiClient.get<Blob>(`/download?path=${encodeURIComponent(path)}`, {
       responseType: 'blob'
     })
   } catch (error) {

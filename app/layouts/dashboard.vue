@@ -1,17 +1,28 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
+import { navigateTo } from '#app'
+import AppSidebar from '~/components/AppSidebar.vue'
 import { useUserStore } from '~/stores/useUserStore'
+import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
 const userStore = useUserStore()
+const workspaceStore = useWorkspaceStore()
 
 async function handleLogout() {
   await userStore.logout()
   await navigateTo('/auth/login')
 }
+
+onMounted(() => {
+  if (userStore.user) {
+    workspaceStore.fetchWorkspaces()
+  }
+})
 </script>
 
 <template>
   <div class="min-h-screen bg-[var(--ui-bg-muted)] text-[var(--ui-text)]">
-    <div class="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
+    <div class="grid min-h-screen lg:grid-cols-[320px_minmax(0,1fr)]">
       <aside class="border-r border-[var(--ui-border)] bg-[var(--ui-bg)]">
         <div class="flex h-full flex-col">
           <div class="border-b border-[var(--ui-border)] px-6 py-5">
@@ -26,18 +37,7 @@ async function handleLogout() {
             </NuxtLink>
           </div>
 
-          <div class="flex-1 px-5 py-6">
-            <div class="rounded-[1.5rem] border border-dashed border-[var(--ui-border-accented)] bg-[var(--ui-bg-muted)]/70 p-5">
-              <div class="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--ui-text-dimmed)]">
-                <span class="h-2.5 w-2.5 rounded-full bg-[var(--ui-warning)]" />
-                Sidebar Area
-              </div>
-              <h2 class="text-xl font-black text-[var(--ui-text-highlighted)]">Reserved for teammate sidebar</h2>
-              <p class="mt-3 text-sm leading-6 text-[var(--ui-text-muted)]">
-                This section is kept intentionally simple so your teammate can add workspace navigation, channels, and sidebar interactions here.
-              </p>
-            </div>
-          </div>
+          <AppSidebar />
 
           <div class="border-t border-[var(--ui-border)] px-5 py-4">
             <BaseButton

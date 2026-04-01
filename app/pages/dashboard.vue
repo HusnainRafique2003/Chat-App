@@ -8,9 +8,8 @@ definePageMeta({
 
 const userStore = useUserStore()
 
-if (!userStore.isLoggedIn) {
-  await navigateTo('/auth/login')
-}
+// Protected by auth middleware
+
 </script>
 
 <template>

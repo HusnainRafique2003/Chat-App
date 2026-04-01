@@ -1,195 +1,135 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import { storeToRefs } from "pinia";
-import { useWorkspaceStore } from "~/stores/workspace";
-import { useTeamStore } from "~/stores/team";
-import { useChannelStore } from "~/stores/channel";
+import { computed, ref } from 'vue'
+import WorkspaceModal from '~/components/modals/WorkspaceModal.vue'
+import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
-// 1. Initialize Stores
-const workspaceStore = useWorkspaceStore();
-const teamStore = useTeamStore();
-const channelStore = useChannelStore();
+const workspaceStore = useWorkspaceStore()
+const openCreateModal = ref<boolean>(false)
 
-// 2. Extract State (Use storeToRefs to keep them reactive in the template!)
-const { workspaces, activeWorkspaceId } = storeToRefs(workspaceStore);
-const { teams, activeTeamId } = storeToRefs(teamStore);
-const { channels, activeChannelId } = storeToRefs(channelStore);
+const workspaceItems = computed(() => 
+  workspaceStore.workspaces.map(w => ({
+    id: w.id,
+    label: w.name.slice(0,2).toUpperCase(),
+    active: w.id === workspaceStore.currentWorkspaceId
+  }))
+)
 
-// Modals UI State
-const isWorkspaceModalOpen = ref(false);
-const isTeamModalOpen = ref(false);
-const isChannelModalOpen = ref(false);
-
-// UI Helpers
-function getInitials(name: string) {
-  if (!name) return "?";
-  return name.substring(0, 2).toUpperCase();
+interface SidebarItem {
+  id: string
+  name?: string
+  active?: boolean
+  online?: boolean
+  label?: string
 }
 
-// --- THE CHAIN REACTION LOGIC ---
+const channelItems: SidebarItem[] = []
+const directMessages: SidebarItem[] = []
 
-async function handleWorkspaceSelect(id: string) {
-  workspaceStore.setActiveWorkspace(id);
-  teamStore.setActiveTeam(null);
-  channelStore.setActiveChannel(null);
-
-  await teamStore.fetchTeams(id);
-
-  // Auto-select first team
-  if (teamStore.teams.length > 0) {
-    handleTeamSelect(teamStore.teams[0].id);
-  }
-}
-
-async function handleTeamSelect(id: string) {
-  teamStore.setActiveTeam(id);
-  channelStore.setActiveChannel(null);
-
-  await channelStore.fetchChannels(id);
-
-  // Auto-select first channel (when API works)
-  if (channelStore.channels.length > 0) {
-    channelStore.setActiveChannel(channelStore.channels[0].id);
-  }
-}
-
-// Initial Load
-onMounted(async () => {
-  await workspaceStore.fetchWorkspaces();
-  if (workspaceStore.workspaces.length > 0) {
-    handleWorkspaceSelect(workspaceStore.workspaces[0].id);
-  }
-});
 </script>
+
 <template>
-  <div
-    class="flex h-screen bg-[#EEEDE9] text-[#371B17] border-r border-[#371B17]/10 dark:bg-[#09090b] dark:text-[#fafafa] dark:border-white/10 font-sans w-[320px] transition-colors duration-300">
+  <aside class="flex h-screen w-[320px] border-r border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-text)]">
+    <div class="flex w-24 flex-col items-center border-r border-[var(--ui-border)] px-4 py-6">
+      <p class="mb-4 text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--ui-text-dimmed)]">
+        Workspaces
+      </p>
 
-    <div
-      class="w-24 flex flex-col items-center py-6 border-r border-[#371B17]/10 dark:border-white/10 shrink-0 overflow-y-auto hide-scrollbar">
-
-      <div class="flex flex-col items-center w-full mb-8">
-        <p class="text-[9px] font-bold uppercase tracking-widest mb-4 opacity-70">
-          Workspaces
-        </p>
-
-        <div class="flex flex-col gap-3 items-center">
-          <UTooltip v-for="workspace in workspaces" :key="workspace.id" :text="workspace.name" side="right"
-            :popper="{ arrow: true }">
-            <button @click="handleWorkspaceSelect(workspace.id)"
-              class="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm transition-all" :class="activeWorkspaceId === workspace.id
-                ? 'bg-[#371B17] text-[#EEEDE9] shadow-md ring-2 ring-offset-2 ring-offset-[#EEEDE9] ring-[#371B17] dark:bg-[#818cf8] dark:text-[#09090b] dark:ring-offset-[#09090b] dark:ring-[#818cf8]'
-                : 'bg-[#371B17]/10 text-[#371B17] hover:bg-[#371B17]/20 dark:bg-white/10 dark:text-[#fafafa] dark:hover:bg-white/20'
-                ">
-              {{ getInitials(workspace.name) }}
-            </button>
-          </UTooltip>
-        </div>
-      </div>
-
-      <div class="flex flex-col items-center w-full">
-        <p class="text-[9px] font-bold uppercase tracking-widest mb-4 opacity-70">
-          Teams
-        </p>
-        <div class="flex flex-col gap-3 items-center">
-          <UTooltip v-for="team in teams" :key="team.id" :text="team.name" side="right" :popper="{ arrow: true }">
-            <button @click="handleTeamSelect(team.id)"
-              class="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm transition-all ring-offset-[#EEEDE9] dark:ring-offset-[#09090b]"
-              :class="[
-                activeTeamId === team.id
-                  ? 'ring-2 ring-offset-2 ring-[#371B17] dark:ring-[#818cf8]'
-                  : 'hover:opacity-80',
-                'bg-rose-100 text-[#371B17]',
-              ]">
-              {{ getInitials(team.name) }}
-            </button>
-          </UTooltip>
-
-          <UTooltip text="Create New Team" side="right">
-            <button @click="isTeamModalOpen = true"
-              class="w-12 h-12 rounded-xl border-2 border-dashed border-[#371B17]/30 text-[#371B17]/50 hover:border-[#371B17] transition-colors">
-              <UIcon name="i-lucide-plus" class="text-xl" />
-            </button>
-          </UTooltip>
-        </div>
+      <div class="flex flex-col items-center gap-3">
+        <button
+          v-for="workspace in workspaceItems"
+          :key="workspace.id"
+          type="button"
+          @click="workspaceStore.setCurrentWorkspace(workspace.id)"
+          class="flex h-12 w-12 items-center justify-center rounded-xl text-sm font-bold transition-all"
+          :class="workspace.active
+            ? 'bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)]'
+            : 'bg-[var(--ui-bg-muted)] text-[var(--ui-text)] hover:bg-[var(--ui-bg-elevated)]'"
+        >
+          {{ workspace.label }}
+        </button>
+        <button
+          @click="openCreateModal = true"
+          class="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--ui-bg-muted)] text-[var(--ui-text-dimmed)] hover:bg-[var(--ui-bg-elevated)] hover:text-[var(--ui-text)] transition-all"
+          title="Create workspace"
+        >
+          <UIcon name="i-lucide-plus" class="h-5 w-5" />
+        </button>
       </div>
     </div>
 
-    <div class="flex-1 flex flex-col pt-6 pb-4 px-4 h-full relative overflow-y-auto">
-
-      <div class="flex items-center justify-between cursor-pointer group mb-8">
-        <h1 class="text-lg font-bold truncate pr-2">
-          {{
-            workspaces.find((w) => w.id === activeWorkspaceId)?.name ||
-            "Archive Workspace"
-          }}
-        </h1>
-        <UIcon name="i-lucide-chevron-down" class="text-lg opacity-50 group-hover:opacity-100" />
+    <div class="flex min-w-0 flex-1 flex-col px-4 py-6">
+      <div class="mb-8">
+        <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ui-text-dimmed)]">
+          Workspace
+        </p>
+        <h2 class="mt-2 text-lg font-black text-[var(--ui-text-highlighted)]">{{ workspaceStore.currentWorkspace?.name || 'No workspace selected' }}</h2>
+        <p class="mt-2 text-sm leading-6 text-[var(--ui-text-muted)]">
+          {{ workspaceStore.currentWorkspace?.description || 'Loading...' }}
+        </p>
       </div>
 
       <div class="mb-8">
-        <div class="flex items-center justify-between mb-3 px-2">
-          <p class="text-[10px] font-bold uppercase tracking-widest opacity-70">
+        <div class="mb-3 flex items-center justify-between">
+          <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ui-text-dimmed)]">
             Channels
           </p>
-          <button @click="isChannelModalOpen = true" class="opacity-50 hover:opacity-100">
-            <UIcon name="i-lucide-plus-circle" class="text-sm" />
-          </button>
+          <UIcon name="i-lucide-plus-circle" class="h-4 w-4 text-[var(--ui-text-dimmed)]" />
         </div>
 
-        <div class="flex flex-col gap-1">
-          <button v-for="channel in channels" :key="channel.id" @click="handleChannelSelect(channel.id)"
-            class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors text-left" :class="activeChannelId === channel.id
-              ? 'bg-[#371B17]/10 dark:bg-white/10 font-bold'
-              : 'hover:bg-[#371B17]/5 dark:hover:bg-white/5 font-medium opacity-80'
-              ">
-            <span class="opacity-50 font-normal">#</span>
+        <div class="space-y-1">
+          <div v-if="channelItems.length === 0" class="text-sm text-[var(--ui-text-muted)]">
+            No channels yet
+          </div>
+          <button
+            v-for="channel in channelItems"
+            :key="channel.id"
+            type="button"
+            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors"
+            :class="channel.active
+              ? 'bg-[var(--ui-bg-muted)] font-semibold text-[var(--ui-text-highlighted)]'
+              : 'text-[var(--ui-text-muted)] hover:bg-[var(--ui-bg-muted)]/70'"
+          >
+            <span class="opacity-50">#</span>
             <span class="truncate">{{ channel.name }}</span>
           </button>
-
-          <p v-if="channels.length === 0" class="text-[10px] opacity-40 px-3 italic">
-            No channels in this team
-          </p>
         </div>
       </div>
 
-      <div>
-        <p class="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-3 px-2">
-          Direct Messages
+      <div class="mt-auto">
+        <p class="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ui-text-dimmed)]">
+          Direct messages
         </p>
-        <div class="flex flex-col gap-1">
-          <button v-for="dm in directMessages" :key="dm.id"
-            class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm hover:bg-[#371B17]/5 dark:hover:bg-white/5 transition-colors">
-            <span class="w-2 h-2 rounded-full" :class="dm.online
-              ? 'bg-emerald-500'
-              : 'border border-[#371B17] dark:border-white'
-              "></span>
-            <span class="truncate opacity-80">{{ dm.name }}</span>
-          </button>
-        </div>
-      </div>
 
-      <div class="mt-auto flex items-center gap-3 pt-4 px-2">
-        <UAvatar src="https://i.pravatar.cc/150?u=elena" size="sm" />
-        <div class="flex-1 min-w-0 flex flex-col">
-          <span class="text-sm font-bold truncate">Elena V.</span>
-          <span class="text-[9px] uppercase tracking-wider opacity-60 truncate">Creative Lead</span>
+        <div class="space-y-2">
+          <div
+            v-for="dm in directMessages"
+            :key="dm.id"
+            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--ui-text-muted)]"
+          >
+            <span class="h-2.5 w-2.5 rounded-full" :class="dm.online ? 'bg-[var(--ui-success)]' : 'bg-[var(--ui-border-accented)]'" />
+            <span class="truncate">{{ dm.name }}</span>
+          </div>
         </div>
-        <UIcon name="i-lucide-settings" class="text-lg opacity-50" />
       </div>
     </div>
+  </aside>
 
-    <TeamModal v-model:open="isTeamModalOpen" mode="create" />
-    <ChannelModal v-model:open="isChannelModalOpen" mode="create" />
-  </div>
+  <WorkspaceModal 
+    v-model:open="openCreateModal"
+    mode="create"
+    @submit="(payload) => {
+      const { name, description } = payload
+      workspaceStore.createWorkspace({ name, description }).then((result) => {
+        if (result?.success) {
+          console.log('Workspace created:', result)
+          openCreateModal.value = false
+        } else {
+          console.error('Create error:', result?.error)
+        }
+      })
+    }"
+    @cancel="openCreateModal = false"
+  />
+
 </template>
-<style scoped>
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
 
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-</style>

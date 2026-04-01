@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "nuxt build",
-    "dev": "nuxt dev",
+    "dev": "nuxt dev --ssr false",
     "dev:clean": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Remove-Item -Recurse -Force .nuxt,'.vite' -ErrorAction SilentlyContinue; npx nuxi dev\"",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
@@ -26,14 +26,13 @@
     "@tiptap/vue-3": "^3.22.0",
     "axios": "^1.14.0",
     "lowlight": "^3.3.0",
-    "nuxt": "^4.1.3",
+    "nuxt": "4.4.2",
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.7.1",
     "tailwindcss": "^4.2.1"
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.15.2",
-    "@nuxt/vite-builder": "^4.4.2",
     "@types/node": "^25.5.0",
     "eslint": "^10.0.3",
     "typescript": "^5.9.3",

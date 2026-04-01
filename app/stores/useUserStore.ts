@@ -1,22 +1,14 @@
 import { defineStore } from 'pinia'
 import { postApi, type ApiEnvelope } from '~/composables/useApi'
 
-// Updated to match your backend auth response perfectly
-export interface UserInfo {
 export interface ApiUser {
   id: string
   name: string
   email: string
   is_active: boolean
-  access_token: string
-}
-
-interface UserState {
-  user: UserInfo | null
-  userList: UserInfo[]
   access_token: string | null
-  created_at: string
-  updated_at: string
+  created_at?: string
+  updated_at?: string
 }
 
 interface AuthUserPayload {
@@ -37,14 +29,11 @@ function extractMessage(error: unknown, fallback: string) {
   return fallback
 }
 
+
+
 export const useUserStore = defineStore('user', {
   state: (): UserState => ({
     user: null,
-    userList: [],
-  }),
-
-  getters: {
-    isLoggedIn: (state): boolean => !!state.user?.access_token,
     token: null,
     isLoading: false
   }),
@@ -56,9 +45,6 @@ export const useUserStore = defineStore('user', {
   persist: true,
 
   actions: {
-    // Call this when your login API request succeeds
-    login(info: UserInfo) {
-      this.user = info
     setAuth(user: ApiUser) {
       this.user = user
       this.token = user.access_token ?? null
@@ -66,10 +52,6 @@ export const useUserStore = defineStore('user', {
 
     clearAuth() {
       this.user = null
-    },
-    $reset() {
-      this.user = null
-      this.userList = []
       this.token = null
     },
 
@@ -122,9 +104,6 @@ export const useUserStore = defineStore('user', {
       }
     },
 
-  // This ensures the token survives page refreshes!
-  persist: true, 
-})
     async verifySignup(email: string, token: string) {
       this.isLoading = true
 
@@ -184,18 +163,45 @@ export const useUserStore = defineStore('user', {
     },
 
     async logout() {
-      if (!this.token) {
+      // Always clear auth immediately for UI consistency, ignore API response
+      this.clearAuth()
+
+      if (this.token) {
+        try {
+          await postApi<ApiEnvelope<null>>('/logout', {})
+        } catch {
+          // Ignore logout API errors (e.g. 401 stale token)
+        }
+      }
+
+      return { success: true }
+    },
+
+    async validateAuth(): Promise<{ valid: boolean }> {
+      if (!this.token || !this.user) {
         this.clearAuth()
-        return { success: true }
+        return { valid: false }
       }
 
       try {
-        await postApi<ApiEnvelope<null>>('/logout', {})
-        return { success: true }
-      } catch {
-        return { success: false }
-      } finally {
+        if (process.server) {
+          return { valid: true }
+        }
+
+        const response = await postApi<ApiEnvelope<ApiUser>>('/user', {})
+        const payload = response.data
+
+        if (!payload.success || !payload.data?.is_active) {
+          this.clearAuth()
+          return { valid: false }
+        }
+
+        this.setAuth(payload.data)
+        return { valid: true }
+      } catch (error) {
+        console.error('Auth validation failed:', error)
         this.clearAuth()
+        return { valid: false }
       }
     }
   }

@@ -182,7 +182,7 @@ watch(() => props.initialContent, (value) => {
   const normalized = value || ''
   if (editor.value.getHTML() === normalized) return
 
-  editor.value.commands.setContent(normalized, false)
+  editor.value.commands.setContent(normalized)
 }, { immediate: true })
 
 onBeforeUnmount(() => {

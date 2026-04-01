@@ -31,11 +31,19 @@ interface State {
   currentWorkspaceId: string | null
 }
 
-export const useWorkspaceStore = defineStore('workspace', {
-  state: (): State => ({
-    workspaces: [],
+export const useWorkspaceStore = defineStore('workspace-data', {
+state: (): State => ({
+    workspaces: [{
+      id: 'demo-workspace',
+      name: 'Demo Workspace',
+      description: 'Development preview workspace for testing dashboard.',
+      creator_id: 'demo-user',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      members: []
+    }],
     loading: false,
-    currentWorkspaceId: null,
+    currentWorkspaceId: 'demo-workspace',
   }),
 
   getters: {
@@ -52,7 +60,7 @@ async fetchWorkspaces() {
         if (data.success) {
           this.workspaces = data.data.workspaces || []
           if (this.workspaces.length > 0 && !this.currentWorkspaceId) {
-            this.currentWorkspaceId = this.workspaces[0].id
+            this.currentWorkspaceId = this.workspaces[0]?.id || null
           }
         }
       } catch (error) {
@@ -69,7 +77,7 @@ async createWorkspace(form: WorkspacePayload) {
         const data = response.data
         if (data.success) {
           this.workspaces.push(data.data.workspace)
-          this.currentWorkspaceId = data.data.workspace.id
+          this.currentWorkspaceId = data.data.workspace?.id || null
           return { success: true }
         }
       } catch (error: any) {
@@ -148,7 +156,11 @@ async createWorkspace(form: WorkspacePayload) {
         if (data.success) {
           const index = this.workspaces.findIndex(w => w.id === workspace_id)
           if (index > -1) {
-            this.workspaces[index].members = this.workspaces[index].members.filter(m => !user_ids.includes(m.id))
+            const workspace = this.workspaces[index]
+
+            if (workspace) {
+              workspace.members = workspace.members.filter(member => !user_ids.includes(member.id))
+            }
           }
           return { success: true }
         }
