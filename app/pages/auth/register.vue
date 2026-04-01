@@ -1,203 +1,350 @@
 <script setup lang="ts">
+import AuthLayout from '~/layouts/AuthLayout.vue'
+import { useValidation } from '~/composables/useValidation'
 import { useUserStore } from '~/stores/useUserStore'
+
+definePageMeta({
+  layout: false
+})
+
 const userStore = useUserStore()
-
-const router = useRouter()
 const route = useRoute()
+const {
+  clearErrors,
+  getError,
+  getPasswordStrength,
+  validateEmail,
+  validateName,
+  validatePassword,
+  validatePasswordConfirmation,
+  validateToken,
+  validateWorkspace
+} = useValidation()
 
-// Step state
 const step = ref<'signup' | 'verify'>('signup')
-const email = ref('')
-const name = ref('')
-const workspace = ref('')
-const password = ref('')
-const passwordConfirm = ref('')
-const otpToken = ref('')
-const loading = computed(() => userStore.isLoading)
-const error = ref('')
+const formError = ref('')
 const successMessage = ref('')
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
 
-// Track registered email for verify step
-const registeredEmail = ref('')
+const signupForm = reactive({
+  name: '',
+  email: '',
+  workspace: '',
+  password: '',
+  password_confirmation: ''
+})
+
+const verifyForm = reactive({
+  email: typeof route.query.email === 'string' ? route.query.email : '',
+  token: typeof route.query.token === 'string' ? route.query.token : ''
+})
+
+const loading = computed(() => userStore.isLoading)
+const passwordStrength = computed(() => getPasswordStrength(signupForm.password))
+
+const isSignupDisabled = computed(() => {
+  return loading.value
+    || !signupForm.name.trim()
+    || !signupForm.email.trim()
+    || !signupForm.workspace.trim()
+    || !signupForm.password
+    || !signupForm.password_confirmation
+})
+
+const isVerifyDisabled = computed(() => {
+  return loading.value || !verifyForm.token.trim()
+})
+
+function validateSignupForm() {
+  clearErrors()
+
+  signupForm.name = signupForm.name.trim()
+  signupForm.email = signupForm.email.trim().toLowerCase()
+  signupForm.workspace = signupForm.workspace.trim()
+
+  const checks = [
+    validateName(signupForm.name, 'name'),
+    validateEmail(signupForm.email, 'email'),
+    validateWorkspace(signupForm.workspace, 'workspace'),
+    validatePassword(signupForm.password, 'password'),
+    validatePasswordConfirmation(signupForm.password, signupForm.password_confirmation, 'password_confirmation')
+  ]
+
+  return checks.every(Boolean)
+}
+
+function validateVerifyForm() {
+  clearErrors()
+  verifyForm.email = verifyForm.email.trim().toLowerCase()
+  const checks = [
+    validateEmail(verifyForm.email, 'verify_email'),
+    validateToken(verifyForm.token, 'token')
+  ]
+
+  return checks.every(Boolean)
+}
 
 async function handleSignup() {
-  error.value = ''
-  const form = {
-    name: name.value,
-    email: email.value,
-    workspace: workspace.value,
-    password: password.value,
-    password_confirmation: passwordConfirm.value,
+  formError.value = ''
+  successMessage.value = ''
+
+  if (!validateSignupForm()) return
+
+  const result = await userStore.register({ ...signupForm })
+
+  if (!result.success) {
+    formError.value = result.error || 'Unable to create your account.'
+    return
   }
-  
-  const result = await userStore.register(form)
-  if (result.success) {
-    registeredEmail.value = email.value
-    step.value = 'verify'
-    successMessage.value = 'Account created! Enter the verification token sent to your email.'
-  } else {
-    error.value = result.error || 'Registration failed'
-  }
+
+  verifyForm.email = signupForm.email
+  verifyForm.token = ''
+  step.value = 'verify'
+  successMessage.value = result.message || 'Check your email for the verification token.'
 }
 
 async function handleVerify() {
-  error.value = ''
-  const result = await userStore.verifySignup(email.value, otpToken.value)
-  if (result.success) {
-    await navigateTo('/dashboard')
-  } else {
-    error.value = result.error || 'Verification failed'
+  formError.value = ''
+
+  if (!validateVerifyForm()) return
+
+  const result = await userStore.verifySignup(verifyForm.email, verifyForm.token.trim())
+
+  if (!result.success) {
+    formError.value = result.error || 'Unable to verify your email.'
+    return
   }
+
+  await navigateTo('/dashboard')
 }
 
-function goBack() {
-  step.value = 'signup'
+function goBackToSignup() {
+  formError.value = ''
   successMessage.value = ''
+  clearErrors()
+  step.value = 'signup'
 }
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-[var(--ui-secondary)]/5 to-[var(--ui-success)]/5">
-    <div class="max-w-md w-full space-y-8">
-      <!-- Header -->
-      <div>
-        <NuxtLink to="/">
-          <div class="mx-auto h-16 w-16 bg-[var(--ui-success)] rounded-2xl flex items-center justify-center mb-6">
-            <Icon name="i-mdi-account-plus" class="w-10 h-10 text-white" />
-          </div>
-        </NuxtLink>
-        <h2 class="mt-6 text-center text-3xl font-bold text-[var(--ui-text-highlighted)]">
-          {{ step === 'signup' ? 'Create Account' : 'Verify Email' }}
-        </h2>
-        <p v-if="step === 'signup'" class="mt-2 text-center text-[var(--ui-text-muted)]">
-          Join ChatSphere in less than a minute.
-        </p>
-        <p v-else class="mt-2 text-center text-[var(--ui-text-muted)]">
-          Check your email for the verification token.
-        </p>
-      </div>
-
-      <!-- Form -->
-      <BaseCard class="p-8">
-        <!-- Success message after signup -->
-        <div v-if="successMessage" class="mb-6 p-4 bg-[var(--ui-success)]/10 border border-[var(--ui-success)]/20 rounded-xl text-[var(--ui-success)]">
-          {{ successMessage }}
-        </div>
-
-        <!-- Signup Form -->
-        <form v-if="step === 'signup'" @submit.prevent="handleSignup" class="space-y-6">
-          <BaseInput
-            v-model="name"
-            label="Full Name"
-            placeholder="John Doe"
-            required
-            icon="i-mdi-account"
-          />
-          <BaseInput
-            v-model="email"
-            label="Email"
-            type="email"
-            placeholder="john@example.com"
-            required
-            autocomplete="email"
-            icon="i-mdi-email"
-          />
-          <BaseInput
-            v-model="workspace"
-            label="Workspace Name"
-            placeholder="My Team"
-            required
-            icon="i-mdi-briefcase"
-          />
-          <BaseInput
-            v-model="password"
-            label="Password"
-            type="password"
-            placeholder="At least 8 characters"
-            required
-            autocomplete="new-password"
-            icon="i-mdi-lock"
-          />
-          <BaseInput
-            v-model="passwordConfirm"
-            label="Confirm Password"
-            type="password"
-            placeholder="Confirm your password"
-            required
-            autocomplete="new-password"
-            icon="i-mdi-lock-check"
-          />
-
-          <BaseButton
-            type="submit"
-            label="Create Account"
-            color="success"
-            :block="true"
-            :loading="loading"
-            size="lg"
-            class="!bg-[var(--ui-success)] hover:shadow-xl"
-          />
-        </form>
-
-        <!-- Verify Form -->
-        <form v-else @submit.prevent="handleVerify" class="space-y-6">
-          <div>
-            <label class="block text-sm font-medium text-[var(--ui-text)] mb-2">
-              Email (pre-filled)
-            </label>
-            <BaseInput
-              v-model="email"
-              type="email"
-              :value="registeredEmail"
-              readonly
-              class="bg-[var(--ui-bg-muted)]"
-            />
-          </div>
-          <BaseInput
-            v-model="otpToken"
-            label="Verification Token"
-            placeholder="Paste token from email"
-            required
-            autocomplete="one-time-code"
-            icon="i-mdi-check-circle"
-          />
-
-          <div class="flex gap-3">
-            <BaseButton
-              type="submit"
-              label="Verify & Continue"
-              color="success"
-              :block="true"
-              :loading="loading"
-              flex="1"
-              class="!bg-[var(--ui-success)]"
-            />
-            <BaseButton
-              type="button"
-              label="Back"
-              color="neutral"
-              variant="outline"
-              @click="goBack"
-              flex="1"
-            />
-          </div>
-        </form>
-
-        <div v-if="error" class="mt-6 p-4 bg-[var(--ui-error)]/10 border border-[var(--ui-error)]/20 rounded-lg text-[var(--ui-error)] text-sm">
-          {{ error }}
-        </div>
-      </BaseCard>
-
-      <!-- Footer -->
-      <div class="text-center">
-        <p v-if="step === 'signup'" class="text-[var(--ui-text-muted)]">
-          Already have an account?
-          <NuxtLink to="/auth/login" class="font-semibold text-[var(--ui-primary)] hover:text-[var(--ui-primary)]/80 ml-1">
-            Sign in
-          </NuxtLink>
-        </p>
-      </div>
+  <AuthLayout
+    :title="step === 'signup' ? 'Create your workspace account' : 'Verify your email'"
+    :subtitle="step === 'signup'
+      ? 'Set up your account and workspace in one clean onboarding flow.'
+      : 'Enter the verification token from your email to activate your account.'"
+    badge="Secure workspace onboarding"
+    gradient="from-[var(--ui-secondary)]/7 via-transparent to-[var(--ui-success)]/10"
+  >
+    <div class="mb-8">
+      <h2 class="text-2xl font-black text-[var(--ui-text-highlighted)]">
+        {{ step === 'signup' ? 'Get started' : 'Email verification' }}
+      </h2>
+      <p class="mt-2 text-[var(--ui-text-muted)]">
+        {{ step === 'signup'
+          ? 'Create your account with a strong password and a clear workspace name.'
+          : 'Verification completes activation and signs you into the app.' }}
+      </p>
     </div>
-  </div>
-</template>
 
+    <div
+      v-if="successMessage"
+      class="mb-6 rounded-2xl border border-[var(--ui-success)]/20 bg-[var(--ui-success)]/8 px-4 py-3 text-sm text-[var(--ui-success)]"
+    >
+      {{ successMessage }}
+    </div>
+
+    <form v-if="step === 'signup'" class="space-y-5" novalidate @submit.prevent="handleSignup">
+      <BaseInput
+        v-model="signupForm.name"
+        label="Full name"
+        name="name"
+        placeholder="John Doe"
+        required
+        icon="i-mdi-account-outline"
+        :error="getError('name')"
+        @blur="validateName(signupForm.name, 'name')"
+      />
+
+      <BaseInput
+        v-model="signupForm.email"
+        label="Work email"
+        name="email"
+        type="email"
+        autocomplete="email"
+        placeholder="john@company.com"
+        required
+        icon="i-mdi-email-outline"
+        :error="getError('email')"
+        @blur="validateEmail(signupForm.email, 'email')"
+      />
+
+      <BaseInput
+        v-model="signupForm.workspace"
+        label="Workspace name"
+        name="workspace"
+        placeholder="Product Team"
+        required
+        icon="i-mdi-briefcase-outline"
+        :error="getError('workspace')"
+        @blur="validateWorkspace(signupForm.workspace, 'workspace')"
+      />
+
+      <div>
+        <BaseInput
+          v-model="signupForm.password"
+          label="Password"
+          name="password"
+          :type="showPassword ? 'text' : 'password'"
+          autocomplete="new-password"
+          placeholder="Create a secure password"
+          required
+          icon="i-mdi-lock-outline"
+          :error="getError('password')"
+          @blur="validatePassword(signupForm.password, 'password')"
+        >
+          <template #trailing>
+            <button
+              type="button"
+              class="flex items-center justify-center text-[var(--ui-text-muted)] transition-colors hover:text-[var(--ui-text)]"
+              aria-label="Toggle password visibility"
+              @click="showPassword = !showPassword"
+            >
+              <Icon :name="showPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
+            </button>
+          </template>
+        </BaseInput>
+
+        <div class="mt-3 flex items-center gap-2">
+          <div class="h-2 flex-1 overflow-hidden rounded-full bg-[var(--ui-bg-muted)]">
+            <div
+              class="h-full rounded-full transition-all duration-300"
+              :class="{
+                'w-1/3 bg-[var(--ui-error)]': passwordStrength === 'weak',
+                'w-2/3 bg-[var(--ui-warning)]': passwordStrength === 'medium',
+                'w-full bg-[var(--ui-success)]': passwordStrength === 'strong'
+              }"
+            />
+          </div>
+          <span class="text-xs font-medium uppercase tracking-[0.12em] text-[var(--ui-text-dimmed)]">
+            {{ passwordStrength }}
+          </span>
+        </div>
+        <p class="mt-2 text-xs text-[var(--ui-text-muted)]">
+          Use at least 8 characters with uppercase, lowercase, a number, and a symbol.
+        </p>
+      </div>
+
+      <BaseInput
+        v-model="signupForm.password_confirmation"
+        label="Confirm password"
+        name="password_confirmation"
+        :type="showConfirmPassword ? 'text' : 'password'"
+        autocomplete="new-password"
+        placeholder="Repeat your password"
+        required
+        icon="i-mdi-lock-check-outline"
+        :error="getError('password_confirmation')"
+        @blur="validatePasswordConfirmation(signupForm.password, signupForm.password_confirmation, 'password_confirmation')"
+      >
+        <template #trailing>
+          <button
+            type="button"
+            class="flex items-center justify-center text-[var(--ui-text-muted)] transition-colors hover:text-[var(--ui-text)]"
+            aria-label="Toggle confirm password visibility"
+            @click="showConfirmPassword = !showConfirmPassword"
+          >
+            <Icon :name="showConfirmPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
+          </button>
+        </template>
+      </BaseInput>
+
+      <div
+        v-if="formError"
+        class="rounded-2xl border border-[var(--ui-error)]/20 bg-[var(--ui-error)]/8 px-4 py-3 text-sm text-[var(--ui-error)]"
+        role="alert"
+      >
+        {{ formError }}
+      </div>
+
+      <BaseButton
+        type="submit"
+        label="Create Account"
+        color="primary"
+        size="lg"
+        :block="true"
+        :loading="loading"
+        :disabled="isSignupDisabled"
+      />
+    </form>
+
+    <form v-else class="space-y-5" novalidate @submit.prevent="handleVerify">
+      <BaseInput
+        v-model="verifyForm.email"
+        label="Email"
+        name="verify_email"
+        type="email"
+        autocomplete="email"
+        placeholder="you@company.com"
+        required
+        icon="i-mdi-email-outline"
+        :error="getError('verify_email')"
+        @blur="validateEmail(verifyForm.email, 'verify_email')"
+      />
+
+      <BaseInput
+        v-model="verifyForm.token"
+        label="Verification token"
+        name="token"
+        placeholder="Paste the token from your email"
+        required
+        icon="i-mdi-shield-key-outline"
+        :error="getError('token')"
+        @blur="validateToken(verifyForm.token, 'token')"
+      />
+
+      <div
+        v-if="formError"
+        class="rounded-2xl border border-[var(--ui-error)]/20 bg-[var(--ui-error)]/8 px-4 py-3 text-sm text-[var(--ui-error)]"
+        role="alert"
+      >
+        {{ formError }}
+      </div>
+
+      <div class="flex flex-col gap-3 sm:flex-row">
+        <BaseButton
+          type="submit"
+          label="Verify and Continue"
+          color="primary"
+          size="lg"
+          :block="true"
+          :loading="loading"
+          :disabled="isVerifyDisabled"
+        />
+        <BaseButton
+          type="button"
+          label="Back"
+          color="neutral"
+          variant="soft"
+          size="lg"
+          :block="true"
+          @click="goBackToSignup"
+        />
+      </div>
+    </form>
+
+    <div v-if="step === 'signup'" class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]">
+      Already have an account?
+      <NuxtLink to="/auth/login" class="ml-1 font-semibold text-[var(--ui-primary)] hover:opacity-75">
+        Sign in
+      </NuxtLink>
+    </div>
+
+    <div v-else class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]">
+      Need a different email?
+      <button type="button" class="ml-1 font-semibold text-[var(--ui-primary)] hover:opacity-75" @click="goBackToSignup">
+        Edit details
+      </button>
+    </div>
+  </AuthLayout>
+</template>

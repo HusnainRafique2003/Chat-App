@@ -12,11 +12,18 @@ const workspacesApiClient = axios.create({
   },
 })
 
-// Request interceptor for auth token
+// Request interceptor for auth token - client-side only
 workspacesApiClient.interceptors.request.use((config) => {
-  const token = useUserStore().token
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  if (process.client) {
+    const userStore = useUserStore()
+    const token = userStore.token
+    console.log('Workspaces interceptor token:', token ? token.slice(0,10) + '...' : 'missing')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+      config.headers.token = token
+    }
+  } else {
+    console.log('Workspaces interceptor SSR - no token')
   }
   return config
 })
@@ -94,4 +101,3 @@ export async function removeMembersFromWorkspace(data: { workspace_id: string, u
 }
 
 export { workspacesApiClient }
-

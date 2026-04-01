@@ -2,23 +2,14 @@
 import { useUserStore } from '~/stores/useUserStore'
 
 const userStore = useUserStore()
-const route = useRoute()
-const router = useRouter()
 
 const navItems = [
   { label: 'Home', icon: 'i-mdi-home', to: '/' },
-  { label: 'Features', icon: 'i-mdi-lightning-bolt', to: '/features' }, // stub
+  { label: 'Features', icon: 'i-mdi-lightning-bolt', to: '/#features' },
+  { label: 'Reviews', icon: 'i-mdi-star-four-points', to: '/#reviews' },
+  { label: 'Get Started', icon: 'i-mdi-rocket-launch', to: '/#get-started' }
 ]
 
-function handleLogin() {
-  router.push('/auth/login')
-}
-function handleRegister() {
-  router.push('/auth/register')
-}
-function handleDashboard() {
-  router.push('/dashboard')
-}
 function handleLogout() {
   userStore.logout()
 }
@@ -55,7 +46,7 @@ function handleLogout() {
                 label="Dashboard" 
                 size="sm" 
                 color="primary" 
-                @click="handleDashboard"
+                to="/dashboard"
               />
               <BaseButton 
                 label="Logout" 
@@ -71,13 +62,13 @@ function handleLogout() {
                 size="sm" 
                 color="secondary" 
                 variant="outline"
-                @click="handleLogin"
+                to="/auth/login"
               />
               <BaseButton 
                 label="Sign Up" 
                 size="sm" 
                 color="primary"
-                @click="handleRegister"
+                to="/auth/register"
               />
             </template>
             <ColorModeButton class="ml-2" />
@@ -109,9 +100,9 @@ function handleLogout() {
           <div>
             <h4 class="font-semibold text-[var(--ui-text)] mb-4">Product</h4>
             <ul class="space-y-2 text-sm">
-              <li><NuxtLink to="/features" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Features</NuxtLink></li>
-              <li><NuxtLink to="/pricing" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Pricing</NuxtLink></li>
-              <li><NuxtLink to="/docs" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Documentation</NuxtLink></li>
+              <li><NuxtLink to="/#features" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Features</NuxtLink></li>
+              <li><NuxtLink to="/#reviews" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Reviews</NuxtLink></li>
+              <li><NuxtLink to="/#get-started" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Get Started</NuxtLink></li>
             </ul>
           </div>
 
@@ -141,4 +132,3 @@ function handleLogout() {
     </footer>
   </div>
 </template>
-

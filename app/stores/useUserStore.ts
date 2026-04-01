@@ -1,9 +1,6 @@
 import { defineStore } from 'pinia'
-import { postApi, type ApiResponse } from '~/composables/useApi'
+import { postApi, type ApiEnvelope } from '~/composables/useApi'
 
-const API_BASE = 'http://178.104.58.236/api/auth'
-
-// API User type
 export interface ApiUser {
   id: string
   name: string
@@ -14,61 +11,92 @@ export interface ApiUser {
   updated_at: string
 }
 
+interface AuthUserPayload {
+  user: ApiUser
+}
+
 interface UserState {
   user: ApiUser | null
   token: string | null
   isLoading: boolean
 }
 
+function extractMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  return fallback
+}
+
 export const useUserStore = defineStore('user', {
   state: (): UserState => ({
     user: null,
     token: null,
-    isLoading: false,
+    isLoading: false
   }),
 
   getters: {
-    isLoggedIn: (state): boolean => !!state.user?.is_active && !!state.token,
+    isLoggedIn: (state) => Boolean(state.user?.is_active && state.token)
   },
+
+  persist: true,
 
   actions: {
     setAuth(user: ApiUser) {
       this.user = user
-      if (user.access_token) {
-        this.token = user.access_token
-      }
+      this.token = user.access_token ?? null
+    },
+
+    clearAuth() {
+      this.user = null
+      this.token = null
     },
 
     async login(email: string, password: string) {
       this.isLoading = true
+
       try {
-        const response = await postApi<ApiResponse<ApiUser>>('/login', { email, password })
-        const data = response.data as ApiResponse<ApiUser>
-        if (data.success) {
-          this.setAuth(data.data.user)
-          console.log(data.message || 'Login successful')
-          return { success: true }
+        const response = await postApi<ApiEnvelope<AuthUserPayload>>('/login', { email, password })
+        const payload = response.data
+
+        if (!payload.success || !payload.data?.user) {
+          return { success: false, error: payload.message || 'Login failed' }
         }
-      } catch (error: any) {
-        console.error(error.message || 'Login failed')
-        return { success: false, error: error.message }
+
+        this.setAuth(payload.data.user)
+        return { success: true, message: payload.message || 'Login successful' }
+      } catch (error) {
+        return { success: false, error: extractMessage(error, 'Login failed') }
       } finally {
         this.isLoading = false
       }
     },
 
-    async register(form: { name: string, email: string, workspace: string, password: string, password_confirmation: string }) {
+    async register(form: {
+      name: string
+      email: string
+      workspace: string
+      password: string
+      password_confirmation: string
+    }) {
       this.isLoading = true
+
       try {
-        const response = await postApi<ApiResponse<ApiUser>>('/signup', form)
-        const data = response.data as ApiResponse<ApiUser>
-        if (data.success) {
-          console.log('Account created! Check your email to verify.')
-          return { success: true }
+        const response = await postApi<ApiEnvelope<AuthUserPayload>>('/signup', form)
+        const payload = response.data
+
+        if (!payload.success) {
+          return { success: false, error: payload.message || 'Registration failed' }
         }
-      } catch (error: any) {
-        console.error(error.message || 'Registration failed')
-        return { success: false, error: error.message }
+
+        return {
+          success: true,
+          message: payload.message || 'User registered successfully. Please check your email for verification.',
+          user: payload.data?.user ?? null
+        }
+      } catch (error) {
+        return { success: false, error: extractMessage(error, 'Registration failed') }
       } finally {
         this.isLoading = false
       }
@@ -76,17 +104,19 @@ export const useUserStore = defineStore('user', {
 
     async verifySignup(email: string, token: string) {
       this.isLoading = true
+
       try {
-        const response = await postApi<ApiResponse<ApiUser>>('/verify-signup', { email, token })
-        const data = response.data as ApiResponse<ApiUser>
-        if (data.success) {
-          this.setAuth(data.data.user)
-          console.log('Email verified!')
-          return { success: true }
+        const response = await postApi<ApiEnvelope<AuthUserPayload>>('/verify-signup', { email, token })
+        const payload = response.data
+
+        if (!payload.success || !payload.data?.user) {
+          return { success: false, error: payload.message || 'Verification failed' }
         }
-      } catch (error: any) {
-        console.error(error.message || 'Verification failed')
-        return { success: false, error: error.message }
+
+        this.setAuth(payload.data.user)
+        return { success: true, message: payload.message || 'Email verified successfully. You can now login.' }
+      } catch (error) {
+        return { success: false, error: extractMessage(error, 'Verification failed') }
       } finally {
         this.isLoading = false
       }
@@ -94,16 +124,18 @@ export const useUserStore = defineStore('user', {
 
     async forgotPassword(email: string) {
       this.isLoading = true
+
       try {
-        const response = await postApi('/forgot-password', { email })
-        const data = response.data as ApiResponse<any>
-        if (data.success) {
-          console.log('Password reset email sent!')
-          return { success: true }
+        const response = await postApi<ApiEnvelope<null>>('/forgot-password', { email })
+        const payload = response.data
+
+        if (!payload.success) {
+          return { success: false, error: payload.message || 'Failed to send reset email' }
         }
-      } catch (error: any) {
-        console.error(error.message || 'Failed to send reset email')
-        return { success: false, error: error.message }
+
+        return { success: true, message: payload.message || 'Password reset link sent to your email' }
+      } catch (error) {
+        return { success: false, error: extractMessage(error, 'Failed to send reset email') }
       } finally {
         this.isLoading = false
       }
@@ -111,38 +143,37 @@ export const useUserStore = defineStore('user', {
 
     async resetPassword(token: string, password: string, password_confirmation: string) {
       this.isLoading = true
+
       try {
-        const response = await postApi('/reset-password', { token, password, password_confirmation })
-        const data = response.data as ApiResponse<any>
-        if (data.success) {
-          console.log('Password reset successful!')
-          return { success: true }
+        const response = await postApi<ApiEnvelope<null>>('/reset-password', { token, password, password_confirmation })
+        const payload = response.data
+
+        if (!payload.success) {
+          return { success: false, error: payload.message || 'Password reset failed' }
         }
-      } catch (error: any) {
-        console.error(error.message || 'Password reset failed')
-        return { success: false, error: error.message }
+
+        return { success: true, message: payload.message || 'Password reset successfully' }
+      } catch (error) {
+        return { success: false, error: extractMessage(error, 'Password reset failed') }
       } finally {
         this.isLoading = false
       }
     },
 
     async logout() {
-      if (!this.token) return
-      try {
-        await postApi('/logout')
-      } catch {
-        // Ignore logout errors
-      } finally {
-        this.user = null
-        this.token = null
+      if (!this.token) {
+        this.clearAuth()
+        return { success: true }
       }
-      console.log('Logged out successfully')
-    },
 
-    $reset() {
-      this.user = null
-      this.token = null
-      this.isLoading = false
-    },
-  },
+      try {
+        await postApi<ApiEnvelope<null>>('/logout', {})
+        return { success: true }
+      } catch {
+        return { success: false }
+      } finally {
+        this.clearAuth()
+      }
+    }
+  }
 })

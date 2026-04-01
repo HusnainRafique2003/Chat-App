@@ -1,34 +1,23 @@
-# Chat App Implementation TODO
+# Nuxt Dev Server Fix - TODO Steps
 
-## Plan Overview
-Transform to chat app with landing page, auth (login/register/verify/forgot/reset), API integration.
+## Plan Status: Approved ✅
 
-## Steps (0/14 completed)
+**Step 1: Create TODO.md** ⭕ (current)
 
-### Phase 1: Layout & Main Page (fix hydration)
-- [x] 1. Create app/layouts/default.vue (navbar w/ auth state, footer)
-- [x] 2. Update app/app.vue to use default layout
-- [x] 3. Transform app/pages/index.vue to landing page (hero, features, stats, CTAs, remove demo)
+**Step 2: Fix CSS warnings in main.css** ✅
+- Move @import fonts to TOP
+- Fix .truncate-2: display: box → display: flex
 
-### Phase 2: API & Stores
-- [x] 4. Extend app/composables/useApi.ts (add post(), auth headers)
-- [ ] 5. Update app/stores/useUserStore.ts (real auth actions: login/register/verify etc.)
-- [ ] 6. Update app/stores/useSessionStore.ts (temp state for OTP etc.)
+**Step 3: Update nuxt.config.ts** ✅
+- Remove/comment vite.optimizeDeps.include
 
-### Phase 3: Auth Pages
-- [x] 7. Create app/pages/auth/login.vue
-- [x] 8. Create app/pages/auth/register.vue (signup + verify flow)
-- [x] 9. Create app/pages/auth/forgot-password.vue
-- [x] 10. Create app/pages/auth/reset-password.vue
+**Step 4: Clean cache & reinstall** ✅
+- Kill dev servers (Ctrl+C)
+- `pnpm store prune && rm -rf .nuxt node_modules/.vite && pnpm i`
 
-### Phase 4: Routing & Protected
-- [x] 11. Create app/pages/dashboard.vue (stub)
-- [x] 12. Create app/middleware/auth.global.ts (protect dashboard)
-- [ ] 13. Add route rules in nuxt.config if needed
+**Step 5: Test dev server** 🔄
+- `pnpm dev`
+- Check http://localhost:3000/
 
-### Phase 5: Test & Polish
-- [x] 14. Test API calls, hydration fixed, responsive design
+**Step 6: Complete** ⭕
 
-✅ **ALL STEPS COMPLETE!**
-
-**Next: Step 1**

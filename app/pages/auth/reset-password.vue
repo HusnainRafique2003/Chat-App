@@ -1,110 +1,209 @@
 <script setup lang="ts">
+import AuthLayout from '~/layouts/AuthLayout.vue'
+import { useValidation } from '~/composables/useValidation'
 import { useUserStore } from '~/stores/useUserStore'
-const userStore = useUserStore()
+
+definePageMeta({
+  layout: false
+})
 
 const route = useRoute()
-const router = useRouter()
+const userStore = useUserStore()
+const {
+  clearErrors,
+  getError,
+  getPasswordStrength,
+  validatePassword,
+  validatePasswordConfirmation,
+  validateToken
+} = useValidation()
 
-const token = ref(route.query.token as string || '')
+const token = ref(typeof route.query.token === 'string' ? route.query.token : '')
 const password = ref('')
-const passwordConfirm = ref('')
-const loading = computed(() => userStore.isLoading)
-const error = ref('')
-const success = ref(false)
+const passwordConfirmation = ref('')
+const showPassword = ref(false)
+const showPasswordConfirmation = ref(false)
+const successMessage = ref('')
+const formError = ref('')
 
-async function handleReset() {
-  error.value = ''
-  const result = await userStore.resetPassword(token.value, password.value, passwordConfirm.value)
-  if (result.success) {
-    success.value = true
-  } else {
-    error.value = result.error || 'Reset failed'
+const loading = computed(() => userStore.isLoading)
+const passwordStrength = computed(() => getPasswordStrength(password.value))
+const isSubmitDisabled = computed(() => loading.value || !token.value.trim() || !password.value || !passwordConfirmation.value)
+
+function handleTokenBlur() {
+  validateToken(token.value, 'token')
+}
+
+function handlePasswordBlur() {
+  validatePassword(password.value, 'password')
+}
+
+function handlePasswordConfirmationBlur() {
+  validatePasswordConfirmation(password.value, passwordConfirmation.value, 'password_confirmation')
+}
+
+async function handleSubmit() {
+  formError.value = ''
+  successMessage.value = ''
+  clearErrors()
+
+  token.value = token.value.trim()
+
+  const checks = [
+    validateToken(token.value, 'token'),
+    validatePassword(password.value, 'password'),
+    validatePasswordConfirmation(password.value, passwordConfirmation.value, 'password_confirmation')
+  ]
+
+  if (!checks.every(Boolean)) return
+
+  const result = await userStore.resetPassword(token.value, password.value, passwordConfirmation.value)
+
+  if (!result.success) {
+    formError.value = result.error || 'Unable to reset your password.'
+    return
   }
+
+  successMessage.value = result.message || 'Password reset successfully'
 }
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-[var(--ui-warning)]/5 to-[var(--ui-error)]/5">
-    <div class="max-w-md w-full space-y-8">
-      <!-- Header -->
-      <div>
-        <NuxtLink to="/">
-          <div class="mx-auto h-16 w-16 bg-[var(--ui-warning)] rounded-2xl flex items-center justify-center mb-6">
-            <Icon name="i-mdi-key-change" class="w-10 h-10 text-white" />
-          </div>
-        </NuxtLink>
-        <h2 class="mt-6 text-center text-3xl font-bold text-[var(--ui-text-highlighted)]">
-          Reset Password
-        </h2>
-        <p class="mt-2 text-center text-[var(--ui-text-muted)]">
-          Enter your new password.
-        </p>
-      </div>
-
-      <!-- Form -->
-      <BaseCard class="p-8">
-        <!-- Success State -->
-        <div v-if="success" class="text-center">
-          <div class="w-24 h-24 mx-auto mb-6 bg-[var(--ui-success)]/20 rounded-2xl flex items-center justify-center">
-            <Icon name="i-mdi-check-circle" class="w-12 h-12 text-[var(--ui-success)]" />
-          </div>
-          <h3 class="text-2xl font-bold text-[var(--ui-success)] mb-6">Password Reset Successful!</h3>
-          <BaseButton label="Sign In" color="primary" size="lg" :block="true" to="/auth/login" />
-        </div>
-
-        <!-- Form State -->
-        <form v-else @submit.prevent="handleReset" class="space-y-6">
-          <BaseInput
-            v-model="token"
-            label="Reset Token"
-            placeholder="Paste token from email"
-            required
-            autocomplete="one-time-code"
-            icon="i-mdi-key"
-          />
-          <BaseInput
-            v-model="password"
-            label="New Password"
-            type="password"
-            placeholder="New secure password"
-            required
-            autocomplete="new-password"
-            icon="i-mdi-lock"
-          />
-          <BaseInput
-            v-model="passwordConfirm"
-            label="Confirm Password"
-            type="password"
-            placeholder="Confirm new password"
-            required
-            autocomplete="new-password"
-            icon="i-mdi-lock-check"
-          />
-
-          <BaseButton
-            type="submit"
-            label="Reset Password"
-            color="warning"
-            :block="true"
-            :loading="loading"
-            size="lg"
-            class="!bg-[var(--ui-warning)] hover:shadow-xl"
-          />
-
-          <div v-if="error" class="text-[var(--ui-error)] text-sm text-center bg-[var(--ui-error)]/10 p-3 rounded-lg border border-[var(--ui-error)]/20">
-            {{ error }}
-          </div>
-        </form>
-      </BaseCard>
-
-      <div class="text-center">
-        <p class="text-[var(--ui-text-muted)]">
-          <NuxtLink to="/auth/login" class="font-semibold text-[var(--ui-primary)] hover:text-[var(--ui-primary)]/80">
-            Back to Sign In
-          </NuxtLink>
-        </p>
-      </div>
+  <AuthLayout
+    title="Choose a new password"
+    subtitle="Finish recovery with a secure password that protects your workspace account."
+    badge="Reset access securely"
+    gradient="from-[var(--ui-warning)]/7 via-transparent to-[var(--ui-secondary)]/10"
+  >
+    <div class="mb-8">
+      <h2 class="text-2xl font-black text-[var(--ui-text-highlighted)]">Set a new password</h2>
+      <p class="mt-2 text-[var(--ui-text-muted)]">Use a strong password that you have not used elsewhere.</p>
     </div>
-  </div>
-</template>
 
+    <div
+      v-if="successMessage"
+      class="mb-6 rounded-2xl border border-[var(--ui-success)]/20 bg-[var(--ui-success)]/8 px-4 py-3 text-sm text-[var(--ui-success)]"
+    >
+      {{ successMessage }}
+    </div>
+
+    <div v-if="successMessage" class="space-y-5">
+      <div class="rounded-2xl border border-[var(--ui-success)]/20 bg-[var(--ui-success)]/8 px-4 py-4 text-sm text-[var(--ui-success)]">
+        {{ successMessage }}
+      </div>
+
+      <BaseButton
+        label="Back to Sign In"
+        to="/auth/login"
+        color="primary"
+        size="lg"
+        :block="true"
+      />
+    </div>
+
+    <form v-else class="space-y-5" novalidate @submit.prevent="handleSubmit">
+      <BaseInput
+        v-model="token"
+        label="Reset token"
+        name="token"
+        autocomplete="one-time-code"
+        placeholder="Paste your reset token"
+        required
+        icon="i-mdi-key-outline"
+        :error="getError('token')"
+        @blur="handleTokenBlur"
+      />
+
+      <div>
+        <BaseInput
+          v-model="password"
+          label="New password"
+          name="password"
+          :type="showPassword ? 'text' : 'password'"
+          autocomplete="new-password"
+          placeholder="Create a secure password"
+          required
+          icon="i-mdi-lock-outline"
+          :error="getError('password')"
+          @blur="handlePasswordBlur"
+        >
+          <template #trailing>
+            <button
+              type="button"
+              class="flex items-center justify-center text-[var(--ui-text-muted)] transition-colors hover:text-[var(--ui-text)]"
+              aria-label="Toggle password visibility"
+              @click="showPassword = !showPassword"
+            >
+              <Icon :name="showPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
+            </button>
+          </template>
+        </BaseInput>
+
+        <div class="mt-3 flex items-center gap-2">
+          <div class="h-2 flex-1 overflow-hidden rounded-full bg-[var(--ui-bg-muted)]">
+            <div
+              class="h-full rounded-full transition-all duration-300"
+              :class="{
+                'w-1/3 bg-[var(--ui-error)]': passwordStrength === 'weak',
+                'w-2/3 bg-[var(--ui-warning)]': passwordStrength === 'medium',
+                'w-full bg-[var(--ui-success)]': passwordStrength === 'strong'
+              }"
+            />
+          </div>
+          <span class="text-xs font-medium uppercase tracking-[0.12em] text-[var(--ui-text-dimmed)]">
+            {{ passwordStrength }}
+          </span>
+        </div>
+      </div>
+
+      <BaseInput
+        v-model="passwordConfirmation"
+        label="Confirm new password"
+        name="password_confirmation"
+        :type="showPasswordConfirmation ? 'text' : 'password'"
+        autocomplete="new-password"
+        placeholder="Repeat the new password"
+        required
+        icon="i-mdi-lock-check-outline"
+        :error="getError('password_confirmation')"
+        @blur="handlePasswordConfirmationBlur"
+      >
+        <template #trailing>
+          <button
+            type="button"
+            class="flex items-center justify-center text-[var(--ui-text-muted)] transition-colors hover:text-[var(--ui-text)]"
+            aria-label="Toggle confirm password visibility"
+            @click="showPasswordConfirmation = !showPasswordConfirmation"
+          >
+            <Icon :name="showPasswordConfirmation ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
+          </button>
+        </template>
+      </BaseInput>
+
+      <div
+        v-if="formError"
+        class="rounded-2xl border border-[var(--ui-error)]/20 bg-[var(--ui-error)]/8 px-4 py-3 text-sm text-[var(--ui-error)]"
+        role="alert"
+      >
+        {{ formError }}
+      </div>
+
+      <BaseButton
+        type="submit"
+        label="Reset Password"
+        color="primary"
+        size="lg"
+        :block="true"
+        :loading="loading"
+        :disabled="isSubmitDisabled"
+      />
+    </form>
+
+    <div v-if="!successMessage" class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]">
+      Return to
+      <NuxtLink to="/auth/login" class="ml-1 font-semibold text-[var(--ui-primary)] hover:opacity-75">
+        sign in
+      </NuxtLink>
+    </div>
+  </AuthLayout>
+</template>

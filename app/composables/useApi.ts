@@ -1,7 +1,6 @@
 import type { AxiosRequestConfig, AxiosResponse } from 'axios'
 import axios from 'axios'
 
-// Auth base URL
 const API_BASE = 'http://178.104.58.236/api/auth'
 
 // Global axios instance with interceptors
@@ -12,11 +11,14 @@ const apiClient = axios.create({
   },
 })
 
-// Request interceptor for auth token
 apiClient.interceptors.request.use((config) => {
-  const token = useUserStore().token
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  if (process.client) {
+    const userStore = useUserStore()
+    const token = userStore.token
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+      config.headers.token = token
+    }
   }
   return config
 })
@@ -72,14 +74,16 @@ export function useApi<T = unknown>(url: string, config?: AxiosRequestConfig) {
   return { data, error, loading, fetch, abort }
 }
 
-// New POST function for auth APIs
-export async function postApi<T = unknown>(url: string, data: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+export async function postApi<T = unknown>(url: string, data: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
   try {
     const response = await apiClient.post<T>(url, data, config)
     return response
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.message || error.message)
+      const message = typeof error.response?.data?.message === 'string'
+        ? error.response.data.message
+        : error.message
+      throw new Error(message || 'Request failed')
     }
     throw error
   }
@@ -89,9 +93,8 @@ export async function postApi<T = unknown>(url: string, data: any, config?: Axio
 export { apiClient }
 
 // Types
-export interface ApiResponse<T> {
+export interface ApiEnvelope<T> {
   success: boolean
   message: string
   data: T
 }
-

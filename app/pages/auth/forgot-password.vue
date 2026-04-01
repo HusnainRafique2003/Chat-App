@@ -1,94 +1,103 @@
 <script setup lang="ts">
+import AuthLayout from '~/layouts/AuthLayout.vue'
+import { useValidation } from '~/composables/useValidation'
 import { useUserStore } from '~/stores/useUserStore'
-const userStore = useUserStore()
 
-const router = useRouter()
+definePageMeta({
+  layout: false
+})
+
+const userStore = useUserStore()
+const { clearErrors, getError, validateEmail } = useValidation()
 
 const email = ref('')
-const loading = computed(() => userStore.isLoading)
-const error = ref('')
-const success = ref(false)
-const message = ref('')
+const successMessage = ref('')
+const formError = ref('')
 
-async function handleForgot() {
-  error.value = ''
+const loading = computed(() => userStore.isLoading)
+const isSubmitDisabled = computed(() => loading.value || !email.value.trim())
+
+function handleEmailBlur() {
+  validateEmail(email.value, 'email')
+}
+
+async function handleSubmit() {
+  formError.value = ''
+  successMessage.value = ''
+  clearErrors()
+
+  email.value = email.value.trim().toLowerCase()
+
+  if (!validateEmail(email.value, 'email')) return
+
   const result = await userStore.forgotPassword(email.value)
-  if (result.success) {
-    success.value = true
-    message.value = 'Password reset link sent to your email!'
-  } else {
-    error.value = result.error || 'Failed to send email'
+
+  if (!result.success) {
+    formError.value = result.error || 'Unable to send a reset link right now.'
+    return
   }
+
+  successMessage.value = result.message || 'Password reset link sent to your email'
 }
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-[var(--ui-warning)]/5 to-[var(--ui-error)]/5">
-    <div class="max-w-md w-full space-y-8">
-      <!-- Header -->
-      <div>
-        <NuxtLink to="/">
-          <div class="mx-auto h-16 w-16 bg-[var(--ui-warning)] rounded-2xl flex items-center justify-center mb-6">
-            <Icon name="i-mdi-lock-reset" class="w-10 h-10 text-white" />
-          </div>
-        </NuxtLink>
-        <h2 class="mt-6 text-center text-3xl font-bold text-[var(--ui-text-highlighted)]">
-          Forgot Password?
-        </h2>
-        <p class="mt-2 text-center text-[var(--ui-text-muted)]">
-          Enter your email and we'll send you a reset link.
-        </p>
-      </div>
-
-      <!-- Form -->
-      <BaseCard class="p-8">
-        <!-- Success State -->
-        <div v-if="success" class="text-center">
-          <div class="w-24 h-24 mx-auto mb-6 bg-[var(--ui-success)]/20 rounded-2xl flex items-center justify-center">
-            <Icon name="i-mdi-email-check" class="w-12 h-12 text-[var(--ui-success)]" />
-          </div>
-          <h3 class="text-2xl font-bold text-[var(--ui-success)] mb-4">{{ message }}</h3>
-          <BaseButton label="Back to Login" color="primary" to="/auth/login" />
-        </div>
-
-        <!-- Form State -->
-        <form v-else @submit.prevent="handleForgot" class="space-y-6">
-          <BaseInput
-            v-model="email"
-            label="Email"
-            type="email"
-            placeholder="your@email.com"
-            required
-            autocomplete="email"
-            icon="i-mdi-email"
-          />
-
-          <BaseButton
-            type="submit"
-            label="Send Reset Link"
-            color="warning"
-            :block="true"
-            :loading="loading"
-            size="lg"
-            class="!bg-[var(--ui-warning)] hover:shadow-xl"
-          />
-
-          <div v-if="error" class="text-[var(--ui-error)] text-sm text-center bg-[var(--ui-error)]/10 p-3 rounded-lg border border-[var(--ui-error)]/20">
-            {{ error }}
-          </div>
-        </form>
-      </BaseCard>
-
-      <!-- Footer -->
-      <div class="text-center">
-        <p class="text-[var(--ui-text-muted)]">
-          Remember your password?
-          <NuxtLink to="/auth/login" class="font-semibold text-[var(--ui-primary)] hover:text-[var(--ui-primary)]/80 ml-1">
-            Sign in
-          </NuxtLink>
-        </p>
-      </div>
+  <AuthLayout
+    title="Reset your password"
+    subtitle="We&apos;ll send a reset link to the email address attached to your workspace account."
+    badge="Password recovery"
+    gradient="from-[var(--ui-warning)]/7 via-transparent to-[var(--ui-error)]/10"
+  >
+    <div class="mb-8">
+      <h2 class="text-2xl font-black text-[var(--ui-text-highlighted)]">Forgot password</h2>
+      <p class="mt-2 text-[var(--ui-text-muted)]">Enter your work email and we&apos;ll guide you back into the app.</p>
     </div>
-  </div>
-</template>
 
+    <div
+      v-if="successMessage"
+      class="mb-6 rounded-2xl border border-[var(--ui-success)]/20 bg-[var(--ui-success)]/8 px-4 py-3 text-sm text-[var(--ui-success)]"
+    >
+      {{ successMessage }}
+    </div>
+
+    <form class="space-y-5" novalidate @submit.prevent="handleSubmit">
+      <BaseInput
+        v-model="email"
+        label="Work email"
+        name="email"
+        type="email"
+        autocomplete="email"
+        placeholder="you@company.com"
+        required
+        icon="i-mdi-email-outline"
+        :error="getError('email')"
+        @blur="handleEmailBlur"
+      />
+
+      <div
+        v-if="formError"
+        class="rounded-2xl border border-[var(--ui-error)]/20 bg-[var(--ui-error)]/8 px-4 py-3 text-sm text-[var(--ui-error)]"
+        role="alert"
+      >
+        {{ formError }}
+      </div>
+
+      <BaseButton
+        type="submit"
+        label="Send Reset Link"
+        color="primary"
+        size="lg"
+        :block="true"
+        :loading="loading"
+        :disabled="isSubmitDisabled"
+      />
+    </form>
+
+    <div class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]">
+      Remembered your password?
+      <NuxtLink to="/auth/login" class="ml-1 font-semibold text-[var(--ui-primary)] hover:opacity-75">
+        Sign in
+      </NuxtLink>
+    </div>
+  </AuthLayout>
+</template>

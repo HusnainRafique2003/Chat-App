@@ -1,7 +1,9 @@
 export default defineNuxtRouteMiddleware((to) => {
-  if (import.meta.server || process.client) return
-  
+  if (process.server) return // Skip SSR
+
   const userStore = useUserStore()
+  
+  console.log('Auth middleware - isLoggedIn:', userStore.isLoggedIn, 'path:', to.path)
   
   // Skip auth check if already logged in
   if (userStore.isLoggedIn) return
@@ -11,8 +13,6 @@ export default defineNuxtRouteMiddleware((to) => {
   if (publicPages.includes(to.path)) return
   
   // Redirect to login for protected routes
-  if (to.path.startsWith('/dashboard')) {
-    return navigateTo('/auth/login')
-  }
+  return navigateTo('/auth/login')
 })
 

@@ -3,8 +3,9 @@ import * as locales from '@nuxt/ui/locale'
 
 const { locale } = useI18n()
 
-const lang = computed(() => locales[locale.value]?.code ?? 'en')
-const dir = computed(() => locales[locale.value]?.dir ?? 'ltr')
+const uiLocale = computed(() => locales[locale.value] ?? locales.en)
+const lang = computed(() => uiLocale.value.code ?? 'en')
+const dir = computed(() => uiLocale.value.dir ?? 'ltr')
 
 useHead({
   htmlAttrs: { lang, dir }
@@ -12,9 +13,9 @@ useHead({
 </script>
 
 <template>
-<NuxtLayout>
-    <UApp :locale="locales[locale]">
-      <NuxtPage />
-    </UApp>
-  </NuxtLayout>
+  <UApp :locale="uiLocale">
+    <NuxtLayout>
+      <NuxtPage :page-key="route => route.fullPath" />
+    </NuxtLayout>
+  </UApp>
 </template>

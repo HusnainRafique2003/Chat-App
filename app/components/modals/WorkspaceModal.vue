@@ -130,7 +130,7 @@ function handleSubmit() {
           <p class="text-sm font-medium text-default">Private Workspace</p>
           <p class="text-xs text-muted">Only invited members can join.</p>
         </div>
-        <UToggle v-model="form.isPrivate" color="primary" />
+<input type="checkbox" v-model="form.isPrivate" class="toggle toggle-primary" />
       </div>
 
     </div>

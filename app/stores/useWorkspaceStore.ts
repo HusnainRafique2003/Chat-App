@@ -1,5 +1,13 @@
 import { defineStore } from 'pinia'
 import type { ApiUser } from '~/stores/useUserStore'
+import {
+  addMembersToWorkspace,
+  createWorkspace,
+  deleteWorkspace,
+  getWorkspaces,
+  removeMembersFromWorkspace,
+  updateWorkspace
+} from '~/composables/useWorkspacesApi'
 
 export interface Workspace {
   id: string
@@ -40,6 +48,7 @@ async fetchWorkspaces() {
       try {
         const response = await getWorkspaces()
         const data = response.data
+        console.log('Workspaces response:', data)
         if (data.success) {
           this.workspaces = data.data.workspaces || []
           if (this.workspaces.length > 0 && !this.currentWorkspaceId) {
@@ -154,6 +163,9 @@ async createWorkspace(form: WorkspacePayload) {
     setCurrentWorkspace(id: string) {
       this.currentWorkspaceId = id
     },
+
+    clearCurrentWorkspace() {
+      this.currentWorkspaceId = null
+    },
   },
 })
-
