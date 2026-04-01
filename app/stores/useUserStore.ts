@@ -1,52 +1,43 @@
 import { defineStore } from 'pinia'
 
+// Updated to match your backend auth response perfectly
 export interface UserInfo {
+  id: string
   name: string
-  age: number
   email: string
+  is_active: boolean
+  access_token: string
 }
 
 interface UserState {
   user: UserInfo | null
   userList: UserInfo[]
-  isAdmin: boolean
-  visitCount: number
 }
 
 export const useUserStore = defineStore('user', {
   state: (): UserState => ({
     user: null,
     userList: [],
-    isAdmin: false,
-    visitCount: 0,
   }),
 
   getters: {
-    isLoggedIn: (state): boolean => state.user !== null,
-    fullGreeting: (state): string =>
-      state.user ? `Welcome back, ${state.user.name}!` : 'You are not logged in.',
+    isLoggedIn: (state): boolean => !!state.user?.access_token,
   },
 
   actions: {
+    // Call this when your login API request succeeds
     login(info: UserInfo) {
       this.user = info
-      this.isAdmin = info.email.includes('admin')
-      this.visitCount++
     },
     logout() {
       this.user = null
-      this.isAdmin = false
-    },
-    addToList(info: UserInfo) {
-      this.userList.push(info)
     },
     $reset() {
       this.user = null
       this.userList = []
-      this.isAdmin = false
-      this.visitCount = 0
     },
   },
 
-  persist: true,
+  // This ensures the token survives page refreshes!
+  persist: true, 
 })

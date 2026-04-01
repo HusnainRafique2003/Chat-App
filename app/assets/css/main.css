@@ -2,25 +2,25 @@
 @import "@nuxt/ui";
 
 :root {
-  /* Light mode colors */
-  --ui-bg: #ffffff;
-  --ui-bg-muted: #f4f4f5;
-  --ui-bg-elevated: #e4e4e7;
-  --ui-bg-accented: #d4d4d8;
+  /* Tactile Theme - Light mode colors */
+  --ui-bg: #eeede9;
+  --ui-bg-muted: #e5e4e0;
+  --ui-bg-elevated: #dfdeda;
+  --ui-bg-accented: #d5d4d0;
 
-  --ui-text: #18181b;
-  --ui-text-muted: #71717a;
-  --ui-text-dimmed: #a1a1aa;
-  --ui-text-highlighted: #09090b;
+  --ui-text: #371b17;
+  --ui-text-muted: #371b1799; /* 60% opacity for muted text */
+  --ui-text-dimmed: #371b1766; /* 40% opacity */
+  --ui-text-highlighted: #1a0d0b; /* Darker brown */
 
-  --ui-border: #e4e4e7;
-  --ui-border-muted: #f4f4f5;
-  --ui-border-accented: #d4d4d8;
+  --ui-border: #371b1720; /* 12% opacity border */
+  --ui-border-muted: #371b1710;
+  --ui-border-accented: #371b1730;
 
-  --ui-primary: #6366f1;        /* indigo */
-  --ui-primary-foreground: #ffffff;
+  --ui-primary: #371b17; /* Using the dark brown as your primary brand color */
+  --ui-primary-foreground: #eeede9; /* Light text on primary buttons */
 
-  --ui-secondary: #8b5cf6;      /* violet */
+  --ui-secondary: #8b5cf6;
   --ui-secondary-foreground: #ffffff;
 
   --ui-success: #22c55e;
@@ -37,7 +37,7 @@
 }
 
 .dark {
-  /* Dark mode colors */
+  /* Dark mode colors (Kept intact from your scaffold) */
   --ui-bg: #09090b;
   --ui-bg-muted: #18181b;
   --ui-bg-elevated: #27272a;
@@ -52,10 +52,10 @@
   --ui-border-muted: #18181b;
   --ui-border-accented: #3f3f46;
 
-  --ui-primary: #818cf8;        /* lighter indigo for dark bg */
+  --ui-primary: #818cf8;
   --ui-primary-foreground: #09090b;
 
-  --ui-secondary: #a78bfa;      /* lighter violet */
+  --ui-secondary: #a78bfa;
   --ui-secondary-foreground: #09090b;
 
   --ui-success: #4ade80;
