@@ -7,43 +7,43 @@
     "axios": {
       "src": "../../../node_modules/.pnpm/axios@1.14.0/node_modules/axios/index.js",
       "file": "axios.js",
-      "fileHash": "c0441efb",
+      "fileHash": "686fed5d",
       "needsInterop": false
     },
     "@tiptap/extension-code-block-lowlight": {
       "src": "../../../node_modules/.pnpm/@tiptap+extension-code-bloc_0dcece44e1fb3018b738959c89a99769/node_modules/@tiptap/extension-code-block-lowlight/dist/index.js",
       "file": "@tiptap_extension-code-block-lowlight.js",
-      "fileHash": "e8c67381",
+      "fileHash": "9d8f8b30",
       "needsInterop": false
     },
     "@tiptap/extension-placeholder": {
       "src": "../../../node_modules/.pnpm/@tiptap+extension-placehold_7ce36c8360a28c686ad25c0dbd3961a4/node_modules/@tiptap/extension-placeholder/dist/index.js",
       "file": "@tiptap_extension-placeholder.js",
-      "fileHash": "12635385",
+      "fileHash": "0657af99",
       "needsInterop": false
     },
     "@tiptap/starter-kit": {
       "src": "../../../node_modules/.pnpm/@tiptap+starter-kit@3.22.0/node_modules/@tiptap/starter-kit/dist/index.js",
       "file": "@tiptap_starter-kit.js",
-      "fileHash": "3f36e46c",
+      "fileHash": "cb08e05a",
       "needsInterop": false
     },
     "@tiptap/vue-3": {
       "src": "../../../node_modules/.pnpm/@tiptap+vue-3@3.22.0_@float_fae4eadc316640dc2b13f37a7ea1ef82/node_modules/@tiptap/vue-3/dist/index.js",
       "file": "@tiptap_vue-3.js",
-      "fileHash": "04aa9252",
+      "fileHash": "02cbcf1f",
       "needsInterop": false
     },
     "lowlight": {
       "src": "../../../node_modules/.pnpm/lowlight@3.3.0/node_modules/lowlight/index.js",
       "file": "lowlight.js",
-      "fileHash": "2811e66c",
+      "fileHash": "311c255e",
       "needsInterop": false
     },
     "errx": {
       "src": "../../../node_modules/.pnpm/errx@0.1.0/node_modules/errx/dist/index.js",
       "file": "errx.js",
-      "fileHash": "d53b7e7d",
+      "fileHash": "dba46ee3",
       "needsInterop": false
     }
   },

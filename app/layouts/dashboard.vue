@@ -2,11 +2,15 @@
 import { navigateTo } from '#app'
 import { onMounted, watch } from 'vue'
 import AppSidebar from '~/components/AppSidebar.vue'
+import { useChannelStore } from '~/stores/useChannelStore'
+import { useTeamStore } from '~/stores/useTeamStore'
 import { useUserStore } from '~/stores/useUserStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
 const userStore = useUserStore()
 const workspaceStore = useWorkspaceStore()
+const teamStore = useTeamStore()
+const channelStore = useChannelStore()
 
 async function handleLogout() {
   await userStore.logout()
@@ -14,13 +18,11 @@ async function handleLogout() {
 }
 
 onMounted(() => {
-  // Wait for store to be hydrated from localStorage
   if (userStore.token && userStore.user) {
     console.log('Dashboard - Token available, fetching workspaces')
     workspaceStore.fetchWorkspaces()
   } else {
     console.log('Dashboard - No token yet, waiting...')
-    // Watch for token to become available
     const unwatch = watch(
       () => userStore.token,
       (token) => {
@@ -33,6 +35,27 @@ onMounted(() => {
     )
   }
 })
+
+watch(
+  () => workspaceStore.currentWorkspaceId,
+  (workspaceId) => {
+    if (workspaceId) {
+      console.log('Dashboard - Workspace changed, fetching teams for:', workspaceId)
+      teamStore.fetchTeams(workspaceId)
+      channelStore.clearChannels()
+    } else {
+      teamStore.clearTeams()
+      channelStore.clearChannels()
+    }
+  }
+)
+
+watch(
+  () => teamStore.currentTeamId,
+  () => {
+    channelStore.clearChannels()
+  }
+)
 </script>
 
 <template>
@@ -80,7 +103,7 @@ onMounted(() => {
           </div>
         </header>
 
-        <main class="flex-1 p-5 sm:p-8">
+        <main class="flex-1 overflow-hidden p-5 sm:p-8">
           <slot />
         </main>
       </div>

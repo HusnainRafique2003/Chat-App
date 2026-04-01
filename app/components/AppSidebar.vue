@@ -1,14 +1,37 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { useChannelStore } from '~/stores/useChannelStore'
+import { useTeamStore } from '~/stores/useTeamStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
 const workspaceStore = useWorkspaceStore()
+const teamStore = useTeamStore()
+const channelStore = useChannelStore()
+
+const showCreateChannelModal = ref(false)
+const newChannelName = ref('')
 
 const workspaceItems = computed(() =>
   workspaceStore.workspaces.map(w => ({
     id: w.id,
     label: w.name.slice(0,2).toUpperCase(),
     active: w.id === workspaceStore.currentWorkspaceId
+  }))
+)
+
+const teamItems = computed(() =>
+  teamStore.teams.map(t => ({
+    id: t.id,
+    name: t.name,
+    active: t.id === teamStore.currentTeamId
+  }))
+)
+
+const channelItems = computed(() =>
+  channelStore.channels.map(c => ({
+    id: c.id,
+    name: c.name,
+    active: c.id === channelStore.currentChannelId
   }))
 )
 
@@ -20,8 +43,24 @@ interface SidebarItem {
   label?: string
 }
 
-const channelItems: SidebarItem[] = []
 const directMessages: SidebarItem[] = []
+
+async function handleCreateChannel() {
+  if (!newChannelName.value.trim() || !teamStore.currentTeamId || !workspaceStore.currentWorkspaceId) {
+    return
+  }
+
+  const result = await channelStore.createChannel({
+    name: newChannelName.value.trim(),
+    workspace_id: workspaceStore.currentWorkspaceId,
+    team_id: teamStore.currentTeamId
+  })
+
+  if (result.success) {
+    newChannelName.value = ''
+    showCreateChannelModal.value = false
+  }
+}
 </script>
 
 <template>
@@ -61,9 +100,44 @@ const directMessages: SidebarItem[] = []
       <div class="mb-8">
         <div class="mb-3 flex items-center justify-between">
           <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ui-text-dimmed)]">
+            Teams
+          </p>
+        </div>
+
+        <div class="space-y-1">
+          <div v-if="teamItems.length === 0" class="text-sm text-[var(--ui-text-muted)]">
+            No teams yet
+          </div>
+          <button
+            v-for="team in teamItems"
+            :key="team.id"
+            type="button"
+            @click="teamStore.setCurrentTeam(team.id)"
+            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors"
+            :class="team.active
+              ? 'bg-[var(--ui-bg-muted)] font-semibold text-[var(--ui-text-highlighted)]'
+              : 'text-[var(--ui-text-muted)] hover:bg-[var(--ui-bg-muted)]/70'"
+          >
+            <span class="opacity-50">👥</span>
+            <span class="truncate">{{ team.name }}</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="mb-8">
+        <div class="mb-3 flex items-center justify-between">
+          <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ui-text-dimmed)]">
             Channels
           </p>
-          <UIcon name="i-lucide-plus-circle" class="h-4 w-4 text-[var(--ui-text-dimmed)]" />
+          <button
+            v-if="teamStore.currentTeamId"
+            type="button"
+            @click="showCreateChannelModal = true"
+            class="text-[var(--ui-text-dimmed)] hover:text-[var(--ui-text)] transition-colors"
+            title="Create channel"
+          >
+            <UIcon name="i-lucide-plus-circle" class="h-4 w-4" />
+          </button>
         </div>
 
         <div class="space-y-1">
@@ -74,6 +148,7 @@ const directMessages: SidebarItem[] = []
             v-for="channel in channelItems"
             :key="channel.id"
             type="button"
+            @click="channelStore.setCurrentChannel(channel.id)"
             class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors"
             :class="channel.active
               ? 'bg-[var(--ui-bg-muted)] font-semibold text-[var(--ui-text-highlighted)]'
@@ -103,4 +178,35 @@ const directMessages: SidebarItem[] = []
       </div>
     </div>
   </aside>
+
+  <!-- Create Channel Modal -->
+  <div v-if="showCreateChannelModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div class="rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-6 shadow-lg w-96">
+      <h3 class="text-lg font-bold text-[var(--ui-text-highlighted)]">Create Channel</h3>
+      <p class="mt-2 text-sm text-[var(--ui-text-muted)]">Create a new public channel in this team</p>
+
+      <input
+        v-model="newChannelName"
+        type="text"
+        placeholder="Channel name"
+        class="mt-4 w-full rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg-muted)] px-3 py-2 text-[var(--ui-text)] placeholder-[var(--ui-text-muted)]"
+        @keyup.enter="handleCreateChannel"
+      />
+
+      <div class="mt-6 flex gap-3">
+        <button
+          @click="handleCreateChannel"
+          class="flex-1 rounded-lg bg-[var(--ui-primary)] px-4 py-2 font-semibold text-[var(--ui-primary-foreground)] hover:opacity-90 transition-opacity"
+        >
+          Create
+        </button>
+        <button
+          @click="showCreateChannelModal = false"
+          class="flex-1 rounded-lg border border-[var(--ui-border)] px-4 py-2 font-semibold text-[var(--ui-text)] hover:bg-[var(--ui-bg-muted)] transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
