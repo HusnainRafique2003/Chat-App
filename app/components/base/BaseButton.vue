@@ -10,35 +10,50 @@ interface Props {
   loading?: boolean
   disabled?: boolean
   block?: boolean
+  type?: 'button' | 'submit' | 'reset'
+  to?: string
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   color: 'primary',
   variant: 'solid',
   size: 'md',
   loading: false,
   disabled: false,
   block: false,
+  type: 'button',
+  to: undefined
 })
 
 const emit = defineEmits<{
   click: [event: MouseEvent]
 }>()
+
+async function handleClick(event: MouseEvent) {
+  emit('click', event)
+
+  if (event.defaultPrevented || props.disabled || props.loading || !props.to) {
+    return
+  }
+
+  await navigateTo(props.to)
+}
 </script>
 
 <template>
   <UButton
-    :color="color"
-    :variant="variant"
-    :size="size"
-    :icon="icon"
-    :leading-icon="leadingIcon"
-    :trailing-icon="trailingIcon"
-    :loading="loading"
-    :disabled="disabled"
-    :block="block"
-    @click="emit('click', $event)"
+    :type="type"
+    :color="props.color"
+    :variant="props.variant"
+    :size="props.size"
+    :icon="props.icon"
+    :leading-icon="props.leadingIcon"
+    :trailing-icon="props.trailingIcon"
+    :loading="props.loading"
+    :disabled="props.disabled"
+    :block="props.block"
+    @click="handleClick"
   >
-    <slot>{{ label }}</slot>
+    <slot>{{ props.label }}</slot>
   </UButton>
 </template>

@@ -1,17 +1,38 @@
+import type { AxiosRequestConfig, AxiosResponse } from 'axios'
 import axios from 'axios'
 import type { AxiosRequestConfig } from 'axios'
 import { ref, onUnmounted } from 'vue'
+
+const API_BASE = 'http://178.104.58.236/api/auth'
+
+// Global axios instance with interceptors
+const apiClient = axios.create({
+  baseURL: API_BASE,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+apiClient.interceptors.request.use((config) => {
+  if (process.client) {
+    const userStore = useUserStore()
+    const token = userStore.token
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+      config.headers.token = token
+    }
+  }
+  return config
+})
 
 export function useApi<T = unknown>(url: string, config?: AxiosRequestConfig) {
   const data = ref<T | null>(null)
   const error = ref<string | null>(null)
   const loading = ref(false)
 
-  // The AbortController — one per request
   let controller: AbortController | null = null
 
   async function fetch(overrideUrl?: string, overrideConfig?: AxiosRequestConfig) {
-    // Cancel any in-flight request before starting a new one
     abort()
 
     controller = new AbortController()
@@ -33,6 +54,11 @@ const response = await axios.request<T>({
   },
   signal: controller.signal,
 })
+      const response = await axios.get<T>(overrideUrl ?? url, {
+        ...config,
+        ...overrideConfig,
+        signal: controller.signal,
+      })
       data.value = response.data
     }
     catch (err) {
@@ -63,4 +89,29 @@ const response = await axios.request<T>({
   onUnmounted(() => abort())
 
   return { data, error, loading, fetch, abort }
+}
+
+export async function postApi<T = unknown>(url: string, data: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+  try {
+    const response = await apiClient.post<T>(url, data, config)
+    return response
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const message = typeof error.response?.data?.message === 'string'
+        ? error.response.data.message
+        : error.message
+      throw new Error(message || 'Request failed')
+    }
+    throw error
+  }
+}
+
+// Export client for stores
+export { apiClient }
+
+// Types
+export interface ApiEnvelope<T> {
+  success: boolean
+  message: string
+  data: T
 }

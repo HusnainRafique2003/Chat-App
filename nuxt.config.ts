@@ -31,10 +31,6 @@ export default defineNuxtConfig({
     ]
   },
 
-  routeRules: {
-    '/': { prerender: true }
-  },
-
   compatibilityDate: '2025-01-15',
 
   eslint: {
@@ -47,11 +43,28 @@ export default defineNuxtConfig({
   },
 
   vite: {
+    cacheDir: '.vite',
+    devServer: {
+      port: 3001,
+      host: true,
+      hmr: {
+        port: 3001
+      }
+    },
     optimizeDeps: {
+      force: true,
       include: [
-        '@vue/devtools-core',
-        '@vue/devtools-kit',
+        'vue',
+        'vue-router',
+        'pinia',
+        '@vue/shared'
       ]
+    }
+  },
+
+  nitro: {
+    server: {
+      port: 3001
     }
   }
 })
