@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Message } from '~/composables/useMessagesApi'
 import { useMessageStore } from '~/stores/useMessageStore'
+import RichMessageComposer from './RichMessageComposer.vue'
 
 interface Props {
  channelId: string
@@ -162,6 +163,6 @@ async function handleReaction(messageId: string, emoji: string) {
     </div>
 
     <!-- Message Composer -->
-    <MessageComposer @send="$emit('message-sent', $event)" />
+    <RichMessageComposer @send="$emit('message-sent', $event)" />
   </div>
 </template>

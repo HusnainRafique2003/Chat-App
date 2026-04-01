@@ -3,7 +3,6 @@ import { downloadMessageFile } from '~/composables/useMessagesApi'
 import { useMessageStore } from '~/stores/useMessageStore'
 import { useUserStore } from '~/stores/useUserStore'
 import MessageBubble from './MessageBubble.vue'
-import MessageComposer from './MessageComposer.vue'
 
 const messageStore = useMessageStore()
 const userStore = useUserStore()
@@ -219,7 +218,7 @@ onMounted(async () => {
           </div>
 
           <div class="border-t border-[var(--ui-border)] bg-[var(--ui-bg-muted)]/55 p-4">
-            <MessageComposer
+            <RichMessageComposer
               :initial-content="selectedMessage?.content || ''"
               :loading="messageStore.sending"
               :submit-label="editingMessageId ? 'Update message' : 'Send message'"
