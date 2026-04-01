@@ -42,7 +42,9 @@ export const useUserStore = defineStore('user', {
     isLoggedIn: (state) => Boolean(state.user?.is_active && state.token)
   },
 
-  persist: true,
+  persist: {
+    enabled: true
+  },
 
   actions: {
     setAuth(user: ApiUser) {

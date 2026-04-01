@@ -12,14 +12,12 @@ const apiClient = axios.create({
 })
 
 apiClient.interceptors.request.use((config) => {
-  if (process.client) {
-    const userStore = useUserStore()
-    const token = userStore.token
+  const userStore = useUserStore()
+  const token = userStore.token
 
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-      config.headers.token = token
-    }
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+    config.headers.token = token
   }
 
   return config

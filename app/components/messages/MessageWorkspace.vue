@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import MessageBubble from './MessageBubble.vue'
-import MessageComposer from './MessageComposer.vue'
 import { downloadMessageFile } from '~/composables/useMessagesApi'
 import { useMessageStore } from '~/stores/useMessageStore'
 import { useUserStore } from '~/stores/useUserStore'
+import MessageBubble from './MessageBubble.vue'
+import MessageComposer from './MessageComposer.vue'
 
 const messageStore = useMessageStore()
 const userStore = useUserStore()
@@ -175,7 +175,7 @@ onMounted(async () => {
           <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex items-center gap-4">
               <div class="flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)]">
-                <Icon name="i-mdi-pound" class="h-6 w-6" />
+                <UIcon name="i-mdi-pound" class="h-6 w-6" />
               </div>
               <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ui-text-dimmed)]">Active channel</p>
