@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
-import Placeholder from '@tiptap/extension-placeholder'
-import StarterKit from '@tiptap/starter-kit'
-import { EditorContent, useEditor } from '@tiptap/vue-3'
-import { lowlight } from 'lowlight'
+import Placeholder from '@tiptap/extension-placeholder';
+import StarterKit from '@tiptap/starter-kit';
+import { EditorContent, useEditor } from '@tiptap/vue-3';
 
 interface Emits {
-  (e: 'send', data: { html: string; text: string; file: File | null }): void
+  (e: 'send', data: { content: string; file?: File }): void
 }
 
 defineProps<{
@@ -31,9 +29,7 @@ const editor = useEditor({
     StarterKit.configure({
       codeBlock: false
     }),
-    CodeBlockLowlight.configure({
-      lowlight
-    }),
+    CodeBlock,
     Placeholder.configure({
       placeholder: 'Type a message... Use / for commands'
     })
@@ -134,9 +130,8 @@ async function sendMessage() {
   if (!text.trim() && !selectedFile.value) return
 
   emit('send', {
-    html,
-    text,
-    file: selectedFile.value
+    content: html,
+    file: selectedFile.value || undefined
   })
 
   editor.value.commands.clearContent()

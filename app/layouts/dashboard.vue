@@ -52,8 +52,13 @@ watch(
 
 watch(
   () => teamStore.currentTeamId,
-  () => {
-    channelStore.clearChannels()
+  (teamId) => {
+    if (teamId) {
+      console.log('Dashboard - Team changed, fetching channels for:', teamId)
+      channelStore.fetchChannels(teamId)
+    } else {
+      channelStore.clearChannels()
+    }
   }
 )
 </script>

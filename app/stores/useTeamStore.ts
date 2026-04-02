@@ -1,5 +1,6 @@
+import axios from 'axios'
 import { defineStore } from 'pinia'
-import { getTeams } from '~/composables/useTeamsApi'
+import { useUserStore } from '~/stores/useUserStore'
 
 export interface TeamMember {
   user_id: string
@@ -28,28 +29,48 @@ export const useTeamStore = defineStore('team-data', {
   state: (): State => ({
     teams: [],
     loading: false,
-    currentTeamId: null,
+    currentTeamId: null
   }),
 
   getters: {
-    currentTeam: (state) => state.teams.find(t => t.id === state.currentTeamId),
+    currentTeam: state => state.teams.find(t => t.id === state.currentTeamId)
   },
 
   actions: {
     async fetchTeams(workspaceId: string) {
       this.loading = true
       try {
-        const response = await getTeams(workspaceId)
-        const data = response.data
+        const userStore = useUserStore()
+        const token = userStore.token
 
-        if (data.success) {
-          this.teams = data.data.teams || []
+        console.log('Fetching teams with token:', token ? `${token.slice(0, 20)}...` : 'NO TOKEN')
+        console.log('Workspace ID:', workspaceId)
+
+        const response = await axios.get('http://178.104.58.236/api/team/read', {
+          headers: {
+            'token': token,
+            'Content-Type': 'application/json'
+          },
+          params: {
+            workspace_id: workspaceId
+          }
+        })
+
+        console.log('Teams response:', response.data)
+
+        if (response.data?.success) {
+          const teamsData = response.data.data?.teams || response.data.data || []
+          this.teams = teamsData
+
           if (this.teams.length > 0 && !this.currentTeamId) {
             this.currentTeamId = this.teams[0]?.id || null
           }
+
+          console.log('Teams loaded:', this.teams.length)
         }
-      } catch (error) {
-        console.error('Failed to fetch teams:', error)
+      } catch {
+        console.warn('Teams endpoint not available - backend may not have implemented /api/team/read yet')
+        this.teams = []
       } finally {
         this.loading = false
       }
@@ -66,6 +87,6 @@ export const useTeamStore = defineStore('team-data', {
     clearTeams() {
       this.teams = []
       this.currentTeamId = null
-    },
-  },
+    }
+  }
 })
