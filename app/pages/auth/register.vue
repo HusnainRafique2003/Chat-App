@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import AuthLayout from '~/layouts/AuthLayout.vue'
 import { useValidation } from '~/composables/useValidation'
+import AuthLayout from '~/layouts/AuthLayout.vue'
 import { useUserStore } from '~/stores/useUserStore'
 
 definePageMeta({
@@ -210,7 +210,7 @@ function goBackToSignup() {
               aria-label="Toggle password visibility"
               @click="showPassword = !showPassword"
             >
-              <Icon :name="showPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
+              <UIcon :name="showPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
             </button>
           </template>
         </BaseInput>
@@ -254,7 +254,7 @@ function goBackToSignup() {
             aria-label="Toggle confirm password visibility"
             @click="showConfirmPassword = !showConfirmPassword"
           >
-            <Icon :name="showConfirmPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
+            <UIcon :name="showConfirmPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
           </button>
         </template>
       </BaseInput>

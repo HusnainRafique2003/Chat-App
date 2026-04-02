@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BaseButton from '~/components/base/BaseButton.vue'
 import { useUserStore } from '~/stores/useUserStore'
 
 const userStore = useUserStore()
@@ -28,13 +29,13 @@ function handleLogout() {
 
           <!-- Nav Links -->
           <nav class="hidden md:flex items-center gap-8">
-            <NuxtLink 
-              v-for="item in navItems" 
-              :key="item.to" 
+            <NuxtLink
+              v-for="item in navItems"
+              :key="item.to"
               :to="item.to"
               class="flex items-center gap-2 px-3 py-2 rounded-lg text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-bg-elevated)] transition-all duration-200 font-medium"
             >
-              <Icon :name="item.icon" class="w-4 h-4" />
+              <UIcon :name="item.icon" class="w-4 h-4" />
               {{ item.label }}
             </NuxtLink>
           </nav>
@@ -42,31 +43,31 @@ function handleLogout() {
           <!-- Auth CTAs -->
           <div class="flex items-center gap-3">
             <template v-if="userStore.isLoggedIn">
-              <BaseButton 
-                label="Dashboard" 
-                size="sm" 
-                color="primary" 
+              <BaseButton
+                label="Dashboard"
+                size="sm"
+                color="primary"
                 to="/dashboard"
               />
-              <BaseButton 
-                label="Logout" 
-                size="sm" 
-                color="neutral" 
+              <BaseButton
+                label="Logout"
+                size="sm"
+                color="neutral"
                 variant="ghost"
                 @click="handleLogout"
               />
             </template>
             <template v-else>
-              <BaseButton 
-                label="Login" 
-                size="sm" 
-                color="secondary" 
+              <BaseButton
+                label="Login"
+                size="sm"
+                color="secondary"
                 variant="outline"
                 to="/auth/login"
               />
-              <BaseButton 
-                label="Sign Up" 
-                size="sm" 
+              <BaseButton
+                label="Sign Up"
+                size="sm"
                 color="primary"
                 to="/auth/register"
               />

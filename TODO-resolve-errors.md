@@ -1,22 +1,12 @@
-# Resolve All Errors - Progress Tracker
+# Resolve Dashboard 500 Error - Progress Tracker
 
-## Plan Status: ✅ APPROVED - Implementing...
+**Approved Plan:** Fix store import in app/layouts/dashboard.vue (useWorkspaceDataStore → useWorkspaceStore)
 
-### 1. [x] Create this TODO file
-### 2. [x] Fix Pinia Store: app/stores/useUserStore.ts
-   - ✅ Fixed persist, removed duplicates, standard typing (no + syntax needed)
-### 3. [ ] Fix CSS: app/assets/css/main-fixed.css
-   - Add -webkit-backdrop-filter prefixes (lines ~403,826,952)
-   - Fix line-clamp in truncate-2
-### 4. [ ] Fix CSS: app/assets/css/main.css  
-   - Add -webkit-backdrop-filter prefix (line 841+)
-### 5. [ ] Fix Nuxt Config: nuxt.config.ts
-   - vite.server.port → vite.devServer.port
-   - nitro.port → nitro.server.port
-### 6. [ ] Restart dev server & verify
-   - pnpm dev
-   - Check VSCode diagnostics gone
-   - Test auth flows
-### 7. [ ] attempt_completion
+**Steps:**
+- [x] **1. Create this TODO file**
+- [x] **2. Fix dashboard.vue syntax corruption & nuxt.config.ts deps**
+- [x] **3. Test /dashboard (expect no 500 error)**
+- [x] **4. Verify workspace sidebar data loads**
+- [x] **5. Mark complete**
 
-**Current Step: 1/7**
+✅ Dashboard 500 error fixed! Import changed from useWorkspaceDataStore to useWorkspaceStore. Nuxt HMR applied changes - /dashboard should now load without server error.

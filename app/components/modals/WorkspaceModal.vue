@@ -4,8 +4,8 @@ import { ref, watch } from 'vue'
 export interface WorkspacePayload {
   name: string
   description: string
-  icon: string
-  isPrivate: boolean
+  icon?: string
+  isPrivate?: boolean
 }
 
 interface Props {
@@ -28,8 +28,6 @@ const open = defineModel<boolean>('open', { default: false })
 const form = ref<WorkspacePayload>({
   name: '',
   description: '',
-  icon: 'i-mdi-briefcase',
-  isPrivate: false,
 })
 
 const errors = ref({ name: '', description: '' })
@@ -86,24 +84,6 @@ function handleSubmit() {
   >
     <div class="flex flex-col gap-4">
 
-      <!-- Icon Picker -->
-      <div class="flex flex-col gap-2">
-        <p class="text-sm font-medium text-default">Workspace Icon</p>
-        <div class="flex gap-2 flex-wrap">
-          <button
-            v-for="ico in iconOptions"
-            :key="ico"
-            class="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
-            :class="form.icon === ico
-              ? 'bg-primary text-white ring-2 ring-primary ring-offset-2'
-              : 'bg-muted hover:bg-elevated text-default'"
-            @click="form.icon = ico"
-          >
-            <UIcon :name="ico" class="text-xl" />
-          </button>
-        </div>
-      </div>
-
       <!-- Name -->
       <UFormField label="Workspace Name" :error="errors.name" required>
         <UInput
@@ -125,13 +105,7 @@ function handleSubmit() {
       </UFormField>
 
       <!-- Private Toggle -->
-      <div class="flex items-center justify-between p-3 rounded-lg bg-muted">
-        <div>
-          <p class="text-sm font-medium text-default">Private Workspace</p>
-          <p class="text-xs text-muted">Only invited members can join.</p>
-        </div>
-<input type="checkbox" v-model="form.isPrivate" class="toggle toggle-primary" />
-      </div>
+      <!-- Removed as not in API spec -->
 
     </div>
   </BaseModal>

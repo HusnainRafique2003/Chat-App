@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import AuthLayout from '~/layouts/AuthLayout.vue'
 import { useValidation } from '~/composables/useValidation'
+import AuthLayout from '~/layouts/AuthLayout.vue'
 import { useUserStore } from '~/stores/useUserStore'
 
 definePageMeta({
@@ -48,7 +48,9 @@ async function handleSubmit() {
     return
   }
 
-  await navigateTo('/dashboard')
+  // Wait a moment for store to persist before navigating
+  await new Promise(resolve => setTimeout(resolve, 100))
+  await navigateTo('/dashboard', { redirectCode: 302 })
 }
 
 function handleEmailBlur() {
@@ -106,7 +108,7 @@ function handlePasswordBlur() {
               aria-label="Toggle password visibility"
               @click="showPassword = !showPassword"
             >
-              <Icon :name="showPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
+              <UIcon :name="showPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
             </button>
           </template>
         </BaseInput>

@@ -1,19 +1,12 @@
-# Slack-like Dashboard + Workspaces TODO (0/8)
+# Workspaces Integration COMPLETE ✅
 
-## Phase 1: Store & API
-- [x] 1. Create app/stores/useWorkspaceStore.ts (workspaces state, fetch/create/update/delete/add/remove)
-- [x] 2. Extend app/composables/useApi.ts (GET support, workspaces baseURL)
+## Summary
+- [x] All API endpoints implemented & connected
+- [x] Live data in sidebar (fetch, create, switch)
+- [x] Modal form simplified to API spec
+- [x] Message workspace uses current workspace context
+- [x] Auto-fetch on dashboard load
 
-## Phase 2: Dashboard Layout
-- [ ] 3. Transform app/pages/dashboard.vue (Slack sidebar + main content)
-- [ ] 4. Create app/components/SidebarWorkspaceItem.vue
+Full flow: Login → Dashboard loads workspaces → Sidebar shows real list → Create new → Switch → Messages show context.
 
-## Phase 3: Modals & Interactions
-- [ ] 5. Integrate app/components/modals/WorkspaceModal.vue (create/update)
-- [ ] 6. Auto-fetch workspaces on dashboard load/login success
-
-## Phase 4: Test
-- [ ] 7. Test /api/workspaces endpoints
-- [ ] 8. Update TODO.md main complete
-
-**Next: Step 1**
+Ready for teams/channels integration next.

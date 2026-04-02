@@ -1,5 +1,20 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+  ssr: false,
+  srcDir: 'app',
+  app: {
+    head: {
+      link: [
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap'
+        }
+      ]
+    }
+  },
+
   modules: [
     '@nuxt/eslint',
     '@nuxt/ui',
@@ -42,29 +57,26 @@ export default defineNuxtConfig({
     }
   },
 
+  nitro: {
+    preset: 'node-server'
+  },
+
   vite: {
     cacheDir: '.vite',
-    devServer: {
-      port: 3001,
-      host: true,
-      hmr: {
-        port: 3001
-      }
-    },
     optimizeDeps: {
-      force: true,
+      force: false,
       include: [
         'vue',
         'vue-router',
         'pinia',
-        '@vue/shared'
+        '@vue/shared',
+        'axios',
+        '@tiptap/extension-code-block-lowlight',
+        '@tiptap/extension-placeholder',
+        '@tiptap/starter-kit',
+        '@tiptap/vue-3',
+        'lowlight'
       ]
-    }
-  },
-
-  nitro: {
-    server: {
-      port: 3001
     }
   }
 })
