@@ -1,33 +1,48 @@
-import type { AxiosRequestConfig, AxiosResponse } from 'axios'
+import type { AxiosResponse } from 'axios'
 import axios from 'axios'
 import { useUserStore } from '~/stores/useUserStore'
 
 const MESSAGES_BASE = 'http://178.104.58.236/api/messages'
 
-export interface MessageSenderSummary {
+const messagesApiClient = axios.create({
+  baseURL: MESSAGES_BASE,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+messagesApiClient.interceptors.request.use((config) => {
+  const userStore = useUserStore()
+  const token = userStore.token
+
+  if (token) {
+    config.headers.token = token
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
+  return config
+})
+
+export interface MessageSender {
   id: string
   name: string
-  email?: string
-  is_active?: boolean
-  access_token?: string | null
-  updated_at?: string
-  created_at?: string
+  email: string
+  is_active: boolean
 }
 
-export interface MessageChannelSummary {
+export interface MessageChannel {
   id: string
   name: string
-  type?: string
 }
 
-export interface MessageReactionSummary {
+export interface ReactionSummary {
   emoji: string
   count: number
   reacted_by_me: boolean
   reacted_by: string[]
 }
 
-export interface ChatMessage {
+export interface Message {
   id: string
   workspace_id: string
   sender_id: string
@@ -39,209 +54,165 @@ export interface ChatMessage {
   file_name: string | null
   file_mime: string | null
   file_download_url: string | null
-  sender: MessageSenderSummary
-  receiver: MessageSenderSummary | null
-  channel: MessageChannelSummary | null
+  sender: MessageSender
+  receiver: MessageSender | null
+  channel: MessageChannel
   created_at: string
   updated_at: string
   read_by_count: number
   is_read_by_me: boolean
-  reactions_summary: MessageReactionSummary[]
-  has_file?: boolean
+  reactions_summary: ReactionSummary[]
 }
 
-export interface MessagePagination {
-  current_page: number
-  per_page: number
-  total: number
-  last_page: number
-}
-
-export interface ApiEnvelope<T> {
-  success: boolean
-  message: string
-  errors?: Record<string, string[]> | null
-  data: T
-}
-
-const messagesApiClient = axios.create({
-  baseURL: MESSAGES_BASE,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
-
-messagesApiClient.interceptors.request.use((config) => {
-  if (process.client) {
-    const userStore = useUserStore()
-    const token = userStore.token
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-      config.headers.token = token
-    }
-  }
-
-  return config
-})
-
-function extractError(error: unknown) {
-  if (axios.isAxiosError(error)) {
-    const message = typeof error.response?.data?.message === 'string'
-      ? error.response.data.message
-      : error.message
-    throw new Error(message || 'Request failed')
-  }
-
-  throw error
-}
-
-function buildMessageFormData(data: {
+export async function createMessage(data: {
   channel_id: string
-  message?: string
-  message_id?: string
-  file?: File | null
-}) {
-  const formData = new FormData()
-  formData.append('channel_id', data.channel_id)
-
-  if (data.message_id) {
-    formData.append('message_id', data.message_id)
-  }
-
-  if (typeof data.message === 'string') {
+  message: string
+  file?: File
+}): Promise<AxiosResponse> {
+  try {
+    const formData = new FormData()
+    formData.append('channel_id', data.channel_id)
     formData.append('message', data.message)
-  }
+    if (data.file) {
+      formData.append('file', data.file)
+    }
 
-  if (data.file) {
-    formData.append('file', data.file)
+    const response = await messagesApiClient.post('/create', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return response
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
   }
-
-  return formData
 }
 
-export async function readMessages(params: {
+export async function readMessages(data: {
   channel_id: string
   page?: number
   per_page?: number
-}) {
+}): Promise<AxiosResponse> {
   try {
-    return await messagesApiClient.get<ApiEnvelope<{ messages: ChatMessage[]; pagination: MessagePagination }>>('/read', {
-      params
+    const response = await messagesApiClient.get('/read', {
+      data: {
+        channel_id: data.channel_id,
+        page: data.page || 1,
+        per_page: data.per_page || 20,
+      },
     })
+    return response
   } catch (error) {
-    return extractError(error)
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
   }
 }
 
-export async function createMessage(payload: {
-  channel_id: string
-  message: string
-  file?: File | null
-}) {
-  const hasFile = Boolean(payload.file)
-  const data = hasFile
-    ? buildMessageFormData(payload)
-    : payload
-
-  const config: AxiosRequestConfig | undefined = hasFile
-    ? { headers: { 'Content-Type': 'multipart/form-data' } }
-    : undefined
-
-  try {
-    return await messagesApiClient.post<ApiEnvelope<{ message: ChatMessage }>>('/create', data, config)
-  } catch (error) {
-    return extractError(error)
-  }
-}
-
-export async function updateMessage(payload: {
+export async function updateMessage(data: {
   channel_id: string
   message_id: string
   message: string
-  file?: File | null
-}) {
-  const hasFile = Boolean(payload.file)
-  const data = hasFile
-    ? buildMessageFormData(payload)
-    : payload
-
-  const config: AxiosRequestConfig | undefined = hasFile
-    ? { headers: { 'Content-Type': 'multipart/form-data' } }
-    : undefined
-
+  file?: File
+}): Promise<AxiosResponse> {
   try {
-    return await messagesApiClient.patch<ApiEnvelope<{ message: ChatMessage }>>('/update', data, config)
+    const formData = new FormData()
+    formData.append('channel_id', data.channel_id)
+    formData.append('message_id', data.message_id)
+    formData.append('message', data.message)
+    if (data.file) {
+      formData.append('file', data.file)
+    }
+
+    const response = await messagesApiClient.patch('/update', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return response
   } catch (error) {
-    return extractError(error)
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
   }
 }
 
-export async function deleteMessage(payload: {
+export async function deleteMessage(data: {
   channel_id: string
   message_id: string
-}) {
+}): Promise<AxiosResponse> {
   try {
-    return await messagesApiClient.delete<ApiEnvelope<null>>('/delete', {
-      data: payload
+    const response = await messagesApiClient.delete('/delete', {
+      data,
     })
+    return response
   } catch (error) {
-    return extractError(error)
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
   }
 }
 
-export async function searchMessages(params: {
-  query: string
+export async function searchMessages(query: string, options?: {
   channel_id?: string
   workspace_id?: string
-  page?: number
   per_page?: number
-}) {
+  page?: number
+}): Promise<AxiosResponse> {
   try {
-    return await messagesApiClient.get<ApiEnvelope<ChatMessage[]>>('/search', {
-      params
-    })
+    const params = new URLSearchParams()
+    params.append('query', query)
+    if (options?.channel_id) params.append('channel_id', options.channel_id)
+    if (options?.workspace_id) params.append('workspace_id', options.workspace_id)
+    if (options?.per_page) params.append('per_page', options.per_page.toString())
+    if (options?.page) params.append('page', options.page.toString())
+
+    const response = await messagesApiClient.get(`/search?${params.toString()}`)
+    return response
   } catch (error) {
-    return extractError(error)
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
   }
 }
 
-export async function markMessagesAsRead(payload: {
+export async function markMessagesAsRead(data: {
   channel_id: string
   message_ids: string[]
-}) {
+}): Promise<AxiosResponse> {
   try {
-    return await messagesApiClient.post<ApiEnvelope<{ updated: number }>>('/read-by', payload)
+    const response = await messagesApiClient.post('/read-by', data)
+    return response
   } catch (error) {
-    return extractError(error)
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
   }
 }
 
-export async function reactToMessage(payload: {
+export async function reactToMessage(data: {
   channel_id: string
   message_ids: string[]
   emoji: string
-}) {
+}): Promise<AxiosResponse> {
   try {
-    return await messagesApiClient.post<ApiEnvelope<{ message: ChatMessage }>>('/react', payload)
+    const response = await messagesApiClient.post('/react', data)
+    return response
   } catch (error) {
-    return extractError(error)
-  }
-}
-
-export function getMessageDownloadUrl(path: string) {
-  const encodedPath = encodeURIComponent(path)
-  return `${MESSAGES_BASE}/download?path=${encodedPath}`
-}
-
-export async function downloadMessageFile(path: string) {
-  try {
-    return await messagesApiClient.get(`/download?path=${encodeURIComponent(path)}`, {
-      responseType: 'blob'
-    })
-  } catch (error) {
-    return extractError(error)
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
   }
 }
 
 export { messagesApiClient }
+

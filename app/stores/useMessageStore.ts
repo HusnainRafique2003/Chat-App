@@ -1,292 +1,213 @@
 import { defineStore } from 'pinia'
-import {
-  createMessage,
-  deleteMessage,
-  markMessagesAsRead,
-  reactToMessage,
-  readMessages,
-  searchMessages,
-  updateMessage,
-  type ChatMessage,
-  type MessagePagination
-} from '~/composables/useMessagesApi'
+import { createMessage, deleteMessage, markMessagesAsRead, reactToMessage, readMessages, searchMessages, updateMessage, type Message } from '~/composables/useMessagesApi'
 
 interface MessageState {
-  currentChannelId: string
-  messages: ChatMessage[]
-  pagination: MessagePagination | null
-  searchResults: ChatMessage[]
-  searchQuery: string
+  messages: Message[]
   loading: boolean
-  sending: boolean
   searching: boolean
-  error: string | null
-}
-
-function upsertMessage(list: ChatMessage[], nextMessage: ChatMessage) {
-  const index = list.findIndex(message => message.id === nextMessage.id)
-
-  if (index === -1) {
-    return [nextMessage, ...list]
+  currentChannelId: string | null
+  pagination: {
+    current_page: number
+    per_page: number
+    total: number
+    last_page: number
   }
-
-  const clone = [...list]
-  clone[index] = nextMessage
-  return clone
 }
 
-export const useMessageStore = defineStore('message', {
+export const useMessageStore = defineStore('messages', {
   state: (): MessageState => ({
-    currentChannelId: '',
     messages: [],
-    pagination: null,
-    searchResults: [],
-    searchQuery: '',
     loading: false,
-    sending: false,
     searching: false,
-    error: null
+    currentChannelId: null,
+    pagination: {
+      current_page: 1,
+      per_page: 20,
+      total: 0,
+      last_page: 1
+    }
   }),
 
   getters: {
-    sortedMessages: (state) => {
-      return [...state.messages].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-    }
+    sortedMessages: (state) => [...state.messages].sort((a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    ),
+    unreadCount: (state) => state.messages.filter(m => !m.is_read_by_me).length
   },
 
   actions: {
-    setChannel(channelId: string) {
-      this.currentChannelId = channelId.trim()
-      this.error = null
-    },
-
-    clearMessages() {
-      this.messages = []
-      this.pagination = null
-      this.error = null
-    },
-
-    clearSearch() {
-      this.searchQuery = ''
-      this.searchResults = []
-    },
-
-    async fetchMessages(channelId = this.currentChannelId, page = 1, perPage = 20) {
-      if (!channelId.trim()) {
-        this.error = 'Channel ID is required'
-        return { success: false, error: this.error }
-      }
-
+    async fetchMessages(channelId: string, page = 1) {
       this.loading = true
-      this.error = null
-      this.currentChannelId = channelId.trim()
-
+      this.currentChannelId = channelId
       try {
         const response = await readMessages({
-          channel_id: this.currentChannelId,
+          channel_id: channelId,
           page,
-          per_page: perPage
+          per_page: 20
         })
+        const data = response.data
 
-        const payload = response.data
-
-        if (!payload.success) {
-          this.error = payload.message || 'Unable to load messages'
-          return { success: false, error: this.error }
+        if (data.success && data.data?.messages) {
+          this.messages = data.data.messages
+          this.pagination = data.data.pagination || {
+            current_page: page,
+            per_page: 20,
+            total: data.data.messages.length,
+            last_page: 1
+          }
+          return { success: true }
         }
 
-        this.messages = payload.data.messages || []
-        this.pagination = payload.data.pagination || null
-
-        return { success: true }
+        return { success: false, error: data.message || 'Failed to fetch messages' }
       } catch (error) {
-        this.error = error instanceof Error ? error.message : 'Unable to load messages'
-        return { success: false, error: this.error }
+        const message = error instanceof Error ? error.message : 'Failed to fetch messages'
+        return { success: false, error: message }
       } finally {
         this.loading = false
       }
     },
 
-    async sendMessage(payload: {
-      channel_id?: string
-      message: string
-      file?: File | null
-    }) {
-      const channelId = (payload.channel_id || this.currentChannelId).trim()
-
-      if (!channelId) {
-        return { success: false, error: 'Channel ID is required' }
-      }
-
-      if (!payload.message.trim() && !payload.file) {
-        return { success: false, error: 'Message or file is required' }
-      }
-
-      this.sending = true
-      this.error = null
-
+    async createMessage(channelId: string, content: string, file?: File) {
       try {
         const response = await createMessage({
           channel_id: channelId,
-          message: payload.message,
-          file: payload.file
+          message: content,
+          file
         })
-        const nextMessage = response.data.data.message
+        const data = response.data
 
-        this.messages = upsertMessage(this.messages, nextMessage)
-        this.currentChannelId = channelId
+        if (data.success && data.data?.message) {
+          this.messages.push(data.data.message)
+  return { success: true, message: data.data.message }
+        }
 
-        return { success: true, message: nextMessage }
+        return { success: false, error: data.message || 'Failed to create message' }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unable to send message'
-        this.error = message
+        const message = error instanceof Error ? error.message : 'Failed to create message'
         return { success: false, error: message }
-      } finally {
-        this.sending = false
       }
     },
 
-    async editMessage(payload: {
-      channel_id?: string
-      message_id: string
-      message: string
-      file?: File | null
-    }) {
-      const channelId = (payload.channel_id || this.currentChannelId).trim()
-
-      if (!channelId) {
-        return { success: false, error: 'Channel ID is required' }
-      }
-
-      this.sending = true
-      this.error = null
-
+    async updateMessage(channelId: string, messageId: string, content: string, file?: File) {
       try {
         const response = await updateMessage({
           channel_id: channelId,
-          message_id: payload.message_id,
-          message: payload.message,
-          file: payload.file
+          message_id: messageId,
+          message: content,
+          file
         })
+        const data = response.data
 
-        this.messages = upsertMessage(this.messages, response.data.data.message)
-        return { success: true }
+        if (data.success && data.data?.message) {
+          const index = this.messages.findIndex(m => m.id === messageId)
+          if (index > -1) {
+            this.messages[index] = data.data.message
+          }
+          return { success: true, message: data.data.message }
+        }
+
+        return { success: false, error: data.message || 'Failed to update message' }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unable to update message'
-        this.error = message
+        const message = error instanceof Error ? error.message : 'Failed to update message'
         return { success: false, error: message }
-      } finally {
-        this.sending = false
       }
     },
 
-    async removeMessage(payload: { channel_id?: string; message_id: string }) {
-      const channelId = (payload.channel_id || this.currentChannelId).trim()
-
-      if (!channelId) {
-        return { success: false, error: 'Channel ID is required' }
-      }
-
-      this.error = null
-
+    async deleteMessage(channelId: string, messageId: string) {
       try {
-        await deleteMessage({
+        const response = await deleteMessage({
           channel_id: channelId,
-          message_id: payload.message_id
+          message_id: messageId
         })
+        const data = response.data
 
-        this.messages = this.messages.filter(message => message.id !== payload.message_id)
-        return { success: true }
+        if (data.success) {
+          this.messages = this.messages.filter(m => m.id !== messageId)
+          return { success: true }
+        }
+
+        return { success: false, error: data.message || 'Failed to delete message' }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unable to delete message'
-        this.error = message
+        const message = error instanceof Error ? error.message : 'Failed to delete message'
         return { success: false, error: message }
       }
     },
 
-    async runSearch(query: string, options?: { channel_id?: string; workspace_id?: string; page?: number; per_page?: number }) {
-      const trimmed = query.trim()
-      this.searchQuery = trimmed
-
-      if (!trimmed) {
-        this.searchResults = []
-        return { success: true }
-      }
-
+    async searchMessages(query: string, channelId?: string) {
       this.searching = true
-      this.error = null
-
       try {
-        const response = await searchMessages({
-          query: trimmed,
-          channel_id: options?.channel_id || this.currentChannelId || undefined,
-          workspace_id: options?.workspace_id,
-          page: options?.page,
-          per_page: options?.per_page
-        })
+        const response = await searchMessages(query, { channel_id: channelId })
+        const data = response.data
 
-        this.searchResults = Array.isArray(response.data.data) ? response.data.data : []
-        return { success: true }
+        if (data.success && Array.isArray(data.data)) {
+          this.messages = data.data
+          return { success: true, messages: data.data }
+        }
+
+        return { success: false, error: data.message || 'Search failed' }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unable to search messages'
-        this.error = message
+        const message = error instanceof Error ? error.message : 'Search failed'
         return { success: false, error: message }
       } finally {
         this.searching = false
       }
     },
 
-    async markRead(messageIds: string[], channelId = this.currentChannelId) {
-      if (!channelId.trim() || !messageIds.length) {
-        return { success: false, error: 'Channel ID and message IDs are required' }
-      }
-
+    async markAsRead(channelId: string, messageIds: string[]) {
       try {
-        await markMessagesAsRead({
+        const response = await markMessagesAsRead({
           channel_id: channelId,
           message_ids: messageIds
         })
+        const data = response.data
 
-        this.messages = this.messages.map(message => {
-          if (!messageIds.includes(message.id)) {
-            return message
-          }
+        if (data.success) {
+          messageIds.forEach(id => {
+            const msg = this.messages.find(m => m.id === id)
+            if (msg) msg.is_read_by_me = true
+          })
+          return { success: true }
+        }
 
-          return {
-            ...message,
-            is_read_by_me: true,
-            read_by_count: Math.max(message.read_by_count, 1)
-          }
-        })
-
-        return { success: true }
+        return { success: false, error: data.message || 'Failed to mark as read' }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unable to mark messages as read'
-        this.error = message
+        const message = error instanceof Error ? error.message : 'Failed to mark as read'
         return { success: false, error: message }
       }
     },
 
-    async react(payload: { messageId: string; emoji: string; channel_id?: string }) {
-      const channelId = (payload.channel_id || this.currentChannelId).trim()
-
-      if (!channelId) {
-        return { success: false, error: 'Channel ID is required' }
-      }
-
+    async addReaction(channelId: string, messageId: string, emoji: string) {
       try {
         const response = await reactToMessage({
           channel_id: channelId,
-          message_ids: [payload.messageId],
-          emoji: payload.emoji
+          message_ids: [messageId],
+          emoji
         })
+        const data = response.data
 
-        this.messages = upsertMessage(this.messages, response.data.data.message)
-        return { success: true }
+        if (data.success && data.data?.message) {
+          const index = this.messages.findIndex(m => m.id === messageId)
+          if (index > -1) {
+            this.messages[index] = data.data.message
+          }
+          return { success: true, message: data.data.message }
+        }
+
+        return { success: false, error: data.message || 'Failed to add reaction' }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unable to update reaction'
-        this.error = message
+        const message = error instanceof Error ? error.message : 'Failed to add reaction'
         return { success: false, error: message }
+      }
+    },
+
+    clearMessages() {
+      this.messages = []
+      this.currentChannelId = null
+      this.pagination = {
+        current_page: 1,
+        per_page: 20,
+        total: 0,
+        last_page: 1
       }
     }
   }

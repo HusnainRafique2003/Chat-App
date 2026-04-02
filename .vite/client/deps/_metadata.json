@@ -1,15 +1,67 @@
 {
-  "hash": "5448fb2e",
-  "configHash": "c2d03d92",
+  "hash": "924be55a",
+  "configHash": "785f836e",
   "lockfileHash": "bacf2221",
-  "browserHash": "bc7b5ffc",
+  "browserHash": "a214cb63",
   "optimized": {
+    "axios": {
+      "src": "../../../node_modules/.pnpm/axios@1.14.0/node_modules/axios/index.js",
+      "file": "axios.js",
+      "fileHash": "84646327",
+      "needsInterop": false
+    },
+    "@tiptap/extension-code-block-lowlight": {
+      "src": "../../../node_modules/.pnpm/@tiptap+extension-code-bloc_0dcece44e1fb3018b738959c89a99769/node_modules/@tiptap/extension-code-block-lowlight/dist/index.js",
+      "file": "@tiptap_extension-code-block-lowlight.js",
+      "fileHash": "8d11cc2c",
+      "needsInterop": false
+    },
+    "@tiptap/extension-placeholder": {
+      "src": "../../../node_modules/.pnpm/@tiptap+extension-placehold_7ce36c8360a28c686ad25c0dbd3961a4/node_modules/@tiptap/extension-placeholder/dist/index.js",
+      "file": "@tiptap_extension-placeholder.js",
+      "fileHash": "5504e2f5",
+      "needsInterop": false
+    },
+    "@tiptap/starter-kit": {
+      "src": "../../../node_modules/.pnpm/@tiptap+starter-kit@3.22.0/node_modules/@tiptap/starter-kit/dist/index.js",
+      "file": "@tiptap_starter-kit.js",
+      "fileHash": "28010714",
+      "needsInterop": false
+    },
+    "@tiptap/vue-3": {
+      "src": "../../../node_modules/.pnpm/@tiptap+vue-3@3.22.0_@float_fae4eadc316640dc2b13f37a7ea1ef82/node_modules/@tiptap/vue-3/dist/index.js",
+      "file": "@tiptap_vue-3.js",
+      "fileHash": "45f75552",
+      "needsInterop": false
+    },
+    "lowlight": {
+      "src": "../../../node_modules/.pnpm/lowlight@3.3.0/node_modules/lowlight/index.js",
+      "file": "lowlight.js",
+      "fileHash": "119b2f46",
+      "needsInterop": false
+    },
     "errx": {
       "src": "../../../node_modules/.pnpm/errx@0.1.0/node_modules/errx/dist/index.js",
       "file": "errx.js",
-      "fileHash": "233ea376",
+      "fileHash": "177a534a",
       "needsInterop": false
     }
   },
-  "chunks": {}
+  "chunks": {
+    "chunk-M4M3XXZU": {
+      "file": "chunk-M4M3XXZU.js"
+    },
+    "chunk-DJXF5IBC": {
+      "file": "chunk-DJXF5IBC.js"
+    },
+    "chunk-OSTQ6LBP": {
+      "file": "chunk-OSTQ6LBP.js"
+    },
+    "chunk-DV2UCQ73": {
+      "file": "chunk-DV2UCQ73.js"
+    },
+    "chunk-G3PMV62Z": {
+      "file": "chunk-G3PMV62Z.js"
+    }
+  }
 }

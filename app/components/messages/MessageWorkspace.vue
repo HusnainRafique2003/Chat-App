@@ -2,73 +2,42 @@
 import { downloadMessageFile } from '~/composables/useMessagesApi'
 import { useMessageStore } from '~/stores/useMessageStore'
 import { useUserStore } from '~/stores/useUserStore'
+import MessageBubble from './MessageBubble.vue'
 
 const messageStore = useMessageStore()
 const userStore = useUserStore()
 const toast = useToast()
 
-const channelId = ref(messageStore.currentChannelId || '')
+const channelId = ref('general') // Default channel for demo
 const search = ref('')
 const editingMessageId = ref('')
-const mockMessages = [
-  {
-    id: 'mock-1',
-    workspace_id: 'mock-workspace',
-    sender_id: 'system-a',
-    receiver_id: null,
-    channel_id: 'mock-channel',
-    message_type: 'text',
-    content: '<p>Welcome to the message layout preview. This area is meant to become your live channel conversation.</p>',
-    file_path: null,
-    file_name: null,
-    file_mime: null,
-    file_download_url: null,
-    sender: { id: 'system-a', name: 'Areeba Malik' },
-    receiver: null,
-    channel: { id: 'mock-channel', name: 'product-launch' },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    read_by_count: 3,
-    is_read_by_me: true,
-    reactions_summary: [{ emoji: '🔥', count: 2, reacted_by_me: false, reacted_by: [] }]
-  },
-  {
-    id: 'mock-2',
-    workspace_id: 'mock-workspace',
-    sender_id: userStore.user?.id || 'me',
-    receiver_id: null,
-    channel_id: 'mock-channel',
-    message_type: 'text',
-    content: '<p>Looks solid. We can connect channel selection from the sidebar next, then map real messages here.</p><pre><code>const activeChannel = sidebar.selectedChannel</code></pre>',
-    file_path: null,
-    file_name: null,
-    file_mime: null,
-    file_download_url: null,
-    sender: { id: userStore.user?.id || 'me', name: userStore.user?.name || 'You' },
-    receiver: null,
-    channel: { id: 'mock-channel', name: 'product-launch' },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    read_by_count: 1,
-    is_read_by_me: true,
-    reactions_summary: [{ emoji: '✅', count: 1, reacted_by_me: true, reacted_by: [] }]
-  }
-]
+const workspaceStore = useWorkspaceStore()
+const currentWorkspaceName = computed(() => {
+  const name = workspaceStore.currentWorkspace?.name
+  return name ? name.trim() : 'Current Workspace'
+})
 
 const selectedMessage = computed(() => {
   return messageStore.messages.find(message => message.id === editingMessageId.value) || null
 })
 
 const visibleMessages = computed(() => {
-  return messageStore.sortedMessages.length ? messageStore.sortedMessages : mockMessages
+  if ((search.value || '').trim()) {
+    return searchItems.value
+  }
+  return messageStore.sortedMessages
 })
 
 const searchItems = computed(() => {
-  return search.value.trim() ? messageStore.searchResults : []
+  return (search.value || '').trim() ? messageStore.searchResults : []
 })
 
 const activeChannelName = computed(() => {
-  return visibleMessages.value[0]?.channel?.name || 'design-review'
+  if (messageStore.currentChannelId) {
+    return `#${(messageStore.currentChannelId || '').trim() || 'channel' }`
+  }
+  const channelName = visibleMessages.value[0]?.channel?.name || ''
+  return `#${channelName.trim() || 'Select channel' }`
 })
 
 async function loadMessages() {
@@ -164,9 +133,18 @@ async function downloadAttachment(path: string) {
   }
 }
 
-watch(search, (value) => {
-  if (!value.trim()) {
+watch([channelId, search], async () => {
+  if (channelId.value) {
+    await loadMessages()
+  }
+  if (!search.value.trim()) {
     messageStore.clearSearch()
+  }
+})
+
+onMounted(async () => {
+  if (channelId.value) {
+    await loadMessages()
   }
 })
 </script>
@@ -178,9 +156,9 @@ watch(search, (value) => {
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p class="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--ui-text-dimmed)]">Message workspace</p>
-            <h2 class="mt-2 text-2xl font-black text-[var(--ui-text-highlighted)]">Channel conversation</h2>
+            <h2 class="mt-2 text-2xl font-black text-[var(--ui-text-highlighted)]">{{ currentWorkspaceName }}</h2>
             <p class="mt-2 text-sm text-[var(--ui-text-muted)]">
-              Paste a channel ID for now, or connect this area to your teammate&apos;s sidebar once it is ready.
+              Active workspace context integrated.
             </p>
           </div>
 
@@ -196,14 +174,14 @@ watch(search, (value) => {
           <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex items-center gap-4">
               <div class="flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)]">
-                <Icon name="i-mdi-pound" class="h-6 w-6" />
+                <UIcon name="i-mdi-pound" class="h-6 w-6" />
               </div>
               <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ui-text-dimmed)]">Active channel</p>
                 <h3 class="mt-1 text-2xl font-black text-[var(--ui-text-highlighted)]"># {{ activeChannelName }}</h3>
-                <p class="mt-1 text-sm text-[var(--ui-text-muted)]">
-                  {{ messageStore.sortedMessages.length ? `${messageStore.sortedMessages.length} live message${messageStore.sortedMessages.length === 1 ? '' : 's'}` : 'Showing polished mock messages until channel API is connected.' }}
-                </p>
+            <p class="mt-1 text-sm text-[var(--ui-text-muted)]">
+              {{ messageStore.sortedMessages.length ? `${messageStore.sortedMessages.length} messages loaded` : 'Enter channel ID to load live messages' }}
+            </p>
               </div>
             </div>
 
@@ -220,9 +198,9 @@ watch(search, (value) => {
 
         <div class="grid min-h-[720px] grid-rows-[minmax(0,1fr)_auto]">
           <div class="chat-preview-surface overflow-auto px-6 py-6">
-            <div v-if="!messageStore.sortedMessages.length" class="mb-6 rounded-[1.5rem] border border-dashed border-[var(--ui-border-accented)] bg-[var(--ui-bg)]/75 px-5 py-4 text-sm text-[var(--ui-text-muted)]">
-              This preview uses styled placeholder messages so you can review spacing, bubbles, attachments, reactions, and composer hierarchy before wiring real channels.
-            </div>
+        <div v-if="visibleMessages.length === 0 && !messageStore.loading" class="mb-6 rounded-[1.5rem] border border-dashed border-[var(--ui-border-accented)] bg-[var(--ui-bg)]/75 px-5 py-4 text-sm text-[var(--ui-text-muted)]">
+          Enter a channel ID above and click "Load Messages" to fetch live data from backend.
+        </div>
 
             <div class="space-y-5">
               <MessageBubble
@@ -240,7 +218,7 @@ watch(search, (value) => {
           </div>
 
           <div class="border-t border-[var(--ui-border)] bg-[var(--ui-bg-muted)]/55 p-4">
-            <MessageComposer
+            <RichMessageComposer
               :initial-content="selectedMessage?.content || ''"
               :loading="messageStore.sending"
               :submit-label="editingMessageId ? 'Update message' : 'Send message'"
@@ -276,8 +254,8 @@ watch(search, (value) => {
         </div>
 
         <div class="mt-5 space-y-3">
-          <div v-if="!searchItems.length" class="rounded-[1.25rem] border border-dashed border-[var(--ui-border-accented)] bg-[var(--ui-bg-muted)]/70 px-4 py-5 text-sm text-[var(--ui-text-muted)]">
-            Search results will appear here.
+          <div v-if="(search.value || '').trim() && !searchItems.length && !messageStore.searching" class="rounded-[1.25rem] border border-dashed border-[var(--ui-border-accented)] bg-[var(--ui-bg-muted)]/70 px-4 py-5 text-sm text-[var(--ui-text-muted)]">
+            No search results found.
           </div>
 
           <div
