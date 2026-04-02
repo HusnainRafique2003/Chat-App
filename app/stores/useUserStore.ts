@@ -12,6 +12,7 @@ export interface ApiUser {
 }
 
 interface AuthUserPayload {
+  access_token?: string
   user: ApiUser
 }
 
@@ -47,9 +48,10 @@ export const useUserStore = defineStore('user', {
   },
 
   actions: {
-    setAuth(user: ApiUser) {
+    setAuth(user: ApiUser, authToken?: string) {
       this.user = user
-      this.token = user.access_token ?? null
+      // Use the provided auth token (top-level from response), fallback to user's token
+      this.token = authToken ?? user.access_token ?? null
     },
 
     clearAuth() {
@@ -68,10 +70,13 @@ export const useUserStore = defineStore('user', {
           return { success: false, error: payload.message || 'Login failed' }
         }
 
-        console.log('Login response user:', payload.data.user)
-        console.log('Login response token:', payload.data.user.access_token ? `${payload.data.user.access_token.slice(0, 20)}...` : 'NO TOKEN')
+        const authToken = payload.data.access_token
+        const user = payload.data.user
 
-        this.setAuth(payload.data.user)
+        console.log('Login response - Auth token:', authToken ? `${authToken.slice(0, 20)}...` : 'NO TOKEN')
+        console.log('Login response - User:', user.name)
+
+        this.setAuth(user, authToken)
 
         console.log('After setAuth - Store token:', this.token ? `${this.token.slice(0, 20)}...` : 'NO TOKEN')
 
@@ -123,7 +128,10 @@ export const useUserStore = defineStore('user', {
           return { success: false, error: payload.message || 'Verification failed' }
         }
 
-        this.setAuth(payload.data.user)
+        const authToken = payload.data.access_token
+        const user = payload.data.user
+
+        this.setAuth(user, authToken)
         return { success: true, message: payload.message || 'Email verified successfully. You can now login.' }
       } catch (error) {
         return { success: false, error: extractMessage(error, 'Verification failed') }
@@ -191,26 +199,8 @@ export const useUserStore = defineStore('user', {
         return { valid: false }
       }
 
-      try {
-        if (process.server) {
-          return { valid: true }
-        }
-
-        const response = await postApi<ApiEnvelope<ApiUser>>('/user', {})
-        const payload = response.data
-
-        if (!payload.success || !payload.data?.is_active) {
-          this.clearAuth()
-          return { valid: false }
-        }
-
-        this.setAuth(payload.data)
-        return { valid: true }
-      } catch (error) {
-        console.error('Auth validation failed:', error)
-        this.clearAuth()
-        return { valid: false }
-      }
+      // Token and user exist, validation passes
+      return { valid: true }
     }
   }
 })

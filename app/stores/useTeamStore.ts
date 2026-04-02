@@ -28,11 +28,11 @@ export const useTeamStore = defineStore('team-data', {
   state: (): State => ({
     teams: [],
     loading: false,
-    currentTeamId: null,
+    currentTeamId: null
   }),
 
   getters: {
-    currentTeam: (state) => state.teams.find(t => t.id === state.currentTeamId),
+    currentTeam: state => state.teams.find(t => t.id === state.currentTeamId)
   },
 
   actions: {
@@ -43,10 +43,15 @@ export const useTeamStore = defineStore('team-data', {
         const data = response.data
 
         if (data.success) {
-          this.teams = data.data.teams || []
+          // Backend returns teams array in data.data.teams
+          const teamsData = data.data?.teams || []
+          this.teams = teamsData
+
           if (this.teams.length > 0 && !this.currentTeamId) {
             this.currentTeamId = this.teams[0]?.id || null
           }
+
+          console.log('Teams loaded:', this.teams.length)
         }
       } catch (error) {
         console.error('Failed to fetch teams:', error)
@@ -66,6 +71,6 @@ export const useTeamStore = defineStore('team-data', {
     clearTeams() {
       this.teams = []
       this.currentTeamId = null
-    },
-  },
+    }
+  }
 })

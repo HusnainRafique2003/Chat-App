@@ -15,9 +15,16 @@ teamsApiClient.interceptors.request.use((config) => {
   const userStore = useUserStore()
   const token = userStore.token
 
+  console.log('Teams API - Token:', token ? `${token.slice(0, 20)}...` : 'MISSING')
+  console.log('Teams API - User:', userStore.user?.email)
+
   if (token) {
+    // Primary: token header (as per API spec)
     config.headers.token = token
+    // Secondary: Authorization header (standard)
     config.headers.Authorization = `Bearer ${token}`
+  } else {
+    console.warn('Teams API - No token available!')
   }
 
   return config
@@ -25,9 +32,7 @@ teamsApiClient.interceptors.request.use((config) => {
 
 export async function getTeams(workspaceId: string): Promise<AxiosResponse> {
   try {
-    const response = await teamsApiClient.get('/read', {
-      data: { workspace_id: workspaceId }
-    })
+    const response = await teamsApiClient.post('/read', { workspace_id: workspaceId })
     return response
   } catch (error) {
     if (axios.isAxiosError(error)) {

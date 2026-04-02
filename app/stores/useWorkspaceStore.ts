@@ -22,11 +22,11 @@ export const useWorkspaceStore = defineStore('workspace-data', {
   state: (): State => ({
     workspaces: [],
     loading: false,
-    currentWorkspaceId: null,
+    currentWorkspaceId: null
   }),
 
   getters: {
-    currentWorkspace: (state) => state.workspaces.find(w => w.id === state.currentWorkspaceId),
+    currentWorkspace: state => state.workspaces.find(w => w.id === state.currentWorkspaceId)
   },
 
   actions: {
@@ -37,10 +37,15 @@ export const useWorkspaceStore = defineStore('workspace-data', {
         const data = response.data
 
         if (data.success) {
-          this.workspaces = data.data.workspaces || []
+          // Backend returns array directly in data.data
+          const workspacesData = Array.isArray(data.data) ? data.data : (data.data?.workspaces || [])
+          this.workspaces = workspacesData
+
           if (this.workspaces.length > 0 && !this.currentWorkspaceId) {
             this.currentWorkspaceId = this.workspaces[0]?.id || null
           }
+
+          console.log('Workspaces loaded:', this.workspaces.length)
         }
       } catch (error) {
         console.error('Failed to fetch workspaces:', error)
@@ -55,6 +60,6 @@ export const useWorkspaceStore = defineStore('workspace-data', {
 
     clearCurrentWorkspace() {
       this.currentWorkspaceId = null
-    },
-  },
+    }
+  }
 })

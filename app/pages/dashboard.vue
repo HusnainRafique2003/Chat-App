@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import MessageList from '~/components/messages/MessageList.vue'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useMessageStore } from '~/stores/useMessageStore'
 import { useTeamStore } from '~/stores/useTeamStore'

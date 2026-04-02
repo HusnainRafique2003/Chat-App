@@ -38,6 +38,30 @@ export const useChannelStore = defineStore('channel-data', {
   },
 
   actions: {
+    async fetchChannels(teamId: string) {
+      this.loading = true
+      try {
+        const response = await getChannels(teamId)
+        const data = response.data
+
+        if (data.success) {
+          // Backend returns array directly in data.data
+          const channelsData = Array.isArray(data.data) ? data.data : (data.data?.channels || [])
+          this.channels = channelsData
+
+          if (this.channels.length > 0 && !this.currentChannelId) {
+            this.currentChannelId = this.channels[0]?.id || null
+          }
+
+          console.log('Channels loaded:', this.channels.length)
+        }
+      } catch (error) {
+        console.error('Failed to fetch channels:', error)
+      } finally {
+        this.loading = false
+      }
+    },
+
     async createChannel(data: {
       name: string
       workspace_id: string

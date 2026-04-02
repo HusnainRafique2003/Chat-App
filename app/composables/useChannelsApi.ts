@@ -55,4 +55,19 @@ export async function updateChannel(data: {
   }
 }
 
+export async function getChannels(teamId: string): Promise<AxiosResponse> {
+  try {
+    const response = await channelsApiClient.get('/read', {
+      data: { team_id: teamId }
+    })
+    return response
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
+  }
+}
+
 export { channelsApiClient }
+
