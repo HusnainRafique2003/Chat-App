@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { createChannel, updateChannel } from '~/composables/useChannelsApi'
+import { createChannel, getChannels, updateChannel } from '~/composables/useChannelsApi'
 
 export interface ChannelMember {
   user_id: string
