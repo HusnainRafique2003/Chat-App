@@ -38,10 +38,10 @@ export const useChannelStore = defineStore('channel-data', {
   },
 
   actions: {
-    async fetchChannels(teamId: string) {
+    async fetchChannels(teamId: string, workspaceId?: string) {
       this.loading = true
       try {
-        const response = await getChannels(teamId)
+        const response = await getChannels(teamId, workspaceId)
         const data = response.data
 
         if (data.success) {

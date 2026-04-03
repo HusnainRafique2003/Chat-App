@@ -80,10 +80,13 @@ export async function updateChannel(data: {
   }
 }
 
-export async function getChannels(teamId: string): Promise<AxiosResponse> {
+export async function getChannels(teamId: string, workspaceId?: string): Promise<AxiosResponse> {
   try {
     // Backends vary: GET with params OR POST with JSON body, and /channel vs /channels.
-    const params = { team_id: teamId }
+    const params: Record<string, string> = { team_id: teamId }
+    if (workspaceId) {
+      params.workspace_id = workspaceId
+    }
 
     const attempts: Array<() => Promise<AxiosResponse>> = [
       () => channelsApiClient.get('/read', { params }),
