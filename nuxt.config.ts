@@ -2,6 +2,13 @@
 export default defineNuxtConfig({
   ssr: false,
   srcDir: 'app',
+  runtimeConfig: {
+    public: {
+      // Dev-only override token for debugging API calls from the browser.
+      // Set via `NUXT_PUBLIC_DEV_API_TOKEN` in `.env.local`.
+      devApiToken: process.env.NUXT_PUBLIC_DEV_API_TOKEN || ''
+    }
+  },
   app: {
     head: {
       link: [

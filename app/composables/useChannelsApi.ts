@@ -1,27 +1,39 @@
 import type { AxiosResponse } from 'axios'
 import axios from 'axios'
+import { useRuntimeConfig } from '#app'
 import { useUserStore } from '~/stores/useUserStore'
 
-const CHANNELS_BASE = 'http://178.104.58.236/api/channel'
+// Some backends use /api/channel, others /api/channels.
+const CHANNELS_BASE_SINGULAR = 'http://178.104.58.236/api/channel'
+const CHANNELS_BASE_PLURAL = 'http://178.104.58.236/api/channels'
 
-const channelsApiClient = axios.create({
-  baseURL: CHANNELS_BASE,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
+function makeClient(baseURL: string) {
+  const client = axios.create({
+    baseURL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
 
-channelsApiClient.interceptors.request.use((config) => {
-  const userStore = useUserStore()
-  const token = userStore.token
+  client.interceptors.request.use((config) => {
+    const userStore = useUserStore()
+    const runtimeConfig = useRuntimeConfig()
+    const devToken = runtimeConfig.public?.devApiToken || ''
+    const token = userStore.token || devToken
 
-  if (token) {
-    config.headers.token = token
-    config.headers.Authorization = `Bearer ${token}`
-  }
+    if (token) {
+      config.headers.token = token
+      config.headers.Authorization = `Bearer ${token}`
+    }
 
-  return config
-})
+    return config
+  })
+
+  return client
+}
+
+const channelsApiClient = makeClient(CHANNELS_BASE_SINGULAR)
+const channelsApiClientPlural = makeClient(CHANNELS_BASE_PLURAL)
 
 export async function createChannel(data: {
   name: string
@@ -30,8 +42,15 @@ export async function createChannel(data: {
   type: 'public'
 }): Promise<AxiosResponse> {
   try {
-    const response = await channelsApiClient.post('/create', data)
-    return response
+    // Try singular then plural
+    try {
+      return await channelsApiClient.post('/create', data)
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return await channelsApiClientPlural.post('/create', data)
+      }
+      throw error
+    }
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.message || error.message)
@@ -45,8 +64,14 @@ export async function updateChannel(data: {
   name: string
 }): Promise<AxiosResponse> {
   try {
-    const response = await channelsApiClient.patch('/update', data)
-    return response
+    try {
+      return await channelsApiClient.patch('/update', data)
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return await channelsApiClientPlural.patch('/update', data)
+      }
+      throw error
+    }
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.message || error.message)
@@ -57,10 +82,31 @@ export async function updateChannel(data: {
 
 export async function getChannels(teamId: string): Promise<AxiosResponse> {
   try {
-    const response = await channelsApiClient.get('/read', {
-      params: { team_id: teamId }
-    })
-    return response
+    // Backends vary: GET with params OR POST with JSON body, and /channel vs /channels.
+    const params = { team_id: teamId }
+
+    const attempts: Array<() => Promise<AxiosResponse>> = [
+      () => channelsApiClient.get('/read', { params }),
+      () => channelsApiClient.post('/read', params),
+      () => channelsApiClientPlural.get('/read', { params }),
+      () => channelsApiClientPlural.post('/read', params),
+    ]
+
+    let lastErr: unknown
+    for (const attempt of attempts) {
+      try {
+        return await attempt()
+      } catch (error) {
+        lastErr = error
+        // Keep trying on 404/method mismatch; throw on other errors.
+        if (axios.isAxiosError(error)) {
+          const status = error.response?.status
+          if (status === 404 || status === 405) continue
+        }
+      }
+    }
+
+    throw lastErr
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.message || error.message)

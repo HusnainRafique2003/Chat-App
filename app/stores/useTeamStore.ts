@@ -1,6 +1,5 @@
-import axios from 'axios'
 import { defineStore } from 'pinia'
-import { useUserStore } from '~/stores/useUserStore'
+import { getTeams } from '~/composables/useTeamsApi'
 
 export interface TeamMember {
   user_id: string
@@ -40,23 +39,7 @@ export const useTeamStore = defineStore('team-data', {
     async fetchTeams(workspaceId: string) {
       this.loading = true
       try {
-        const userStore = useUserStore()
-        const token = userStore.token
-
-        console.log('Fetching teams with token:', token ? `${token.slice(0, 20)}...` : 'NO TOKEN')
-        console.log('Workspace ID:', workspaceId)
-
-        const response = await axios.get('http://178.104.58.236/api/team/read', {
-          headers: {
-            'token': token,
-            'Content-Type': 'application/json'
-          },
-          params: {
-            workspace_id: workspaceId
-          }
-        })
-
-        console.log('Teams response:', response.data)
+        const response = await getTeams(workspaceId)
 
         if (response.data?.success) {
           const teamsData = response.data.data?.teams || response.data.data || []
@@ -65,11 +48,11 @@ export const useTeamStore = defineStore('team-data', {
           if (this.teams.length > 0 && !this.currentTeamId) {
             this.currentTeamId = this.teams[0]?.id || null
           }
-
-          console.log('Teams loaded:', this.teams.length)
+        } else {
+          this.teams = []
         }
-      } catch {
-        console.warn('Teams endpoint not available - backend may not have implemented /api/team/read yet')
+      } catch (error) {
+        console.error('Failed to fetch teams:', error)
         this.teams = []
       } finally {
         this.loading = false

@@ -49,6 +49,14 @@ export const useMessageStore = defineStore('messages', {
 
         if (data.success && data.data?.messages) {
           this.messages = data.data.messages
+
+          // Mark unread messages as read when opening a channel.
+          // (Best-effort; UI shouldn't block if this fails.)
+          const unreadIds = this.messages.filter(m => !m.is_read_by_me).map(m => m.id)
+          if (unreadIds.length) {
+            this.markAsRead(channelId, unreadIds).catch(() => {})
+          }
+
           this.pagination = data.data.pagination || {
             current_page: page,
             per_page: 20,

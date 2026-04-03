@@ -1,27 +1,41 @@
 import type { AxiosResponse } from 'axios'
 import axios from 'axios'
+import { useRuntimeConfig } from '#app'
 import { useUserStore } from '~/stores/useUserStore'
+import { useChannelStore } from '~/stores/useChannelStore'
+import { useTeamStore } from '~/stores/useTeamStore'
+import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
-const MESSAGES_BASE = 'http://178.104.58.236/api/messages'
+const MESSAGES_BASE_SINGULAR = 'http://178.104.58.236/api/message'
+const MESSAGES_BASE_PLURAL = 'http://178.104.58.236/api/messages'
 
-const messagesApiClient = axios.create({
-  baseURL: MESSAGES_BASE,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
+function makeMessagesClient(baseURL: string) {
+  const client = axios.create({
+    baseURL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
 
-messagesApiClient.interceptors.request.use((config) => {
-  const userStore = useUserStore()
-  const token = userStore.token
+  client.interceptors.request.use((config) => {
+    const userStore = useUserStore()
+    const runtimeConfig = useRuntimeConfig()
+    const devToken = runtimeConfig.public?.devApiToken || ''
+    const token = userStore.token || devToken
 
-  if (token) {
-    config.headers.token = token
-    config.headers.Authorization = `Bearer ${token}`
-  }
+    if (token) {
+      config.headers.token = token
+      config.headers.Authorization = `Bearer ${token}`
+    }
 
-  return config
-})
+    return config
+  })
+
+  return client
+}
+
+const messagesApiClient = makeMessagesClient(MESSAGES_BASE_PLURAL)
+const messagesApiClientSingular = makeMessagesClient(MESSAGES_BASE_SINGULAR)
 
 export interface MessageSender {
   id: string
@@ -97,14 +111,42 @@ export async function readMessages(data: {
   per_page?: number
 }): Promise<AxiosResponse> {
   try {
-    const response = await messagesApiClient.get('/read', {
-      data: {
-        channel_id: data.channel_id,
-        page: data.page || 1,
-        per_page: data.per_page || 20,
-      },
-    })
-    return response
+    const channelStore = useChannelStore()
+    const teamStore = useTeamStore()
+    const workspaceStore = useWorkspaceStore()
+    const selectedChannel = channelStore.channels.find(c => c.id === data.channel_id)
+
+    const payload = {
+      channel_id: data.channel_id,
+      page: data.page || 1,
+      per_page: data.per_page || 20,
+      workspace_id: selectedChannel?.workspace_id || workspaceStore.currentWorkspaceId || undefined,
+      team_id: selectedChannel?.team_id || teamStore.currentTeamId || undefined,
+    }
+
+    // Different deployments expose this endpoint with different
+    // base paths/methods. Try all common variants before failing.
+    const attempts: Array<() => Promise<AxiosResponse>> = [
+      () => messagesApiClient.get('/read', { params: payload }),
+      () => messagesApiClient.post('/read', payload),
+      () => messagesApiClientSingular.get('/read', { params: payload }),
+      () => messagesApiClientSingular.post('/read', payload),
+    ]
+
+    let lastErr: unknown
+    for (const attempt of attempts) {
+      try {
+        return await attempt()
+      } catch (error) {
+        lastErr = error
+        if (axios.isAxiosError(error)) {
+          const status = error.response?.status
+          if (status === 404 || status === 405) continue
+        }
+      }
+    }
+
+    throw lastErr
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.message || error.message)
@@ -206,6 +248,24 @@ export async function reactToMessage(data: {
   try {
     const response = await messagesApiClient.post('/react', data)
     return response
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
+  }
+}
+
+export async function downloadMessageFile(path: string): Promise<AxiosResponse<Blob>> {
+  try {
+    // Backend expects: GET /download?path=workspaces/{workspace_id}/messages/{filename}
+    return await messagesApiClient.get('/download', {
+      params: { path },
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/octet-stream'
+      }
+    })
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.message || error.message)

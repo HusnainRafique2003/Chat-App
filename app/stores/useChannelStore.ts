@@ -47,7 +47,11 @@ export const useChannelStore = defineStore('channel-data', {
         if (data.success) {
           // Backend returns array directly in data.data
           const channelsData = Array.isArray(data.data) ? data.data : (data.data?.channels || [])
-          this.channels = channelsData
+          // Normalize id field (some backends return _id only)
+          this.channels = channelsData.map((c: Channel) => ({
+            ...c,
+            id: (c as any).id || (c as any)._id
+          }))
 
           if (this.channels.length > 0 && !this.currentChannelId) {
             this.currentChannelId = this.channels[0]?.id || null

@@ -25,7 +25,14 @@ const loading = computed(() => userStore.isLoading)
 const passwordStrength = computed(() => password.value ? getPasswordStrength(password.value) : null)
 
 const isSubmitDisabled = computed(() => {
-  return loading.value || !email.value.trim() || !password.value
+  return loading.value
+})
+
+onMounted(() => {
+  // Prevent stale persisted/loading UI lock from previous interrupted requests.
+  if (userStore.isLoading) {
+    userStore.isLoading = false
+  }
 })
 
 function validateForm() {
@@ -74,7 +81,7 @@ function handlePasswordBlur() {
       <p class="mt-2 text-[var(--ui-text-muted)]">Use your workspace credentials to access the dashboard.</p>
     </div>
 
-    <form class="space-y-5" novalidate @submit.prevent="handleSubmit">
+    <form class="space-y-5" novalidate @submit.prevent>
       <BaseInput
         v-model="email"
         label="Work email"
@@ -146,7 +153,7 @@ function handlePasswordBlur() {
       </div>
 
       <BaseButton
-        type="submit"
+        type="button"
         label="Sign In"
         color="primary"
         size="lg"
@@ -154,6 +161,7 @@ function handlePasswordBlur() {
         :loading="loading"
         :disabled="isSubmitDisabled"
         class="mt-2"
+        @click="handleSubmit"
       />
     </form>
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { downloadMessageFile } from '~/composables/useMessagesApi'
 import type { Message } from '~/composables/useMessagesApi'
 import { useUserStore } from '~/stores/useUserStore'
 
@@ -12,14 +13,15 @@ interface Emits {
   (e: 'react', emoji: string): void
 }
 
-defineProps<Props>()
 defineEmits<Emits>()
 
 const userStore = useUserStore()
 const showReactions = ref(false)
 const showMenu = ref(false)
+const toast = useToast()
 
-const isOwn = computed(() => message.sender_id === userStore.user?.id)
+const props = defineProps<Props>()
+const isOwn = computed(() => props.message.sender_id === userStore.user?.id)
 
 const emojis = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '✨']
 
@@ -42,6 +44,36 @@ function formatDate(date: string) {
     return 'Yesterday'
   }
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+async function handleDownload() {
+  // Backend doc: GET /download?path=workspaces/{workspace_id}/messages/{filename}
+  const workspaceId = props.message.workspace_id
+  const filename = props.message.file_name
+  const fallbackPath = workspaceId && filename
+    ? `workspaces/${workspaceId}/messages/${filename}`
+    : ''
+
+  const path = props.message.file_path || fallbackPath
+  if (!path) return
+
+  try {
+    const response = await downloadMessageFile(path)
+    const blob = new Blob([response.data], {
+      type: response.headers['content-type'] || 'application/octet-stream'
+    })
+    const downloadUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = filename || 'attachment'
+    link.click()
+    URL.revokeObjectURL(downloadUrl)
+  } catch (error) {
+    toast.add({
+      title: error instanceof Error ? error.message : 'Unable to download file',
+      color: 'error'
+    })
+  }
 }
 </script>
 
@@ -69,11 +101,15 @@ function formatDate(date: string) {
           ? 'bg-[var(--ui-primary)] text-white rounded-br-none'
           : 'bg-[var(--ui-bg-elevated)] text-[var(--ui-text)] rounded-bl-none'
       ]">
-        <p class="text-sm leading-relaxed">{{ message.content }}</p>
+        <p
+          class="text-sm leading-relaxed"
+          v-html="message.content"
+        />
 
         <!-- File Attachment -->
         <div v-if="message.file_name" class="mt-2 pt-2 border-t border-current border-opacity-20">
           <a
+            v-if="message.file_download_url"
             :href="message.file_download_url"
             target="_blank"
             class="flex items-center gap-2 text-xs hover:opacity-80 transition-opacity"
@@ -81,6 +117,16 @@ function formatDate(date: string) {
             <UIcon name="i-mdi-file-download" class="w-4 h-4" />
             {{ message.file_name }}
           </a>
+
+          <button
+            v-else
+            type="button"
+            class="flex items-center gap-2 text-xs hover:opacity-80 transition-opacity"
+            @click="handleDownload"
+          >
+            <UIcon name="i-mdi-file-download" class="w-4 h-4" />
+            {{ message.file_name }}
+          </button>
         </div>
       </div>
 

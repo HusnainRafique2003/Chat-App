@@ -1,39 +1,63 @@
 import type { AxiosResponse } from 'axios'
 import axios from 'axios'
+import { useRuntimeConfig } from '#app'
 import { useUserStore } from '~/stores/useUserStore'
 
-const TEAMS_BASE = 'http://178.104.58.236/api/teams'
+const TEAMS_BASE_SINGULAR = 'http://178.104.58.236/api/team'
+const TEAMS_BASE_PLURAL = 'http://178.104.58.236/api/teams'
 
-const teamsApiClient = axios.create({
-  baseURL: TEAMS_BASE,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
+function makeClient(baseURL: string) {
+  const client = axios.create({
+    baseURL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
 
-teamsApiClient.interceptors.request.use((config) => {
-  const userStore = useUserStore()
-  const token = userStore.token
+  client.interceptors.request.use((config) => {
+    const userStore = useUserStore()
+    const runtimeConfig = useRuntimeConfig()
+    const devToken = runtimeConfig.public?.devApiToken || ''
+    const token = userStore.token || devToken
 
-  console.log('Teams API - Token:', token ? `${token.slice(0, 20)}...` : 'MISSING')
-  console.log('Teams API - User:', userStore.user?.email)
+    if (token) {
+      config.headers.token = token
+      config.headers.Authorization = `Bearer ${token}`
+    }
 
-  if (token) {
-    // Primary: token header (as per API spec)
-    config.headers.token = token
-    // Secondary: Authorization header (standard)
-    config.headers.Authorization = `Bearer ${token}`
-  } else {
-    console.warn('Teams API - No token available!')
-  }
+    return config
+  })
 
-  return config
-})
+  return client
+}
+
+const teamsApiClient = makeClient(TEAMS_BASE_PLURAL)
+const teamsApiClientSingular = makeClient(TEAMS_BASE_SINGULAR)
 
 export async function getTeams(workspaceId: string): Promise<AxiosResponse> {
   try {
-    const response = await teamsApiClient.post('/read', { workspace_id: workspaceId })
-    return response
+    const payload = { workspace_id: workspaceId }
+    const attempts: Array<() => Promise<AxiosResponse>> = [
+      () => teamsApiClient.get('/read', { params: payload }),
+      () => teamsApiClient.post('/read', payload),
+      () => teamsApiClientSingular.get('/read', { params: payload }),
+      () => teamsApiClientSingular.post('/read', payload),
+    ]
+
+    let lastErr: unknown
+    for (const attempt of attempts) {
+      try {
+        return await attempt()
+      } catch (error) {
+        lastErr = error
+        if (axios.isAxiosError(error)) {
+          const status = error.response?.status
+          if (status === 404 || status === 405) continue
+        }
+      }
+    }
+
+    throw lastErr
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.message || error.message)

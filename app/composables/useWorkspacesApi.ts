@@ -1,5 +1,6 @@
 import type { AxiosResponse } from 'axios'
 import axios from 'axios'
+import { useRuntimeConfig } from '#app'
 import { useUserStore } from '~/stores/useUserStore'
 
 const WORKSPACES_BASE = 'http://178.104.58.236/api/workspaces'
@@ -13,7 +14,9 @@ const workspacesApiClient = axios.create({
 
 workspacesApiClient.interceptors.request.use((config) => {
   const userStore = useUserStore()
-  const token = userStore.token
+  const runtimeConfig = useRuntimeConfig()
+  const devToken = runtimeConfig.public?.devApiToken || ''
+  const token = userStore.token || devToken
 
   console.log('Workspace API - Token:', token ? `${token.slice(0, 20)}...` : 'MISSING')
   console.log('Workspace API - User:', userStore.user?.email)

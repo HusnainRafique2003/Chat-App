@@ -22,6 +22,9 @@ interface UserState {
   isLoading: boolean
 }
 
+const LOGIN_REQUEST_TIMEOUT_MS = 15000
+let activeLoginController: AbortController | null = null
+
 function extractMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) {
     return error.message
@@ -44,7 +47,8 @@ export const useUserStore = defineStore('user', {
   },
 
   persist: {
-    enabled: true
+    enabled: true,
+    pick: ['user', 'token']
   },
 
   actions: {
@@ -60,10 +64,23 @@ export const useUserStore = defineStore('user', {
     },
 
     async login(email: string, password: string) {
+      if (activeLoginController) {
+        activeLoginController.abort()
+      }
+
+      const controller = new AbortController()
+      activeLoginController = controller
       this.isLoading = true
 
       try {
-        const response = await postApi<ApiEnvelope<AuthUserPayload>>('/login', { email, password })
+        const response = await postApi<ApiEnvelope<AuthUserPayload>>(
+          '/login',
+          { email, password },
+          {
+            signal: controller.signal,
+            timeout: LOGIN_REQUEST_TIMEOUT_MS
+          }
+        )
         const payload = response.data
 
         if (!payload.success || !payload.data?.user) {
@@ -77,13 +94,17 @@ export const useUserStore = defineStore('user', {
         console.log('Login response - User:', user.name)
 
         this.setAuth(user, authToken)
-
-        console.log('After setAuth - Store token:', this.token ? `${this.token.slice(0, 20)}...` : 'NO TOKEN')
-
         return { success: true, message: payload.message || 'Login successful' }
       } catch (error) {
+        if (error instanceof Error && (error.name === 'CanceledError' || error.name === 'AbortError')) {
+          return { success: false, error: 'Login request was cancelled. Please try again.' }
+        }
+
         return { success: false, error: extractMessage(error, 'Login failed') }
       } finally {
+        if (activeLoginController === controller) {
+          activeLoginController = null
+        }
         this.isLoading = false
       }
     },

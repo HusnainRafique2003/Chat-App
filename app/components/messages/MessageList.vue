@@ -19,7 +19,7 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false
 })
 
-defineEmits<Emits>()
+const emit = defineEmits<Emits>()
 
 const messageStore = useMessageStore()
 const messagesContainer = ref<HTMLElement>()
@@ -31,7 +31,9 @@ const sortedMessages = computed(() => messageStore.sortedMessages)
 
 watch(() => props.channelId, async (newChannelId) => {
   if (newChannelId) {
-    await messageStore.fetchMessages(newChannelId)
+    const trimmed = newChannelId.trim()
+    if (!trimmed) return
+    await messageStore.fetchMessages(trimmed)
     scrollToBottom()
   }
 }, { immediate: true })
