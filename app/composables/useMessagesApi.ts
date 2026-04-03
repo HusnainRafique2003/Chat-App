@@ -1,41 +1,8 @@
 import type { AxiosResponse } from 'axios'
-import axios from 'axios'
-import { useRuntimeConfig } from '#app'
-import { useUserStore } from '~/stores/useUserStore'
-import { useChannelStore } from '~/stores/useChannelStore'
-import { useTeamStore } from '~/stores/useTeamStore'
-import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
+import { API_CONFIG, getApiUrl } from '~/config/api.config'
+import { createApiClient } from '~/services/api.client'
 
-const MESSAGES_BASE_SINGULAR = 'http://178.104.58.236/api/message'
-const MESSAGES_BASE_PLURAL = 'http://178.104.58.236/api/messages'
-
-function makeMessagesClient(baseURL: string) {
-  const client = axios.create({
-    baseURL,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  })
-
-  client.interceptors.request.use((config) => {
-    const userStore = useUserStore()
-    const runtimeConfig = useRuntimeConfig()
-    const devToken = runtimeConfig.public?.devApiToken || ''
-    const token = userStore.token || devToken
-
-    if (token) {
-      config.headers.token = token
-      config.headers.Authorization = `Bearer ${token}`
-    }
-
-    return config
-  })
-
-  return client
-}
-
-const messagesApiClient = makeMessagesClient(MESSAGES_BASE_PLURAL)
-const messagesApiClientSingular = makeMessagesClient(MESSAGES_BASE_SINGULAR)
+const messagesApiClient = createApiClient(getApiUrl(API_CONFIG.ENDPOINTS.MESSAGES))
 
 export interface MessageSender {
   id: string
