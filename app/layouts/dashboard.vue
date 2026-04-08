@@ -117,7 +117,7 @@ watch(
           </div>
         </header>
 
-        <main class="flex-1 min-h-0 overflow-hidden p-5 sm:p-8">
+        <main class="flex-1 min-h-0 overflow-hidden">
           <slot />
         </main>
       </div>

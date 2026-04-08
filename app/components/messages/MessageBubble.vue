@@ -25,6 +25,23 @@ const isOwn = computed(() => props.message.sender_id === userStore.user?.id)
 
 const emojis = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '✨']
 
+/**
+ * Strip HTML tags and convert HTML entities to plain text while preserving line breaks
+ */
+function stripHtmlTags(html: string): string {
+  const temp = document.createElement('div')
+  temp.innerHTML = html
+  let text = temp.textContent || temp.innerText || ''
+  // Preserve newlines but trim trailing whitespace
+  text = text.trim()
+  return text
+}
+
+/**
+ * Get clean message content (plain text without HTML tags)
+ */
+const cleanContent = computed(() => stripHtmlTags(props.message.content))
+
 function formatTime(date: string) {
   return new Date(date).toLocaleTimeString('en-US', {
     hour: '2-digit',
@@ -101,10 +118,9 @@ async function handleDownload() {
           ? 'bg-[var(--ui-primary)] text-white rounded-br-none'
           : 'bg-[var(--ui-bg-elevated)] text-[var(--ui-text)] rounded-bl-none'
       ]">
-        <p
-          class="text-sm leading-relaxed"
-          v-html="message.content"
-        />
+        <p class="text-sm leading-relaxed whitespace-pre-wrap">
+          {{ cleanContent }}
+        </p>
 
         <!-- File Attachment -->
         <div v-if="message.file_name" class="mt-2 pt-2 border-t border-current border-opacity-20">

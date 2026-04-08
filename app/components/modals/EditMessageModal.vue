@@ -18,10 +18,28 @@ const open = defineModel<boolean>('open', { default: false })
 const editContent = ref('')
 const originalContent = ref('')
 
+/**
+ * Strip HTML tags and convert HTML entities to plain text while preserving line breaks
+ */
+function stripHtmlTags(html: string): string {
+  // Create a temporary element to use browser's HTML parsing
+  const temp = document.createElement('div')
+  temp.innerHTML = html
+  
+  // Get text content (this removes all HTML tags)
+  let text = temp.textContent || temp.innerText || ''
+  
+  // Preserve newlines but trim trailing whitespace
+  text = text.trim()
+  
+  return text
+}
+
 watch(() => props.message, (newMessage) => {
   if (newMessage && open.value) {
-    editContent.value = newMessage.content
-    originalContent.value = newMessage.content
+    // Strip HTML tags from the message content for display/editing
+    editContent.value = stripHtmlTags(newMessage.content)
+    originalContent.value = stripHtmlTags(newMessage.content)
   }
 }, { immediate: true })
 

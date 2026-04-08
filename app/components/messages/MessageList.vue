@@ -183,11 +183,11 @@ async function handleReaction(messageId: string, emoji: string) {
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-[var(--ui-bg)]">
-    <!-- Messages Container -->
+  <div class="flex flex-col h-full bg-[var(--ui-bg)] overflow-hidden">
+    <!-- Messages Container (scrollable) -->
     <div
       ref="messagesContainer"
-      class="flex-1 overflow-y-auto p-4 space-y-4"
+      class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4"
     >
       <!-- Loading State -->
       <div v-if="loading" class="flex items-center justify-center h-full">
@@ -218,8 +218,10 @@ async function handleReaction(messageId: string, emoji: string) {
       </template>
     </div>
 
-    <!-- Message Composer -->
-    <RichMessageComposer @send="$emit('message-sent', $event)" />
+    <!-- Message Composer (sticky at bottom) -->
+    <div class="shrink-0 border-t border-[var(--ui-border)]">
+      <RichMessageComposer @send="$emit('message-sent', $event)" />
+    </div>
 
     <!-- Edit Message Modal -->
     <EditMessageModal
