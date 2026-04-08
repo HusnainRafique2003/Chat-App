@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { addChannelMember } from '~/composables/useChannelsApi'
 import { canDeleteMessage, canEditMessage, createMessage, deleteMessage, markMessagesAsRead, reactToMessage, readMessages, searchMessages, updateMessage, type Message } from '~/composables/useMessagesApi'
+import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
@@ -222,26 +223,50 @@ export const useMessageStore = defineStore('messages', {
         console.log('[Message Store] First message keys:', messagesArray[0] ? Object.keys(messagesArray[0]) : 'no messages')
         
         const userStore = useUserStore()
+        const workspaceStore = useWorkspaceStore()
         const currentUserId = userStore.user?.id
         const currentUserName = userStore.user?.name
+        const workspaceMembers = workspaceStore.currentWorkspace?.members || []
+        const userNameMap = new Map<string, string>()
+
+        workspaceMembers.forEach((member: any) => {
+          const ids = [member?.id, member?._id, member?.user_id].filter(Boolean)
+          const name = member?.name || member?.user?.name
+
+          if (name) {
+            ids.forEach((id: string) => userNameMap.set(id, name))
+          }
+        })
+
+        const looksLikeUserId = (value?: string | null) => Boolean(value && /^[a-f0-9]{24}$/i.test(value))
         
         this.messages = messagesArray
           .filter((m: any) => !m.channel_id || m.channel_id === channelId)
           .map((m: any) => {
-            // Get sender name using the new method
-            const isCurrentUser = m.sender_id === currentUserId
-            const senderName = this.getSenderName(m.sender_id, m.sender?.name, isCurrentUser)
-            
+            const senderId = m.sender?.id || m.sender?._id || m.sender_id || ''
+            const backendSenderName = m.sender?.name
+            let senderName = backendSenderName
+             
+            if ((!senderName || looksLikeUserId(senderName)) && senderId === currentUserId) {
+              senderName = currentUserName || 'You'
+            } else if (!senderName || looksLikeUserId(senderName)) {
+              senderName = userNameMap.get(senderId) || senderName
+            }
+
+            if (!senderName) {
+              senderName = 'Unknown'
+            }
+             
             const normalized = {
               ...m,
               id: m.id || m._id,
               channel_id: m.channel_id || channelId,
-              // Provide defaults for optional fields that MessageBubble expects
-              sender: m.sender || { 
-                id: m.sender_id, 
+              sender: {
+                ...(m.sender || {}),
+                id: senderId,
                 name: senderName, 
-                email: '', 
-                is_active: true 
+                email: m.sender?.email || '',
+                is_active: m.sender?.is_active ?? true 
               },
               reactions_summary: m.reactions_summary || [],
               is_read_by_me: m.is_read_by_me ?? false,
@@ -290,8 +315,9 @@ export const useMessageStore = defineStore('messages', {
         const is403NotMember = errorMessage.includes('You are not a member of this channel') || 
                                 errorMessage.includes('not a member')
         const isDirectChannel = errorMessage.includes('Cannot add members to a direct channel')
+        const isInactiveDirectChannel = errorMessage.includes('no longer a member of this direct channel')
         
-        if (is403NotMember && retryCount === 0 && !isDirectChannel) {
+        if (is403NotMember && retryCount === 0 && !isDirectChannel && !isInactiveDirectChannel) {
           try {
             const userStore = useUserStore()
             if (!userStore.user?.id) {
@@ -329,7 +355,7 @@ export const useMessageStore = defineStore('messages', {
         }
         
         // For direct channels or if already a member, just show the error
-        if (isDirectChannel || errorMessage.includes('already a member')) {
+        if (isDirectChannel || isInactiveDirectChannel || errorMessage.includes('already a member')) {
           console.warn('[Message Store] Direct channel or already member, cannot auto-add:', { channelId, errorMessage })
           return { success: false, error: errorMessage }
         }

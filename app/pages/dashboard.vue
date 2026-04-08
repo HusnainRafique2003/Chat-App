@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useToast } from '#ui/composables/useToast'
 import MessageList from '~/components/messages/MessageList.vue'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useMessageStore } from '~/stores/useMessageStore'
 import { useTeamStore } from '~/stores/useTeamStore'
+import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
 
 definePageMeta({
@@ -14,6 +16,8 @@ const userStore = useUserStore()
 const teamStore = useTeamStore()
 const channelStore = useChannelStore()
 const messageStore = useMessageStore()
+const workspaceStore = useWorkspaceStore()
+const toast = useToast()
 
 const showMessaging = ref(false)
 
@@ -37,6 +41,19 @@ async function handleMessageSent(data: { content: string; file?: File }) {
   )
 
   if (!result.success) {
+    if (result.error?.includes('no longer a member of this direct channel')) {
+      toast.add({
+        title: 'This direct message is no longer available',
+        description: 'The other user is no longer a member of that conversation.',
+        color: 'warning'
+      })
+      return
+    }
+
+    toast.add({
+      title: result.error || 'Failed to send message',
+      color: 'error'
+    })
     console.error('Failed to send message:', result.error)
   }
 }
@@ -54,6 +71,36 @@ async function handleMessageEdited(data: { messageId: string; content: string; f
   if (!result.success) {
     console.error('Failed to edit message:', result.error)
   }
+}
+
+function looksLikeUserId(value?: string | null) {
+  return Boolean(value && /^[a-f0-9]{24}$/i.test(value))
+}
+
+function getCurrentChannelDisplayName() {
+  const channel = channelStore.currentChannel
+  if (!channel) return channelStore.currentChannelId || ''
+
+  if (channel.type !== 'direct') {
+    return channel.name || channel.id
+  }
+
+  const currentUserId = userStore.user?.id || (userStore.user as any)?._id
+  const otherMemberId = channel.members?.find(member => member.user_id && member.user_id !== currentUserId)?.user_id
+  const workspaceMembers = workspaceStore.currentWorkspace?.members || []
+
+  if (otherMemberId) {
+    const otherMember = workspaceMembers.find((member: any) =>
+      member?.id === otherMemberId || member?._id === otherMemberId || member?.user_id === otherMemberId
+    )
+
+    if (otherMember?.name) {
+      return otherMember.name
+    }
+  }
+
+  const fallbackName = channel.name?.replace('DM: ', '') || channel.id
+  return looksLikeUserId(fallbackName) ? channel.id : fallbackName
 }
 </script>
 

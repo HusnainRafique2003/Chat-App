@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeMount, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import type { Message } from '~/composables/useMessagesApi'
 import { useMessageStore } from '~/stores/useMessageStore'
 import { useUserStore } from '~/stores/useUserStore'
@@ -46,36 +46,26 @@ const sortedMessages = computed(() => {
   return messages
 })
 
-// Ensure store is hydrated from localStorage before fetching
-onBeforeMount(async () => {
-  // Pinia persisted state should be available
-  if (userStore.token) {
-    console.log('[MessageList] Store ready with token:', userStore.token.slice(0, 20) + '...')
-    storeReady.value = true
-  } else {
-    console.warn('[MessageList] No token found in store after mount')
-  }
-})
+watch(
+  [() => props.channelId, () => userStore.token],
+  async ([newChannelId, token]) => {
+    if (!token || !newChannelId) {
+      return
+    }
 
-watch(() => props.channelId, async (newChannelId) => {
-  if (!storeReady.value) {
-    console.warn('[MessageList] Store not ready yet, waiting for token...')
-    return
-  }
-
-  if (newChannelId) {
     const trimmed = newChannelId.trim()
     if (!trimmed) return
-    
+
+    console.log('[MessageList] Store ready with token:', token.slice(0, 20) + '...')
+
     // Reset UI state when switching channels
-    editingMessage.value = null
-    showEditModal.value = false
-    deletingMessageId.value = null
-    showDeleteModal.value = false
-    
+    editingId.value = null
+    editContent.value = ''
+    showDeleteConfirm.value = null
+
     console.log('[MessageList] Switching to channel:', trimmed)
     console.log('[MessageList] Clearing store and fetching messages')
-    
+
     await messageStore.fetchMessages(trimmed)
     // Wait for DOM updates and then scroll to bottom with requestAnimationFrame
     await nextTick()

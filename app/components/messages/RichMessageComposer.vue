@@ -756,62 +756,70 @@ watch(() => props.initialContent, v => {
       >
         <!-- Toolbar -->
         <div
-          class="flex items-center justify-between px-3 py-2
-                 border-b border-[var(--ui-border)] bg-[var(--ui-bg-muted)]/30"
+          class="flex items-center gap-2 px-3 py-2
+                 border-b border-[var(--ui-border)] bg-[var(--ui-bg-muted)]/30
+                 "
         >
-          <div class="flex items-center gap-0.5">
-            <UButton
-              icon="i-lucide-bold"
-              size="xs" color="neutral" variant="ghost"
-              class="h-8 w-8 cursor-pointer"
-              :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('bold') }"
-              title="Bold (Ctrl+B)"
-              @click="insertBold"
-            />
-            <UButton
-              icon="i-lucide-italic"
-              size="xs" color="neutral" variant="ghost"
-              class="h-8 w-8 cursor-pointer"
-              :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('italic') }"
-              title="Italic (Ctrl+I)"
-              @click="insertItalic"
-            />
-            <div class="w-px h-4 bg-[var(--ui-border)] mx-1" />
-            <UButton
-              icon="i-lucide-link"
-              size="xs" color="neutral" variant="ghost"
-              class="h-8 w-8 cursor-pointer"
-              :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('link') }"
-              title="Insert / Edit Link"
-              @click="openLinkDialog"
-            />
-            <UButton
-              icon="i-lucide-code"
-              size="xs" color="neutral" variant="ghost"
-              class="h-8 w-8 cursor-pointer"
-              :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('codeBlock') }"
-              title="Code Block"
-              @click="insertCodeBlock"
-            />
+          <div
+            class="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          >
+            <div class="flex min-w-max items-center gap-1 whitespace-nowrap">
+              <UButton
+                icon="i-lucide-bold"
+                size="xs" color="neutral" variant="ghost"
+                class="h-8 w-8 shrink-0 cursor-pointer"
+                :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('bold') }"
+                title="Bold (Ctrl+B)"
+                @click="insertBold"
+              />
+              <UButton
+                icon="i-lucide-italic"
+                size="xs" color="neutral" variant="ghost"
+                class="h-8 w-8 shrink-0 cursor-pointer"
+                :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('italic') }"
+                title="Italic (Ctrl+I)"
+                @click="insertItalic"
+              />
+              <div class="mx-1 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
+              <UButton
+                icon="i-lucide-link"
+                size="xs" color="neutral" variant="ghost"
+                class="h-8 w-8 shrink-0 cursor-pointer"
+                :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('link') }"
+                title="Insert / Edit Link"
+                @click="openLinkDialog"
+              />
+              <UButton
+                icon="i-lucide-code"
+                size="xs" color="neutral" variant="ghost"
+                class="h-8 w-8 shrink-0 cursor-pointer"
+                :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('codeBlock') }"
+                title="Code Block"
+                @click="insertCodeBlock"
+              />
+              <div class="mx-1 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
+              <UButton
+                icon="i-lucide-mic"
+                size="xs" color="neutral" variant="ghost"
+                class="h-8 w-8 shrink-0 cursor-pointer"
+                title="Voice Note"
+                @click="openVoiceDialog"
+              />
+              <UButton
+                icon="i-lucide-paperclip"
+                size="xs" color="neutral" variant="ghost"
+                class="h-8 w-8 shrink-0 cursor-pointer"
+                title="Attach File"
+                @click="fileInput?.click()"
+              />
+              <input ref="fileInput" type="file" class="hidden" @change="handleFileSelect" />
+              <div class="mx-1 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
+              <UButton icon="i-lucide-smile" size="xs" color="neutral" variant="ghost" class="h-8 w-8 shrink-0 cursor-pointer" title="Add emoji" @click="showEmojiPicker = true" />
+              <UButton icon="i-lucide-at-sign" size="xs" color="neutral" variant="ghost" class="h-8 w-8 shrink-0 cursor-pointer" title="Mention member" @click="openMentionModal" />
+              <UButton icon="i-lucide-calendar-clock" size="xs" color="neutral" variant="ghost" class="h-8 w-8 shrink-0 cursor-pointer" title="Schedule send" @click="showScheduler = true" />
+            </div>
           </div>
-
-          <div class="flex items-center gap-1">
-            <UButton
-              icon="i-lucide-mic"
-              size="xs" color="neutral" variant="ghost"
-              class="h-8 w-8 cursor-pointer"
-              title="Voice Note"
-              @click="openVoiceDialog"
-            />
-            <UButton
-              icon="i-lucide-paperclip"
-              size="xs" color="neutral" variant="ghost"
-              class="h-8 w-8 cursor-pointer"
-              title="Attach File"
-              @click="fileInput?.click()"
-            />
-            <input ref="fileInput" type="file" class="hidden" @change="handleFileSelect" />
-          </div>
+          <UButton icon="i-lucide-send" color="primary" size="xs" class="h-8 w-8 shrink-0 cursor-pointer rounded-full shadow-lg shadow-[var(--ui-primary)]/20" :loading="loading" title="Send message" @click="sendMessage()" />
         </div>
 
         <!-- Rich-text editor area -->
@@ -848,52 +856,9 @@ watch(() => props.initialContent, v => {
             </div>
           </Transition>
         </div>
-
-        <!-- Footer -->
-        <div
-          class="flex items-center justify-between px-3 py-2
-                 border-t border-[var(--ui-border)]/50 bg-[var(--ui-bg)]"
-        >
-          <div class="flex items-center gap-1">
-            <UButton icon="i-lucide-smile"   size="xs" color="neutral" variant="ghost" class="h-8 w-8 cursor-pointer" title="Add emoji" @click="showEmojiPicker = true" />
-            <UButton icon="i-lucide-at-sign" size="xs" color="neutral" variant="ghost" class="h-8 w-8 cursor-pointer" title="Mention member" @click="openMentionModal" />
-          </div>
-
-          <div class="flex items-center gap-2">
-            <span class="text-[10px] font-black text-[var(--ui-text-dimmed)] uppercase tracking-widest hidden sm:block opacity-40">
-              Enter to send · Shift+Enter for new line
-            </span>
-
-            <!-- Schedule button -->
-            <UButton
-              icon="i-lucide-calendar-clock"
-              size="sm"
-              color="neutral"
-              variant="soft"
-              class="cursor-pointer"
-              title="Schedule send"
-              @click="showScheduler = true"
-            />
-
-            <!-- Send now -->
-            <UButton
-              color="primary"
-              size="sm"
-              class="px-4 font-black uppercase tracking-widest text-[10px]
-                     shadow-lg shadow-[var(--ui-primary)]/20 cursor-pointer"
-              :loading="loading"
-              @click="sendMessage()"
-            >
-              {{ submitLabel ?? 'Send' }}
-              <template #trailing>
-                <UIcon name="i-lucide-send" class="h-3.5 w-3.5" />
-              </template>
-            </UButton>
-          </div>
         </div>
       </div>
     </div>
-  </div>
 </template>
 
 <style scoped>

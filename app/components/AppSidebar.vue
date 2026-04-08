@@ -37,6 +37,46 @@ const teamItems = computed(() =>
   }))
 )
 
+const workspaceMemberNameMap = computed(() => {
+  const map = new Map<string, string>()
+
+  for (const member of workspaceStore.currentWorkspace?.members || []) {
+    const ids = [member?.id, (member as any)?._id, (member as any)?.user_id].filter(Boolean)
+    const name = member?.name || 'Unknown User'
+
+    ids.forEach((id) => map.set(String(id), name))
+  }
+
+  return map
+})
+
+function looksLikeUserId(value?: string | null) {
+  return Boolean(value && /^[a-f0-9]{24}$/i.test(value))
+}
+
+function getDirectChannelName(channel: { name: string, members?: Array<{ user_id?: string, id?: string }> }) {
+  const currentUserId = userStore.user?.id || (userStore.user as any)?._id
+  const fallbackName = channel.name.replace('DM: ', '')
+
+  const otherMemberId = channel.members?.find(member => {
+    const memberId = member.user_id || member.id
+    return memberId && memberId !== currentUserId
+  })?.user_id || channel.members?.find(member => {
+    const memberId = member.user_id || member.id
+    return memberId && memberId !== currentUserId
+  })?.id
+
+  if (otherMemberId) {
+    return workspaceMemberNameMap.value.get(otherMemberId) || fallbackName
+  }
+
+  if (looksLikeUserId(fallbackName)) {
+    return workspaceMemberNameMap.value.get(fallbackName) || 'Unknown User'
+  }
+
+  return fallbackName
+}
+
 const channelItems = computed(() =>
   channelStore.channels
     // STRICT FILTER: Only show public/private channels that belong to the active team!
@@ -53,7 +93,7 @@ const directMessages = computed(() =>
     .filter(c => c.type === 'direct')
     .map(c => ({
       id: c.id,
-      name: c.name.replace('DM: ', ''),
+      name: getDirectChannelName(c),
       active: c.id === channelStore.currentChannelId,
       online: true
     }))
