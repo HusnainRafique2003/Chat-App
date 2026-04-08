@@ -69,10 +69,10 @@ async function handleMessageEdited(data: { messageId: string; content: string; f
 
 <template>
   <!-- AppSidebar is already rendered by `layouts/dashboard.vue`. This page renders only the chat area. -->
-  <div class="flex h-full min-h-0 flex-col">
+  <div class="flex h-full w-full flex-col overflow-hidden">
     <div
       v-if="showMessaging && channelStore.currentChannelId"
-      class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-bg)] shadow-[var(--shadow-md)]"
+      class="flex h-full w-full flex-col overflow-hidden"
     >
       <div class="border-b border-[var(--ui-border)] bg-[var(--ui-bg-muted)] px-6 py-4">
         <div class="flex items-center justify-between gap-4">
@@ -101,7 +101,7 @@ async function handleMessageEdited(data: { messageId: string; content: string; f
 
     <div
       v-else
-      class="flex min-h-0 flex-1 items-center justify-center rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-bg)] shadow-[var(--shadow-md)]"
+      class="flex h-full w-full flex-col items-center justify-center"
     >
       <div class="text-center">
         <UIcon name="i-mdi-chat-outline" class="mx-auto mb-4 h-16 w-16 text-[var(--ui-text-dimmed)]" />

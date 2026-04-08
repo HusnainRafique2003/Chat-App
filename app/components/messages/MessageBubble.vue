@@ -128,18 +128,23 @@ async function handleDownload() {
             {{ message.file_name }}
           </button>
         </div>
-      </div>
 
-      <!-- Reactions -->
-      <div v-if="message.reactions_summary.length > 0" class="flex flex-wrap gap-1 mt-1">
-        <button
-          v-for="reaction in message.reactions_summary"
-          :key="reaction.emoji"
-          class="px-2 py-1 rounded-full text-xs bg-[var(--ui-bg-elevated)] hover:bg-[var(--ui-bg-muted)] transition-colors"
-          :title="`${reaction.reacted_by.length} reaction${reaction.reacted_by.length !== 1 ? 's' : ''}`"
-        >
-          {{ reaction.emoji }} {{ reaction.count }}
-        </button>
+        <!-- Reactions Inside Bubble -->
+        <div v-if="message.reactions_summary.length > 0" :class="['flex flex-wrap gap-1 mt-2', isOwn ? 'justify-end' : 'justify-start']">
+          <button
+            v-for="reaction in message.reactions_summary"
+            :key="reaction.emoji"
+            class="px-2 py-1 rounded-full text-xs transition-colors cursor-pointer"
+            :class="[
+              isOwn
+                ? 'bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30'
+                : 'bg-white bg-opacity-50 hover:bg-opacity-70 border border-[var(--ui-border)]'
+            ]"
+            :title="`${reaction.reacted_by.length} reaction${reaction.reacted_by.length !== 1 ? 's' : ''}`"
+          >
+            {{ reaction.emoji }} {{ reaction.count }}
+          </button>
+        </div>
       </div>
 
       <!-- Actions -->
@@ -149,6 +154,7 @@ async function handleDownload() {
           size="xs"
           color="gray"
           variant="ghost"
+          class="cursor-pointer"
           @click="showReactions = !showReactions"
         />
         <UButton
@@ -157,6 +163,7 @@ async function handleDownload() {
           size="xs"
           color="gray"
           variant="ghost"
+          class="cursor-pointer"
           @click="$emit('edit')"
         />
         <UButton
@@ -165,17 +172,19 @@ async function handleDownload() {
           size="xs"
           color="red"
           variant="ghost"
+          class="cursor-pointer"
           @click="$emit('delete')"
         />
       </div>
 
       <!-- Emoji Picker -->
-      <div v-if="showReactions" class="flex flex-wrap gap-2 mt-2 p-2 bg-[var(--ui-bg-elevated)] rounded-lg">
+      <div v-if="showReactions" class="flex flex-wrap gap-2 mt-2 p-3 bg-[var(--ui-bg-elevated)] rounded-lg border border-[var(--ui-border)] shadow-lg">
         <button
           v-for="emoji in emojis"
           :key="emoji"
           class="text-lg hover:scale-125 transition-transform cursor-pointer"
           @click="$emit('react', emoji); showReactions = false"
+          :title="`React with ${emoji}`"
         >
           {{ emoji }}
         </button>
