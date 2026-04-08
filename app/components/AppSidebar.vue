@@ -15,6 +15,7 @@ const channelStore = useChannelStore()
 const userStore = useUserStore()
 
 const showCreateChannelModal = ref(false)
+const isWorkspaceDropdownOpen = ref(false)
 const showDmModal = ref(false)
 const newChannelName = ref('')
 
@@ -114,6 +115,17 @@ const availableWorkspaceMembers = computed(() => {
       email: member.email || 'No email provided'
     }))
 })
+// Formats workspaces into Nuxt UI Dropdown items
+const workspaceDropdownItems = computed(() => {
+  return [
+    workspaceStore.workspaces.map(w => ({
+      label: w.name,
+      // Adds a checkmark next to the active one
+      icon: w.id === workspaceStore.currentWorkspaceId ? 'i-lucide-check-circle' : 'i-lucide-building',
+      click: () => workspaceStore.setCurrentWorkspace(w.id)
+    }))
+  ]
+})
 
 // INSTANT OPEN - Fetches data in the background
 function openDmModal() {
@@ -163,23 +175,54 @@ async function handleStartDm(member: DmMember) {
     
     <div class="flex w-16 flex-col items-center border-r border-[var(--ui-border)] px-2 py-5 overflow-y-auto shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
       
-      <p class="mb-3 text-[8px] font-bold uppercase tracking-[0.2em] text-[var(--ui-text-dimmed)] shrink-0">
+      <p class="mb-3 text-[7px] font-bold uppercase tracking-[0.2em] text-[var(--ui-text-dimmed)] shrink-0">
         Workspace
       </p>
-      <div class="flex flex-col items-center gap-3 mb-6 shrink-0">
+      
+      <div class="flex flex-col items-center mb-6 shrink-0 w-full">
+        
         <button
-          v-for="workspace in workspaceItems"
-          :key="workspace.id"
           type="button"
-          :title="workspace.name"
-          @click="workspaceStore.setCurrentWorkspace(workspace.id)"
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition-all"
-          :class="workspace.active
-            ? 'bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)]'
-            : 'bg-[var(--ui-bg-muted)] text-[var(--ui-text)] hover:bg-[var(--ui-bg-elevated)]'"
+          @click="isWorkspaceDropdownOpen = !isWorkspaceDropdownOpen"
+          :title="workspaceStore.currentWorkspace?.name"
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition-all bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)] ring-2 ring-transparent hover:ring-[var(--ui-primary)]/50 relative z-[101]"
         >
-          {{ workspace.label }}
+          {{ workspaceStore.currentWorkspace?.name?.slice(0,2).toUpperCase() || 'WS' }}
         </button>
+
+        <div 
+          v-if="isWorkspaceDropdownOpen" 
+          class="fixed left-16 top-5 z-[100] ml-2 w-56 rounded-xl bg-[var(--ui-bg)] border border-[var(--ui-border)] shadow-xl overflow-hidden animate-in fade-in slide-in-from-left-2 duration-200"
+        >
+          <div class="px-4 py-3 text-[10px] font-bold text-[var(--ui-text-dimmed)] uppercase tracking-wider border-b border-[var(--ui-border)] bg-[var(--ui-bg-muted)]/50">
+            Switch Workspace
+          </div>
+          
+          <div class="max-h-[400px] overflow-y-auto p-1.5 space-y-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <button
+              v-for="workspace in workspaceStore.workspaces"
+              :key="workspace.id"
+              @click="workspaceStore.setCurrentWorkspace(workspace.id); isWorkspaceDropdownOpen = false"
+              class="w-full flex items-center justify-between px-3 py-2.5 text-sm rounded-lg transition-colors text-left"
+              :class="workspace.id === workspaceStore.currentWorkspaceId 
+                ? 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] font-bold' 
+                : 'text-[var(--ui-text)] hover:bg-[var(--ui-bg-muted)]'"
+            >
+              <span class="truncate pr-2">{{ workspace.name }}</span>
+              <UIcon 
+                v-if="workspace.id === workspaceStore.currentWorkspaceId" 
+                name="i-lucide-check-circle-2" 
+                class="h-4 w-4 shrink-0" 
+              />
+            </button>
+          </div>
+        </div>
+
+        <div 
+          v-if="isWorkspaceDropdownOpen" 
+          @click="isWorkspaceDropdownOpen = false" 
+          class="fixed inset-0 z-[90]"
+        ></div>
       </div>
 
       <p class="mb-3 text-[8px] font-bold uppercase tracking-[0.2em] text-[var(--ui-text-dimmed)] shrink-0">

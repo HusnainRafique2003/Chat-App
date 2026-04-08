@@ -331,12 +331,14 @@ function cancelSchedule() {
 // ─── Send ─────────────────────────────────────────────────────────────────────
 async function sendMessage(scheduledAt?: Date) {
   if (!editor.value) return
-  const html = editor.value.getHTML()
   const text = editor.value.getText()
   if (!text.trim() && !selectedFile.value) return
 
+  // Preserve line breaks - only trim leading/trailing whitespace
+  const content = text.replace(/^\s+|\s+$/g, '')
+
   emit('send', {
-    content: html,
+    content,
     file: selectedFile.value ?? undefined,
     scheduledAt
   })
@@ -744,10 +746,10 @@ watch(() => props.initialContent, v => {
   </Teleport>
 
   <!-- ─── Composer ─────────────────────────────────────────────────────────── -->
-  <div class="p-4 bg-[var(--ui-bg)] border-t border-[var(--ui-border)] relative z-20">
-    <div class="max-w-5xl mx-auto">
+  <div class="bg-[var(--ui-bg)] border-t border-[var(--ui-border)] relative z-20">
+    <div class="w-full">
       <div
-        class="relative flex flex-col rounded-2xl border border-[var(--ui-border)]
+        class="relative flex flex-col border border-[var(--ui-border)] border-t-0
                bg-[var(--ui-bg-elevated)] shadow-lg
                focus-within:ring-2 focus-within:ring-[var(--ui-primary)]/20
                transition-all overflow-hidden"
@@ -821,10 +823,10 @@ watch(() => props.initialContent, v => {
         </div>
 
         <!-- Rich-text editor area -->
-        <div class="relative min-h-[50px] max-h-[160px] flex flex-col overflow-y-auto">
+        <div class="relative min-h-[40px] max-h-[100px] flex flex-col overflow-y-auto">
           <editor-content
             :editor="editor"
-            class="flex-1 px-4 py-1 text-sm focus:outline-none
+            class="flex-1 px-4 py-2 text-sm focus:outline-none
                    prose prose-sm max-w-none dark:prose-invert
                    font-medium leading-relaxed custom-editor"
             @keydown="handleKeyDown"

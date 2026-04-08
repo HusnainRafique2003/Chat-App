@@ -20,7 +20,6 @@ const workspaceStore = useWorkspaceStore()
 const toast = useToast()
 
 const showMessaging = ref(false)
-const customChannelId = ref('')
 
 // Auto-open the chat area when channels finish loading and a current channel becomes available.
 watch(
@@ -28,18 +27,9 @@ watch(
   (channelId) => {
     if (channelId) {
       showMessaging.value = true
-      customChannelId.value = channelId
     }
   }
 )
-
-async function loadCustomChannel() {
-  const trimmed = customChannelId.value.trim()
-  if (!trimmed) return
-  channelStore.setCurrentChannel(trimmed)
-  showMessaging.value = true
-  await messageStore.fetchMessages(trimmed)
-}
 
 async function handleMessageSent(data: { content: string; file?: File }) {
   if (!channelStore.currentChannelId) return
@@ -116,48 +106,31 @@ function getCurrentChannelDisplayName() {
 
 <template>
   <!-- AppSidebar is already rendered by `layouts/dashboard.vue`. This page renders only the chat area. -->
-  <div class="flex h-full min-h-0 flex-col">
+  <div class="h-full w-full flex flex-col overflow-hidden">
+    <!-- Chat Messages Area -->
     <div
       v-if="showMessaging && channelStore.currentChannelId"
-      class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-bg)] shadow-[var(--shadow-md)]"
+      class="flex h-full w-full flex-col overflow-hidden"
     >
-      <div class="border-b border-[var(--ui-border)] bg-[var(--ui-bg-muted)] px-6 py-4">
-        <div class="flex items-center justify-between gap-4">
-          <div>
-            <h2 class="text-xl font-bold text-[var(--ui-text-highlighted)]">
-              # {{ getCurrentChannelDisplayName() }}
-            </h2>
-            <p class="text-sm text-[var(--ui-text-muted)]">
-              {{ messageStore.unreadCount }} unread message{{ messageStore.unreadCount !== 1 ? 's' : '' }}
-            </p>
-          </div>
-          <div class="flex items-center gap-3">
-            <UInput v-model="customChannelId" placeholder="Paste channel_id" class="w-64" />
-            <BaseButton label="Load" color="primary" :disabled="!customChannelId.trim()" @click="loadCustomChannel" />
-          </div>
-        </div>
+      <!-- Messages List (takes remaining space with overflow) -->
+      <div class="flex-1 min-h-0 overflow-hidden">
+        <MessageList
+          :channel-id="channelStore.currentChannelId"
+          :loading="messageStore.loading"
+          @message-sent="handleMessageSent"
+          @message-edited="handleMessageEdited"
+        />
       </div>
-
-      <MessageList
-        :channel-id="channelStore.currentChannelId"
-        :loading="messageStore.loading"
-        @message-sent="handleMessageSent"
-        @message-edited="handleMessageEdited"
-      />
     </div>
 
+    <!-- Empty State -->
     <div
       v-else
-      class="flex min-h-0 flex-1 items-center justify-center rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-bg)] shadow-[var(--shadow-md)]"
+      class="flex h-full w-full flex-col items-center justify-center"
     >
       <div class="text-center">
         <UIcon name="i-mdi-chat-outline" class="mx-auto mb-4 h-16 w-16 text-[var(--ui-text-dimmed)]" />
         <p class="text-[var(--ui-text-muted)]">Select a channel from the sidebar to open messages</p>
-
-        <div class="mt-4 flex items-center justify-center gap-3">
-          <UInput v-model="customChannelId" placeholder="Or paste channel_id" class="w-72" />
-          <BaseButton label="Load" color="primary" :disabled="!customChannelId.trim()" @click="loadCustomChannel" />
-        </div>
       </div>
     </div>
   </div>

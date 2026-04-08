@@ -6,6 +6,8 @@ import { useUserStore } from '~/stores/useUserStore'
 import { useToast } from '#ui/composables/useToast'
 import MessageBubble from './MessageBubble.vue'
 import RichMessageComposer from './RichMessageComposer.vue'
+import EditMessageModal from '../modals/EditMessageModal.vue'
+import MessageDeleteModal from '../modals/MessageDeleteModal.vue'
 
 interface Props {
  channelId: string
@@ -28,9 +30,11 @@ const emit = defineEmits<Emits>()
 const messageStore = useMessageStore()
 const userStore = useUserStore()
 const messagesContainer = ref<HTMLElement>()
-const editingId = ref<string | null>(null)
-const editContent = ref('')
-const showDeleteConfirm = ref<string | null>(null)
+const editingMessage = ref<Message | null>(null)
+const showEditModal = ref(false)
+const deletingMessageId = ref<string | null>(null)
+const showDeleteModal = ref(false)
+const storeReady = ref(false)
 const toast = useToast()
 
 const sortedMessages = computed(() => {
@@ -63,32 +67,50 @@ watch(
     console.log('[MessageList] Clearing store and fetching messages')
 
     await messageStore.fetchMessages(trimmed)
-    scrollToBottom()
-  },
-  { immediate: true }
-)
+    // Wait for DOM updates and then scroll to bottom with requestAnimationFrame
+    await nextTick()
+    // Double requestAnimationFrame ensures layout is fully calculated
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollToBottom()
+      })
+    })
+  }
+}, { immediate: true })
 
 watch(() => sortedMessages.value.length, () => {
-  nextTick(() => scrollToBottom())
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      scrollToBottom()
+    })
+  })
 })
 
 function scrollToBottom() {
   if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    // Use requestAnimationFrame to ensure layout is complete before scrolling
+    requestAnimationFrame(() => {
+      if (messagesContainer.value) {
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+      }
+    })
   }
 }
 
 function startEdit(message: Message) {
-  editingId.value = message.id
-  editContent.value = message.content
+  editingMessage.value = message
+  showEditModal.value = true
 }
 
 function cancelEdit() {
-  editingId.value = null
-  editContent.value = ''
+  editingMessage.value = null
+  showEditModal.value = false
 }
 
-async function handleSaveEdit(messageId: string, content: string) {
+async function handleSaveEdit(content: string) {
+  if (!editingMessage.value) return
+  
+  const messageId = editingMessage.value.id
   const result = await messageStore.updateMessage(props.channelId, messageId, content)
   
   if (result.success) {
@@ -103,20 +125,28 @@ async function handleSaveEdit(messageId: string, content: string) {
       title: result.error || 'Failed to update message',
       color: 'error'
     })
+    // Keep modal open so user can retry
+    if (editingMessage.value) {
+      showEditModal.value = true
+    }
   }
 }
 
 function confirmDelete(messageId: string) {
-  showDeleteConfirm.value = messageId
+  deletingMessageId.value = messageId
+  showDeleteModal.value = true
 }
 
 function cancelDelete() {
-  showDeleteConfirm.value = null
+  deletingMessageId.value = null
+  showDeleteModal.value = false
 }
 
-async function handleDeleteMessage(messageId: string) {
+async function handleDeleteMessage() {
+  if (!deletingMessageId.value) return
+  
+  const messageId = deletingMessageId.value
   const result = await messageStore.deleteMessage(props.channelId, messageId)
-  showDeleteConfirm.value = null
   
   if (result.success) {
     emit('message-deleted', messageId)
@@ -129,7 +159,11 @@ async function handleDeleteMessage(messageId: string) {
       title: result.error || 'Failed to delete message',
       color: 'error'
     })
+    // Keep modal open so user can retry
+    showDeleteModal.value = true
   }
+  
+  cancelDelete()
 }
 
 async function handleReaction(messageId: string, emoji: string) {
@@ -139,11 +173,11 @@ async function handleReaction(messageId: string, emoji: string) {
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-[var(--ui-bg)]">
-    <!-- Messages Container -->
+  <div class="flex flex-col h-full bg-[var(--ui-bg)] overflow-hidden">
+    <!-- Messages Container (scrollable) -->
     <div
       ref="messagesContainer"
-      class="flex-1 overflow-y-auto p-4 space-y-4"
+      class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4"
     >
       <!-- Loading State -->
       <div v-if="loading" class="flex items-center justify-center h-full">
@@ -163,58 +197,8 @@ async function handleReaction(messageId: string, emoji: string) {
 
       <!-- Messages -->
       <template v-else>
-        <div v-for="message in sortedMessages" :key="message.id" class="group">
-          <!-- Delete Confirmation -->
-          <div v-if="showDeleteConfirm === message.id" class="mb-2 p-3 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-800">
-            <p class="text-sm text-red-900 dark:text-red-100 mb-2">Delete this message?</p>
-            <div class="flex gap-2">
-              <UButton
-                size="xs"
-                color="red"
-                @click="handleDeleteMessage(message.id)"
-              >
-                Delete
-              </UButton>
-              <UButton
-                size="xs"
-                color="gray"
-                variant="soft"
-                @click="cancelDelete"
-              >
-                Cancel
-              </UButton>
-            </div>
-          </div>
-
-          <!-- Edit Mode -->
-          <div v-else-if="editingId === message.id" class="mb-2 p-3 bg-[var(--ui-bg-elevated)] rounded-lg border border-[var(--ui-border)]">
-            <textarea
-              v-model="editContent"
-              class="w-full px-3 py-2 rounded-lg bg-[var(--ui-bg)] border border-[var(--ui-border)] text-[var(--ui-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)] resize-none"
-              rows="2"
-            />
-            <div class="flex gap-2 mt-2">
-              <UButton
-                size="xs"
-             color="primary"
-                @click="handleSaveEdit(message.id, editContent)"
-              >
-                Save
-              </UButton>
-              <UButton
-                size="xs"
-                color="gray"
-                variant="soft"
-                @click="cancelEdit"
-              >
-                Cancel
-              </UButton>
-            </div>
-          </div>
-
-          <!-- Message Display -->
+        <div v-for="message in sortedMessages" :key="message.id">
           <MessageBubble
-            v-else
             :message="message"
             @edit="startEdit(message)"
             @delete="confirmDelete(message.id)"
@@ -224,7 +208,24 @@ async function handleReaction(messageId: string, emoji: string) {
       </template>
     </div>
 
-    <!-- Message Composer -->
-    <RichMessageComposer @send="$emit('message-sent', $event)" />
+    <!-- Message Composer (sticky at bottom) -->
+    <div class="shrink-0 border-t border-[var(--ui-border)]">
+      <RichMessageComposer @send="$emit('message-sent', $event)" />
+    </div>
+
+    <!-- Edit Message Modal -->
+    <EditMessageModal
+      v-model:open="showEditModal"
+      :message="editingMessage || undefined"
+      @confirm="handleSaveEdit"
+      @cancel="cancelEdit"
+    />
+
+    <!-- Delete Message Modal -->
+    <MessageDeleteModal
+      v-model:open="showDeleteModal"
+      @confirm="handleDeleteMessage"
+      @cancel="cancelDelete"
+    />
   </div>
 </template>

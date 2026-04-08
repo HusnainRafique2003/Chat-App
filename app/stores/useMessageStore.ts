@@ -3,12 +3,14 @@ import { addChannelMember } from '~/composables/useChannelsApi'
 import { canDeleteMessage, canEditMessage, createMessage, deleteMessage, markMessagesAsRead, reactToMessage, readMessages, searchMessages, updateMessage, type Message } from '~/composables/useMessagesApi'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
+import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
 interface MessageState {
   messages: Message[]
   loading: boolean
   searching: boolean
   currentChannelId: string | null
+  userNameCache: Record<string, string>
   pagination: {
     current_page: number
     per_page: number
@@ -23,6 +25,7 @@ export const useMessageStore = defineStore('messages', {
     loading: false,
     searching: false,
     currentChannelId: null,
+    userNameCache: {},
     pagination: {
       current_page: 1,
       per_page: 20,
@@ -49,6 +52,51 @@ export const useMessageStore = defineStore('messages', {
   },
 
   actions: {
+    /**
+     * Build user name cache from workspace members
+     */
+    buildUserNameCache() {
+      const workspaceStore = useWorkspaceStore()
+      const currentWorkspace = workspaceStore.currentWorkspace
+      
+      if (currentWorkspace?.members) {
+        this.userNameCache = {}
+        currentWorkspace.members.forEach((member: any) => {
+          const userId = member.id || member._id
+          const userName = member.name
+          if (userId && userName) {
+            this.userNameCache[userId] = userName
+          }
+        })
+        console.log('[Message Store] Built user name cache:', Object.keys(this.userNameCache).length, 'users')
+      }
+    },
+
+    /**
+     * Get sender name from cache or store
+     */
+    getSenderName(senderId: string, senderName?: string, isCurrentUser?: boolean): string {
+      const userStore = useUserStore()
+      
+      // If sender name is already provided, use it
+      if (senderName) {
+        return senderName
+      }
+      
+      // If this is the current user, use their name
+      if (isCurrentUser) {
+        return userStore.user?.name || 'You'
+      }
+      
+      // Try to find in cache
+      if (this.userNameCache[senderId]) {
+        return this.userNameCache[senderId]
+      }
+      
+      // Fallback to ID
+      return senderId || 'Unknown'
+    },
+
     async fetchMessages(channelId: string, page = 1, retryCount = 0) {
       this.loading = true
       
@@ -65,6 +113,10 @@ export const useMessageStore = defineStore('messages', {
       }
       
       this.currentChannelId = channelId
+      
+      // Build user name cache from workspace members
+      this.buildUserNameCache()
+      
       try {
         console.log('[Message Store] Fetching messages for channel:', { channelId, page, retryCount })
         
@@ -319,7 +371,6 @@ export const useMessageStore = defineStore('messages', {
     async createMessage(channelId: string, content: string, file?: File, retryCount = 0) {
       try {
         const userStore = useUserStore()
-        const currentUserName = userStore.user?.name || 'You'
         
         const response = await createMessage({
           channel_id: channelId,
@@ -332,11 +383,13 @@ export const useMessageStore = defineStore('messages', {
           // Extract the newly created message from response
           const newMessage = data.data?.message || data.data
           if (newMessage) {
+            const senderName = this.getSenderName(newMessage.sender_id, newMessage.sender?.name, true)
+            
             const normalized = {
               ...newMessage,
               id: newMessage.id || newMessage._id,
               channel_id: channelId,
-              sender: newMessage.sender || { id: newMessage.sender_id, name: currentUserName, email: '', is_active: true },
+              sender: newMessage.sender || { id: newMessage.sender_id, name: senderName, email: '', is_active: true },
               reactions_summary: newMessage.reactions_summary || [],
               is_read_by_me: true,
               read_by_count: newMessage.read_by_count ?? 0,
