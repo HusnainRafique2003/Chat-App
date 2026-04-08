@@ -128,7 +128,7 @@ function handleSubmit() {
           <p class="text-sm font-medium text-default">Private Channel</p>
           <p class="text-xs text-muted">Only selected members can view this channel.</p>
         </div>
-        <UToggle v-model="form.isPrivate" color="primary" />
+        <USwitch v-model="form.isPrivate" color="primary" />
       </div>
 
     </div>
