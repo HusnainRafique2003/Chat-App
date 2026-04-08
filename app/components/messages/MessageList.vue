@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import { computed, nextTick, onBeforeMount, ref, watch } from 'vue'
 import type { Message } from '~/composables/useMessagesApi'
 import { useMessageStore } from '~/stores/useMessageStore'
+import { useUserStore } from '~/stores/useUserStore'
+import { useToast } from '#ui/composables/useToast'
+import MessageBubble from './MessageBubble.vue'
 import RichMessageComposer from './RichMessageComposer.vue'
 
 interface Props {
@@ -22,17 +26,52 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>()
 
 const messageStore = useMessageStore()
+const userStore = useUserStore()
 const messagesContainer = ref<HTMLElement>()
 const editingId = ref<string | null>(null)
 const editContent = ref('')
 const showDeleteConfirm = ref<string | null>(null)
+const storeReady = ref(false)
+const toast = useToast()
 
-const sortedMessages = computed(() => messageStore.sortedMessages)
+const sortedMessages = computed(() => {
+  const messages = messageStore.sortedMessages
+  console.log('[MessageList] Computed sortedMessages:', {
+    count: messages.length,
+    messages: messages.map(m => ({ id: m.id, content: m.content?.slice(0, 30), sender: m.sender?.name }))
+  })
+  return messages
+})
+
+// Ensure store is hydrated from localStorage before fetching
+onBeforeMount(async () => {
+  // Pinia persisted state should be available
+  if (userStore.token) {
+    console.log('[MessageList] Store ready with token:', userStore.token.slice(0, 20) + '...')
+    storeReady.value = true
+  } else {
+    console.warn('[MessageList] No token found in store after mount')
+  }
+})
 
 watch(() => props.channelId, async (newChannelId) => {
+  if (!storeReady.value) {
+    console.warn('[MessageList] Store not ready yet, waiting for token...')
+    return
+  }
+
   if (newChannelId) {
     const trimmed = newChannelId.trim()
     if (!trimmed) return
+    
+    // Reset UI state when switching channels
+    editingId.value = null
+    editContent.value = ''
+    showDeleteConfirm.value = null
+    
+    console.log('[MessageList] Switching to channel:', trimmed)
+    console.log('[MessageList] Clearing store and fetching messages')
+    
     await messageStore.fetchMessages(trimmed)
     scrollToBottom()
   }
@@ -58,6 +97,24 @@ function cancelEdit() {
   editContent.value = ''
 }
 
+async function handleSaveEdit(messageId: string, content: string) {
+  const result = await messageStore.updateMessage(props.channelId, messageId, content)
+  
+  if (result.success) {
+    cancelEdit()
+    emit('message-edited', { messageId, content })
+    toast.add({
+      title: 'Message updated successfully',
+      color: 'success'
+    })
+  } else {
+    toast.add({
+      title: result.error || 'Failed to update message',
+      color: 'error'
+    })
+  }
+}
+
 function confirmDelete(messageId: string) {
   showDeleteConfirm.value = messageId
 }
@@ -67,9 +124,21 @@ function cancelDelete() {
 }
 
 async function handleDeleteMessage(messageId: string) {
-  await messageStore.deleteMessage(props.channelId, messageId)
+  const result = await messageStore.deleteMessage(props.channelId, messageId)
   showDeleteConfirm.value = null
-  emit('message-deleted', messageId)
+  
+  if (result.success) {
+    emit('message-deleted', messageId)
+    toast.add({
+      title: 'Message deleted successfully',
+      color: 'success'
+    })
+  } else {
+    toast.add({
+      title: result.error || 'Failed to delete message',
+      color: 'error'
+    })
+  }
 }
 
 async function handleReaction(messageId: string, emoji: string) {
@@ -137,7 +206,7 @@ async function handleReaction(messageId: string, emoji: string) {
               <UButton
                 size="xs"
              color="primary"
-                @click="$emit('message-edited', { messageId: message.id, content: editContent }); cancelEdit()"
+                @click="handleSaveEdit(message.id, editContent)"
               >
                 Save
               </UButton>

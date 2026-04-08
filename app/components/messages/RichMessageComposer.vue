@@ -1,19 +1,22 @@
 <script setup lang="ts">
-import Placeholder from '@tiptap/extension-placeholder';
-import StarterKit from '@tiptap/starter-kit';
-import { EditorContent, useEditor } from '@tiptap/vue-3';
+import { nextTick, onMounted, ref, watch } from 'vue'
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import Placeholder from '@tiptap/extension-placeholder'
+import StarterKit from '@tiptap/starter-kit'
+import { EditorContent, useEditor } from '@tiptap/vue-3'
+import { common, createLowlight } from 'lowlight'
 
 interface Emits {
   (e: 'send', data: { content: string; file?: File }): void
 }
 
-defineProps<{
+const props = defineProps<{
   initialContent?: string
   loading?: boolean
   submitLabel?: string
 }>()
 
-defineEmits<Emits>()
+const emit = defineEmits<Emits>()
 
 const selectedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement>()
@@ -23,13 +26,17 @@ const isRecording = ref(false)
 const recordedAudio = ref<Blob | null>(null)
 const mediaRecorder = ref<MediaRecorder | null>(null)
 
+const lowlight = createLowlight(common)
+
 const editor = useEditor({
   content: '',
   extensions: [
     StarterKit.configure({
       codeBlock: false
     }),
-    CodeBlock,
+    CodeBlockLowlight.configure({
+      lowlight
+    }),
     Placeholder.configure({
       placeholder: 'Type a message... Use / for commands'
     })
@@ -130,7 +137,7 @@ async function sendMessage() {
   if (!text.trim() && !selectedFile.value) return
 
   emit('send', {
-    content: html,
+    content: text,
     file: selectedFile.value || undefined
   })
 

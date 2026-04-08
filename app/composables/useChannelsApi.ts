@@ -3,15 +3,14 @@ import axios from 'axios'
 import { useRuntimeConfig } from '#app'
 import { useUserStore } from '~/stores/useUserStore'
 
-// Some backends use /api/channel, others /api/channels.
-const CHANNELS_BASE_SINGULAR = 'http://178.104.58.236/api/channel'
-const CHANNELS_BASE_PLURAL = 'http://178.104.58.236/api/channels'
+const API_BASE = 'http://178.104.58.236/api'
 
-function makeClient(baseURL: string) {
+function makeClient() {
   const client = axios.create({
-    baseURL,
+    baseURL: API_BASE,
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
     },
   })
 
@@ -32,9 +31,13 @@ function makeClient(baseURL: string) {
   return client
 }
 
-const channelsApiClient = makeClient(CHANNELS_BASE_SINGULAR)
-const channelsApiClientPlural = makeClient(CHANNELS_BASE_PLURAL)
+const channelsApiClient = makeClient()
 
+/**
+ * Create a channel.
+ * POST /api/channels/create  (from Postman "Create Channel")
+ * Body: { workspace_id, name, type, team_id }
+ */
 export async function createChannel(data: {
   name: string
   workspace_id: string
@@ -42,15 +45,7 @@ export async function createChannel(data: {
   type: 'public'
 }): Promise<AxiosResponse> {
   try {
-    // Try singular then plural
-    try {
-      return await channelsApiClient.post('/create', data)
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        return await channelsApiClientPlural.post('/create', data)
-      }
-      throw error
-    }
+    return await channelsApiClient.post('/channels/create', data)
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.message || error.message)
@@ -59,19 +54,17 @@ export async function createChannel(data: {
   }
 }
 
+/**
+ * Update a channel.
+ * PUT /api/channels  (from Postman "Update Channel")
+ */
 export async function updateChannel(data: {
   channel_id: string
-  name: string
+  name?: string
+  type?: string
 }): Promise<AxiosResponse> {
   try {
-    try {
-      return await channelsApiClient.patch('/update', data)
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        return await channelsApiClientPlural.patch('/update', data)
-      }
-      throw error
-    }
+    return await channelsApiClient.put('/channels', data)
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.message || error.message)
@@ -80,36 +73,73 @@ export async function updateChannel(data: {
   }
 }
 
+/**
+ * Read channels for a team.
+ * GET /api/channels/read?team_id={id}  (confirmed via backend probe)
+ */
 export async function getChannels(teamId: string, workspaceId?: string): Promise<AxiosResponse> {
   try {
-    // Backends vary: GET with params OR POST with JSON body, and /channel vs /channels.
     const params: Record<string, string> = { team_id: teamId }
     if (workspaceId) {
       params.workspace_id = workspaceId
     }
 
-    const attempts: Array<() => Promise<AxiosResponse>> = [
-      () => channelsApiClient.get('/read', { params }),
-      () => channelsApiClient.post('/read', params),
-      () => channelsApiClientPlural.get('/read', { params }),
-      () => channelsApiClientPlural.post('/read', params),
-    ]
-
-    let lastErr: unknown
-    for (const attempt of attempts) {
-      try {
-        return await attempt()
-      } catch (error) {
-        lastErr = error
-        // Keep trying on 404/method mismatch; throw on other errors.
-        if (axios.isAxiosError(error)) {
-          const status = error.response?.status
-          if (status === 404 || status === 405) continue
-        }
-      }
+    console.log('[Channels API] Fetching channels for team:', teamId)
+    return await channelsApiClient.get('/channels/read', { params })
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.error('[Channels API] Failed:', error.response?.status, error.response?.data?.message)
+      throw new Error(error.response?.data?.message || error.message)
     }
+    throw error
+  }
+}
 
-    throw lastErr
+/**
+ * Delete a channel.
+ * DELETE /api/channels/delete  (from Postman "Delete Channel")
+ */
+export async function deleteChannel(data: {
+  channel_id: string
+}): Promise<AxiosResponse> {
+  try {
+    return await channelsApiClient.delete('/channels/delete', { data })
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
+  }
+}
+
+/**
+ * Add a member to a channel.
+ * POST /api/channels/add-member  (from Postman "Add Member")
+ */
+export async function addChannelMember(data: {
+  channel_id: string
+  user_id: string
+}): Promise<AxiosResponse> {
+  try {
+    return await channelsApiClient.post('/channels/add-member', data)
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
+  }
+}
+
+/**
+ * Remove a member from a channel.
+ * DELETE /api/channels/remove-member  (from Postman "Remove Member")
+ */
+export async function removeChannelMember(data: {
+  channel_id: string
+  user_id: string
+}): Promise<AxiosResponse> {
+  try {
+    return await channelsApiClient.delete('/channels/remove-member', { data })
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.message || error.message)
@@ -119,4 +149,3 @@ export async function getChannels(teamId: string, workspaceId?: string): Promise
 }
 
 export { channelsApiClient }
-

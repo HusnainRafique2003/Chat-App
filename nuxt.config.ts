@@ -2,6 +2,10 @@
 export default defineNuxtConfig({
   ssr: false,
   srcDir: 'app',
+  devServer: {
+    host: 'localhost',
+    port: 3000
+  },
   runtimeConfig: {
     public: {
       // Dev-only override token for debugging API calls from the browser.

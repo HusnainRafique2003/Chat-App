@@ -44,20 +44,34 @@ export const useChannelStore = defineStore('channel-data', {
         const response = await getChannels(teamId, workspaceId)
         const data = response.data
 
+        console.log('Channels API response:', JSON.stringify(data).slice(0, 500))
+
         if (data.success) {
-          // Backend returns array directly in data.data
-          const channelsData = Array.isArray(data.data) ? data.data : (data.data?.channels || [])
+          // Handle multiple response shapes
+          let channelsData: any[] = []
+
+          if (Array.isArray(data.data)) {
+            channelsData = data.data
+          } else if (data.data?.channels && Array.isArray(data.data.channels)) {
+            channelsData = data.data.channels
+          } else if (data.data?.data && Array.isArray(data.data.data)) {
+            channelsData = data.data.data
+          }
+
           // Normalize id field (some backends return _id only)
-          this.channels = channelsData.map((c: Channel) => ({
+          this.channels = channelsData.map((c: any) => ({
             ...c,
-            id: (c as any).id || (c as any)._id
+            id: c.id || c._id,
+            workspace_id: c.workspace_id || workspaceId || '',
+            team_id: c.team_id || teamId || '',
+            members: c.members || [],
           }))
 
           if (this.channels.length > 0 && !this.currentChannelId) {
             this.currentChannelId = this.channels[0]?.id || null
           }
 
-          console.log('Channels loaded:', this.channels.length)
+          console.log('Channels loaded:', this.channels.length, this.channels.map((c: any) => c.name))
         }
       } catch (error) {
         console.error('Failed to fetch channels:', error)

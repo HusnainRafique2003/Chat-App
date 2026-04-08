@@ -9,6 +9,7 @@ const workspacesApiClient = axios.create({
   baseURL: WORKSPACES_BASE,
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
 })
 
@@ -18,25 +19,38 @@ workspacesApiClient.interceptors.request.use((config) => {
   const devToken = runtimeConfig.public?.devApiToken || ''
   const token = userStore.token || devToken
 
-  console.log('Workspace API - Token:', token ? `${token.slice(0, 20)}...` : 'MISSING')
-  console.log('Workspace API - User:', userStore.user?.email)
-
   if (token) {
-    // Primary: token header (as per API spec)
     config.headers.token = token
-    // Secondary: Authorization header (standard)
     config.headers.Authorization = `Bearer ${token}`
-  } else {
-    console.warn('Workspace API - No token available!')
   }
 
   return config
 })
 
+/**
+ * Get all workspaces for the current user.
+ * GET /api/workspaces/read  (confirmed via backend probe)
+ */
 export async function getWorkspaces(): Promise<AxiosResponse> {
   try {
-    const response = await workspacesApiClient.get('/read')
-    return response
+    console.log('[Workspaces API] Fetching workspaces')
+    return await workspacesApiClient.get('/read')
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.error('[Workspaces API] Failed:', error.response?.status, error.response?.data?.message)
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
+  }
+}
+
+/**
+ * Get a single workspace by ID.
+ * GET /api/workspaces/read/{workspace_id}  (from Postman "Read Workspaces - happy case single workspace")
+ */
+export async function getWorkspace(workspaceId: string): Promise<AxiosResponse> {
+  try {
+    return await workspacesApiClient.get(`/read/${workspaceId}`)
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.message || error.message)
@@ -46,4 +60,3 @@ export async function getWorkspaces(): Promise<AxiosResponse> {
 }
 
 export { workspacesApiClient }
-

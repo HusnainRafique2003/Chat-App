@@ -2,18 +2,59 @@ import type { AxiosResponse } from 'axios'
 import axios from 'axios'
 import { useRuntimeConfig } from '#app'
 import { useUserStore } from '~/stores/useUserStore'
-import { useChannelStore } from '~/stores/useChannelStore'
-import { useTeamStore } from '~/stores/useTeamStore'
-import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
-const MESSAGES_BASE_SINGULAR = 'http://178.104.58.236/api/message'
-const MESSAGES_BASE_PLURAL = 'http://178.104.58.236/api/messages'
+const API_BASE = 'http://178.104.58.236/api/messages'
 
-function makeMessagesClient(baseURL: string) {
+function makeApiClient() {
   const client = axios.create({
-    baseURL,
+    baseURL: API_BASE,
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+  })
+
+  client.interceptors.request.use((config) => {
+    const userStore = useUserStore()
+    const runtimeConfig = useRuntimeConfig()
+    const devToken = runtimeConfig.public?.devApiToken || ''
+    const token = userStore.token || devToken
+
+    console.log('[Messages API Interceptor]', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      hasToken: !!token,
+      tokenLength: token?.length,
+      tokenPreview: token ? token.slice(0, 15) + '...' : 'NO TOKEN',
+      source: userStore.token ? 'userStore' : devToken ? 'devToken' : 'none',
+    })
+
+    if (token) {
+      config.headers.token = token
+      config.headers.Authorization = `Bearer ${token}`
+      console.log('[Messages API] Token headers set for:', config.url)
+    } else {
+      console.warn('[Messages API] NO TOKEN AVAILABLE - request will likely fail')
+    }
+
+    return config
+  })
+
+  return client
+}
+
+const apiClient = makeApiClient()
+
+// Separate client for files endpoint (at /api/files, not /api/messages/files)
+const API_FILES_BASE = 'http://178.104.58.236/api'
+
+function makeFileClient() {
+  const client = axios.create({
+    baseURL: API_FILES_BASE,
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
     },
   })
 
@@ -34,8 +75,7 @@ function makeMessagesClient(baseURL: string) {
   return client
 }
 
-const messagesApiClient = makeMessagesClient(MESSAGES_BASE_PLURAL)
-const messagesApiClientSingular = makeMessagesClient(MESSAGES_BASE_SINGULAR)
+const fileClient = makeFileClient()
 
 export interface MessageSender {
   id: string
@@ -58,6 +98,7 @@ export interface ReactionSummary {
 
 export interface Message {
   id: string
+  _id?: string
   workspace_id: string
   sender_id: string
   receiver_id: string | null
@@ -78,83 +119,129 @@ export interface Message {
   reactions_summary: ReactionSummary[]
 }
 
+/**
+ * Create a message in a channel.
+ * POST /messages/create
+ * 
+ * @param data - Message data with channel_id, message content, and optional file
+ * @returns Created message response
+ */
 export async function createMessage(data: {
   channel_id: string
   message: string
   file?: File
 }): Promise<AxiosResponse> {
   try {
-    const formData = new FormData()
-    formData.append('channel_id', data.channel_id)
-    formData.append('message', data.message)
+    console.log('[Messages API] Creating message:', { channel_id: data.channel_id, hasFile: !!data.file })
+
+    // File upload uses multipart/form-data
     if (data.file) {
+      const formData = new FormData()
+      formData.append('channel_id', data.channel_id)
+      formData.append('message', data.message)
       formData.append('file', data.file)
+
+      const response = await apiClient.post('/create', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+
+      console.log('[Messages API] Message with file created successfully')
+      return response
     }
 
-    const response = await messagesApiClient.post('/create', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    // Text-only message
+    const response = await apiClient.post('/create', {
+      channel_id: data.channel_id,
+      message: data.message,
     })
+
+    console.log('[Messages API] Text message created successfully')
     return response
   } catch (error) {
     if (axios.isAxiosError(error)) {
+      console.error('[Messages API] Failed to create message:', {
+        status: error.response?.status,
+        message: error.response?.data?.message,
+      })
       throw new Error(error.response?.data?.message || error.message)
     }
     throw error
   }
 }
 
+/**
+ * Read messages for a channel.
+ * GET /messages/read - Query params: channel_id, page, per_page
+ * 
+ * API Documentation:
+ * Endpoint: GET /read
+ * Headers: { Content-Type: application/json, token: {login_token} }
+ * Success Response: { success: true, message: "...", data: { messages: [...], pagination: {...} } }
+ * 
+ * @param data - Query parameters with channel_id, page, and per_page
+ * @returns Messages array with pagination metadata
+ */
 export async function readMessages(data: {
   channel_id: string
   page?: number
   per_page?: number
 }): Promise<AxiosResponse> {
   try {
-    const channelStore = useChannelStore()
-    const teamStore = useTeamStore()
-    const workspaceStore = useWorkspaceStore()
-    const selectedChannel = channelStore.channels.find(c => c.id === data.channel_id)
+    // Validate channel_id
+    if (!data.channel_id || data.channel_id.trim() === '') {
+      throw new Error('channel_id is required')
+    }
 
-    const payload = {
-      channel_id: data.channel_id,
+    const params: Record<string, any> = {
+      channel_id: data.channel_id.trim(),
       page: data.page || 1,
       per_page: data.per_page || 20,
-      workspace_id: selectedChannel?.workspace_id || workspaceStore.currentWorkspaceId || undefined,
-      team_id: selectedChannel?.team_id || teamStore.currentTeamId || undefined,
     }
 
-    // Different deployments expose this endpoint with different
-    // base paths/methods. Try all common variants before failing.
-    const attempts: Array<() => Promise<AxiosResponse>> = [
-      () => messagesApiClient.get('/read', { params: payload }),
-      () => messagesApiClient.post('/read', payload),
-      () => messagesApiClientSingular.get('/read', { params: payload }),
-      () => messagesApiClientSingular.post('/read', payload),
-    ]
+    console.log('[Messages API] Full request details:', {
+      baseURL: apiClient.defaults.baseURL,
+      endpoint: '/read',
+      fullURL: apiClient.defaults.baseURL + '/read',
+      params: params,
+      queryString: new URLSearchParams(params).toString()
+    })
 
-    let lastErr: unknown
-    for (const attempt of attempts) {
-      try {
-        return await attempt()
-      } catch (error) {
-        lastErr = error
-        if (axios.isAxiosError(error)) {
-          const status = error.response?.status
-          if (status === 404 || status === 405) continue
-        }
-      }
-    }
+    const response = await apiClient.get('/read', { params })
 
-    throw lastErr
+    console.log('[Messages API] Raw response status:', response.status)
+    console.log('[Messages API] Full response object:', response.data)
+    console.log('[Messages API] Messages retrieved:', {
+      status: response.status,
+      messageCount: response.data?.data?.messages?.length || 0,
+      channelId: data.channel_id,
+      hasPagination: !!response.data?.data?.pagination,
+    })
+
+    return response
   } catch (error) {
     if (axios.isAxiosError(error)) {
+      console.error('[Messages API] Failed to read messages:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        message: error.response?.data?.message,
+        url: error.config?.url,
+        params: error.config?.params,
+        channelId: data.channel_id,
+      })
       throw new Error(error.response?.data?.message || error.message)
     }
+    console.error('[Messages API] Non-axios error:', error)
     throw error
   }
 }
 
+/**
+ * Update a message.
+ * PATCH /messages/update
+ * 
+ * @param data - Update data with channel_id, message_id, updated content, and optional file
+ * @returns Updated message response
+ */
 export async function updateMessage(data: {
   channel_id: string
   message_id: string
@@ -162,45 +249,87 @@ export async function updateMessage(data: {
   file?: File
 }): Promise<AxiosResponse> {
   try {
-    const formData = new FormData()
-    formData.append('channel_id', data.channel_id)
-    formData.append('message_id', data.message_id)
-    formData.append('message', data.message)
+    console.log('[Messages API] Updating message:', {
+      channel_id: data.channel_id,
+      message_id: data.message_id,
+      hasFile: !!data.file,
+    })
+
+    // File upload uses multipart/form-data and POST with _method=PATCH for form-data fallback
     if (data.file) {
+      const formData = new FormData()
+      formData.append('channel_id', data.channel_id)
+      formData.append('message_id', data.message_id)
+      formData.append('message', data.message)
       formData.append('file', data.file)
+
+      const response = await apiClient.patch('/update', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+
+      console.log('[Messages API] Message with file updated successfully')
+      return response
     }
 
-    const response = await messagesApiClient.patch('/update', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    // Text-only update
+    const response = await apiClient.patch('/update', {
+      channel_id: data.channel_id,
+      message_id: data.message_id,
+      message: data.message,
     })
+
+    console.log('[Messages API] Text message updated successfully')
     return response
   } catch (error) {
     if (axios.isAxiosError(error)) {
+      console.error('[Messages API] Failed to update message:', {
+        status: error.response?.status,
+        message: error.response?.data?.message,
+        messageId: data.message_id,
+      })
       throw new Error(error.response?.data?.message || error.message)
     }
     throw error
   }
 }
 
+/**
+ * Delete a message.
+ * DELETE /messages/delete
+ * 
+ * @param data - Delete data with channel_id and message_id
+ * @returns Success response
+ */
 export async function deleteMessage(data: {
   channel_id: string
   message_id: string
 }): Promise<AxiosResponse> {
   try {
-    const response = await messagesApiClient.delete('/delete', {
-      data,
+    console.log('[Messages API] Deleting message:', {
+      channel_id: data.channel_id,
+      message_id: data.message_id,
     })
+
+    const response = await apiClient.delete('/delete', { data })
+
+    console.log('[Messages API] Message deleted successfully')
     return response
   } catch (error) {
     if (axios.isAxiosError(error)) {
+      console.error('[Messages API] Failed to delete message:', {
+        status: error.response?.status,
+        message: error.response?.data?.message,
+        messageId: data.message_id,
+      })
       throw new Error(error.response?.data?.message || error.message)
     }
     throw error
   }
 }
 
+/**
+ * Search messages.
+ */
 export async function searchMessages(query: string, options?: {
   channel_id?: string
   workspace_id?: string
@@ -208,15 +337,13 @@ export async function searchMessages(query: string, options?: {
   page?: number
 }): Promise<AxiosResponse> {
   try {
-    const params = new URLSearchParams()
-    params.append('query', query)
-    if (options?.channel_id) params.append('channel_id', options.channel_id)
-    if (options?.workspace_id) params.append('workspace_id', options.workspace_id)
-    if (options?.per_page) params.append('per_page', options.per_page.toString())
-    if (options?.page) params.append('page', options.page.toString())
+    const params: Record<string, string> = { query }
+    if (options?.channel_id) params.channel_id = options.channel_id
+    if (options?.workspace_id) params.workspace_id = options.workspace_id
+    if (options?.per_page) params.per_page = options.per_page.toString()
+    if (options?.page) params.page = options.page.toString()
 
-    const response = await messagesApiClient.get(`/search?${params.toString()}`)
-    return response
+    return await apiClient.get('/search', { params })
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.message || error.message)
@@ -225,13 +352,16 @@ export async function searchMessages(query: string, options?: {
   }
 }
 
+/**
+ * Mark messages as read.
+ * POST /api/messages/read-by  (from Postman "Read By")
+ */
 export async function markMessagesAsRead(data: {
   channel_id: string
   message_ids: string[]
 }): Promise<AxiosResponse> {
   try {
-    const response = await messagesApiClient.post('/read-by', data)
-    return response
+    return await apiClient.post('/read-by', data)
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.message || error.message)
@@ -240,14 +370,17 @@ export async function markMessagesAsRead(data: {
   }
 }
 
+/**
+ * React to a message with an emoji.
+ * POST /api/messages/react  (from Postman "Emoji React")
+ */
 export async function reactToMessage(data: {
   channel_id: string
   message_ids: string[]
   emoji: string
 }): Promise<AxiosResponse> {
   try {
-    const response = await messagesApiClient.post('/react', data)
-    return response
+    return await apiClient.post('/react', data)
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.message || error.message)
@@ -256,15 +389,23 @@ export async function reactToMessage(data: {
   }
 }
 
-export async function downloadMessageFile(path: string): Promise<AxiosResponse<Blob>> {
+/**
+ * Download a file attachment.
+ * GET /api/files/{file_id}/download  (from Postman "Download File")
+ */
+export async function downloadMessageFile(fileIdOrPath: string): Promise<AxiosResponse<Blob>> {
   try {
-    // Backend expects: GET /download?path=workspaces/{workspace_id}/messages/{filename}
-    return await messagesApiClient.get('/download', {
-      params: { path },
+    if (/^[a-f0-9]{24}$/i.test(fileIdOrPath)) {
+      return await fileClient.get(`/files/${fileIdOrPath}/download`, {
+        responseType: 'blob',
+        headers: { Accept: 'application/octet-stream' }
+      })
+    }
+
+    return await fileClient.get('/messages/download', {
+      params: { path: fileIdOrPath },
       responseType: 'blob',
-      headers: {
-        Accept: 'application/octet-stream'
-      }
+      headers: { Accept: 'application/octet-stream' }
     })
   } catch (error) {
     if (axios.isAxiosError(error)) {
@@ -274,5 +415,28 @@ export async function downloadMessageFile(path: string): Promise<AxiosResponse<B
   }
 }
 
-export { messagesApiClient }
+export { apiClient as messagesApiClient }
 
+/**
+ * Check if the current user can edit a message.
+ * Only the message sender can edit it.
+ * 
+ * @param message - The message to check
+ * @param currentUserId - The current user's ID
+ * @returns True if user owns the message
+ */
+export function canEditMessage(message: Message, currentUserId: string): boolean {
+  return message.sender_id === currentUserId
+}
+
+/**
+ * Check if the current user can delete a message.
+ * Only the message sender can delete it.
+ * 
+ * @param message - The message to check
+ * @param currentUserId - The current user's ID
+ * @returns True if user owns the message
+ */
+export function canDeleteMessage(message: Message, currentUserId: string): boolean {
+  return message.sender_id === currentUserId
+}

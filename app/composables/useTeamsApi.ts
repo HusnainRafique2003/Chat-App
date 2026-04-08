@@ -3,14 +3,14 @@ import axios from 'axios'
 import { useRuntimeConfig } from '#app'
 import { useUserStore } from '~/stores/useUserStore'
 
-const TEAMS_BASE_SINGULAR = 'http://178.104.58.236/api/team'
-const TEAMS_BASE_PLURAL = 'http://178.104.58.236/api/teams'
+const API_BASE = 'http://178.104.58.236/api'
 
-function makeClient(baseURL: string) {
+function makeClient() {
   const client = axios.create({
-    baseURL,
+    baseURL: API_BASE,
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
     },
   })
 
@@ -31,35 +31,21 @@ function makeClient(baseURL: string) {
   return client
 }
 
-const teamsApiClient = makeClient(TEAMS_BASE_PLURAL)
-const teamsApiClientSingular = makeClient(TEAMS_BASE_SINGULAR)
+const teamsApiClient = makeClient()
 
+/**
+ * Read teams for a workspace.
+ * GET /api/team/read?workspace_id={id}  (singular /team/read - confirmed via backend probe)
+ */
 export async function getTeams(workspaceId: string): Promise<AxiosResponse> {
   try {
-    const payload = { workspace_id: workspaceId }
-    const attempts: Array<() => Promise<AxiosResponse>> = [
-      () => teamsApiClient.get('/read', { params: payload }),
-      () => teamsApiClient.post('/read', payload),
-      () => teamsApiClientSingular.get('/read', { params: payload }),
-      () => teamsApiClientSingular.post('/read', payload),
-    ]
-
-    let lastErr: unknown
-    for (const attempt of attempts) {
-      try {
-        return await attempt()
-      } catch (error) {
-        lastErr = error
-        if (axios.isAxiosError(error)) {
-          const status = error.response?.status
-          if (status === 404 || status === 405) continue
-        }
-      }
-    }
-
-    throw lastErr
+    console.log('[Teams API] Fetching teams for workspace:', workspaceId)
+    return await teamsApiClient.get('/team/read', {
+      params: { workspace_id: workspaceId }
+    })
   } catch (error) {
     if (axios.isAxiosError(error)) {
+      console.error('[Teams API] Failed:', error.response?.status, error.response?.data?.message)
       throw new Error(error.response?.data?.message || error.message)
     }
     throw error
@@ -67,4 +53,3 @@ export async function getTeams(workspaceId: string): Promise<AxiosResponse> {
 }
 
 export { teamsApiClient }
-

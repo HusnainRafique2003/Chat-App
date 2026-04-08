@@ -8,6 +8,7 @@ export interface TeamMember {
 
 export interface Team {
   id: string
+  _id?: string
   name: string
   description: string
   workspace_id: string
@@ -40,19 +41,48 @@ export const useTeamStore = defineStore('team-data', {
       this.loading = true
       try {
         const response = await getTeams(workspaceId)
+        const data = response.data
 
-        if (response.data?.success) {
-          const teamsData = response.data.data?.teams || response.data.data || []
-          this.teams = teamsData
+        console.log('Teams API response:', JSON.stringify(data).slice(0, 500))
+
+        if (data?.success) {
+          // Handle multiple response shapes
+          let teamsData: any[] = []
+
+          if (Array.isArray(data.data)) {
+            teamsData = data.data
+          } else if (data.data?.teams && Array.isArray(data.data.teams)) {
+            teamsData = data.data.teams
+          } else if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+            teamsData = [data.data]
+          }
+
+          // Normalize id field
+          this.teams = teamsData.map((t: any) => ({
+            ...t,
+            id: t.id || t._id,
+            members: t.members || [],
+            members_count: t.members_count ?? (t.members?.length || 0),
+          }))
 
           if (this.teams.length > 0 && !this.currentTeamId) {
             this.currentTeamId = this.teams[0]?.id || null
           }
+
+          console.log('Teams loaded:', this.teams.length)
         } else {
           this.teams = []
         }
       } catch (error) {
-        console.error('Failed to fetch teams:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        
+        // 404 just means this workspace has no teams yet - not a real error
+        if (errorMessage.includes('404') || errorMessage.includes('not found')) {
+          console.log('[Team Store] No teams found for workspace:', workspaceId, '- This is normal if workspace is empty')
+        } else {
+          console.error('[Team Store] Failed to fetch teams:', error)
+        }
+        
         this.teams = []
       } finally {
         this.loading = false
