@@ -3,7 +3,10 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
+import axios from 'axios'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useChannelStore } from '~/stores/useChannelStore'
+import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
 interface Emits {
   (e: 'send', data: { content: string; file?: File; scheduledAt?: Date }): void
@@ -35,7 +38,10 @@ function removeFile() {
 const editor = useEditor({
   content: '',
   extensions: [
-    StarterKit.configure({ codeBlock: {} }),
+    StarterKit.configure({ 
+      codeBlock: {},
+      link: false // Exclude Link from StarterKit since we're adding it separately
+    }),
     Placeholder.configure({ placeholder: 'Type a message… use / for commands' }),
     Link.configure({
       openOnClick: false,
@@ -61,18 +67,107 @@ function insertEmoji(emoji: string) {
 const showMentionModal = ref(false)
 const mentionUsers = ref<Array<{ id: string; name: string; avatar?: string }>>([])
 const mentionLoading = ref(false)
+const mentionError = ref<string | null>(null)
 
 async function openMentionModal() {
   showMentionModal.value = true
+  mentionError.value = null
+  mentionLoading.value = true
+
+  const fetchUserDetails = async (userId: string): Promise<string> => {
+    try {
+      const response = await axios.get(`/api/users/${userId}`)
+      const userData = response.data?.data || response.data
+      return userData?.name || userData?.username || userId
+    } catch (error) {
+      console.warn(`[Mention Modal] Could not fetch user ${userId}:`, error)
+      return userId
+    }
+  }
+
   try {
-    mentionLoading.value = true
-    // Fetch users from your API - adjust endpoint as needed
-    const response = await fetch('/api/teams/members')
-    if (response.ok) {
-      mentionUsers.value = await response.json()
+    // Get current channel from store
+    const channelStore = useChannelStore()
+    const workspaceStore = useWorkspaceStore()
+    const currentChannel = channelStore.currentChannel
+    const currentWorkspace = workspaceStore.currentWorkspace
+
+    console.log('[Mention Modal] Current channel:', currentChannel)
+
+    if (currentChannel && currentChannel.members && currentChannel.members.length > 0) {
+      // Create a mapping of user_id -> user name from workspace members
+      const userNameMap: Record<string, string> = {}
+      if (currentWorkspace && currentWorkspace.members && Array.isArray(currentWorkspace.members)) {
+        currentWorkspace.members.forEach((member: any) => {
+          const userId = member.id || member.user_id || ''
+          const userName = member.name || userId
+          if (userId) {
+            userNameMap[userId] = userName
+          }
+        })
+      }
+
+      console.log('[Mention Modal] User name map:', userNameMap)
+
+      // Map channel members and fetch missing user details
+      const mappedMembers = currentChannel.members
+        .map((member: any) => {
+          const userId = member.user_id || member.id || ''
+          const userName = userNameMap[userId] || userId || 'Unknown User'
+          
+          return {
+            id: userId,
+            name: userName,
+            avatar: member.avatar,
+            missing: !userNameMap[userId] && userId !== userName // Flag if user details are missing
+          }
+        })
+        .filter(m => m.id)
+
+      // Fetch missing user details in parallel
+      const usersToFetch = mappedMembers.filter(m => m.missing).map(m => m.id)
+      
+      if (usersToFetch.length > 0) {
+        console.log('[Mention Modal] Fetching details for missing users:', usersToFetch)
+        
+        const fetchPromises = usersToFetch.map(async (userId) => {
+          const userName = await fetchUserDetails(userId)
+          return { userId, userName }
+        })
+        
+        const fetchedUsers = await Promise.all(fetchPromises)
+        
+        // Update the mapped members with fetched user names
+        fetchedUsers.forEach(({ userId, userName }) => {
+          const memberIndex = mappedMembers.findIndex(m => m.id === userId)
+          const member = memberIndex !== -1 ? mappedMembers[memberIndex] : undefined
+          if (member) {
+            member.name = userName
+            member.missing = false
+          }
+        })
+      }
+
+      // Remove the missing flag before storing
+      mentionUsers.value = mappedMembers.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        avatar: m.avatar
+      }))
+      
+      console.log('[Mention Modal] Members loaded:', mentionUsers.value.length)
+      console.log('[Mention Modal] Members with names:', mentionUsers.value)
+      
+      if (mentionUsers.value.length === 0) {
+        mentionError.value = 'No members in this channel yet'
+      }
+    } else {
+      mentionError.value = 'No channel selected or channel has no members'
+      console.warn('[Mention Modal] No channel selected or no members in channel')
     }
   } catch (error) {
-    console.error('Failed to fetch members:', error)
+    mentionError.value = error instanceof Error ? error.message : 'Failed to load members'
+    console.error('[Mention Modal] Error:', error)
   } finally {
     mentionLoading.value = false
   }
@@ -605,6 +700,21 @@ watch(() => props.initialContent, v => {
         <!-- Loading state -->
         <div v-if="mentionLoading" class="flex items-center justify-center py-8">
           <UIcon name="i-lucide-loader" class="h-5 w-5 animate-spin text-[var(--ui-primary)]" />
+          <span class="ml-2 text-sm text-[var(--ui-text-dimmed)]">Loading members...</span>
+        </div>
+
+        <!-- Error state -->
+        <div v-else-if="mentionError" class="flex flex-col items-center py-8 gap-3">
+          <UIcon name="i-lucide-alert-circle" class="h-5 w-5 text-red-500" />
+          <p class="text-sm text-red-500 text-center">{{ mentionError }}</p>
+          <UButton
+            size="sm"
+            color="primary"
+            class="cursor-pointer"
+            @click="openMentionModal"
+          >
+            Retry
+          </UButton>
         </div>
 
         <!-- Members list -->
@@ -619,9 +729,9 @@ watch(() => props.initialContent, v => {
               <img :src="user.avatar" :alt="user.name" class="w-full h-full object-cover" />
             </div>
             <div v-else class="h-8 w-8 rounded-full bg-[var(--ui-primary)]/10 flex items-center justify-center text-xs font-bold">
-              {{ user.name.charAt(0).toUpperCase() }}
+              {{ (user.name || 'U').charAt(0).toUpperCase() }}
             </div>
-            <span class="text-sm font-medium">{{ user.name }}</span>
+            <span class="text-sm font-medium">{{ user.name || 'Unknown' }}</span>
           </button>
         </div>
 

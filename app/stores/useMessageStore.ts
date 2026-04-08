@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { createMessage, deleteMessage, markMessagesAsRead, reactToMessage, readMessages, searchMessages, updateMessage, canEditMessage, canDeleteMessage, type Message } from '~/composables/useMessagesApi'
 import { addChannelMember } from '~/composables/useChannelsApi'
+import { canDeleteMessage, canEditMessage, createMessage, deleteMessage, markMessagesAsRead, reactToMessage, readMessages, searchMessages, updateMessage, type Message } from '~/composables/useMessagesApi'
 import { useUserStore } from '~/stores/useUserStore'
 
 interface MessageState {
@@ -169,15 +169,35 @@ export const useMessageStore = defineStore('messages', {
         console.log('[Message Store] First message RAW sample:', messagesArray[0])
         console.log('[Message Store] First message keys:', messagesArray[0] ? Object.keys(messagesArray[0]) : 'no messages')
         
+        const userStore = useUserStore()
+        const currentUserId = userStore.user?.id
+        const currentUserName = userStore.user?.name
+        
         this.messages = messagesArray
           .filter((m: any) => !m.channel_id || m.channel_id === channelId)
           .map((m: any) => {
+            // Get sender name - use current user's name if they sent it, otherwise use provided name or fall back to ID
+            let senderName = m.sender?.name
+            
+            if (!senderName && m.sender_id === currentUserId) {
+              // This message was sent by the current user - use their actual name from store
+              senderName = currentUserName || 'You'
+            } else if (!senderName) {
+              // For other users, use their ID as fallback (since backend doesn't provide names)
+              senderName = m.sender_id || 'Unknown'
+            }
+            
             const normalized = {
               ...m,
               id: m.id || m._id,
               channel_id: m.channel_id || channelId,
               // Provide defaults for optional fields that MessageBubble expects
-              sender: m.sender || { id: m.sender_id, name: 'Unknown', email: '', is_active: true },
+              sender: m.sender || { 
+                id: m.sender_id, 
+                name: senderName, 
+                email: '', 
+                is_active: true 
+              },
               reactions_summary: m.reactions_summary || [],
               is_read_by_me: m.is_read_by_me ?? false,
               read_by_count: m.read_by_count ?? 0,
@@ -279,6 +299,9 @@ export const useMessageStore = defineStore('messages', {
 
     async createMessage(channelId: string, content: string, file?: File, retryCount = 0) {
       try {
+        const userStore = useUserStore()
+        const currentUserName = userStore.user?.name || 'You'
+        
         const response = await createMessage({
           channel_id: channelId,
           message: content,
@@ -294,7 +317,7 @@ export const useMessageStore = defineStore('messages', {
               ...newMessage,
               id: newMessage.id || newMessage._id,
               channel_id: channelId,
-              sender: newMessage.sender || { id: newMessage.sender_id, name: 'You', email: '', is_active: true },
+              sender: newMessage.sender || { id: newMessage.sender_id, name: currentUserName, email: '', is_active: true },
               reactions_summary: newMessage.reactions_summary || [],
               is_read_by_me: true,
               read_by_count: newMessage.read_by_count ?? 0,
