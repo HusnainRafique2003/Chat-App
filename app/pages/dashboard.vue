@@ -98,7 +98,6 @@ async function handleMessageEdited(data: { messageId: string; content: string; f
         @message-edited="handleMessageEdited"
       />
     </div>
-
     <div
       v-else
       class="flex h-full w-full flex-col items-center justify-center"
