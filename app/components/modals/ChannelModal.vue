@@ -4,7 +4,7 @@ import { ref, watch } from 'vue'
 export interface ChannelPayload {
   name: string
   description: string
-  type: 'text' | 'announcement' | 'voice'
+  type: 'public' | 'private'
   isPrivate: boolean
 }
 
@@ -24,14 +24,11 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { default: false })
 
-const channelTypes = [
-  { value: 'text',         label: 'Text',         icon: 'i-mdi-pound',      desc: 'Regular text conversations' },
-  { value: 'announcement', label: 'Announcement',  icon: 'i-mdi-bullhorn',   desc: 'Broadcast messages to members' },
-  { value: 'voice',        label: 'Voice',         icon: 'i-mdi-microphone', desc: 'Voice and video calls' },
-]
-
 const form = ref<ChannelPayload>({
-  name: '', description: '', type: 'text', isPrivate: false,
+  name: '', 
+  description: '', 
+  type: 'public', 
+  isPrivate: false,
 })
 const errors = ref({ name: '' })
 
@@ -40,7 +37,7 @@ watch(open, (val) => {
   if (!val) {
     errors.value = { name: '' }
     if (props.mode === 'create')
-      form.value = { name: '', description: '', type: 'text', isPrivate: false }
+      form.value = { name: '', description: '', type: 'public', isPrivate: false }
   }
 })
 
@@ -53,7 +50,14 @@ function validate() {
 
 function handleSubmit() {
   if (!validate()) return
-  emit('submit', { ...form.value })
+  
+  // Automatically set the type based on the toggle before emitting
+  const finalPayload: ChannelPayload = {
+    ...form.value,
+    type: form.value.isPrivate ? 'private' : 'public'
+  }
+  
+  emit('submit', finalPayload)
 }
 </script>
 
@@ -72,34 +76,6 @@ function handleSubmit() {
   >
     <div class="flex flex-col gap-4">
 
-      <!-- Channel Type -->
-      <div class="flex flex-col gap-2">
-        <p class="text-sm font-medium text-default">Channel Type</p>
-        <div class="flex flex-col gap-2">
-          <button
-            v-for="t in channelTypes"
-            :key="t.value"
-            class="flex items-center gap-3 p-3 rounded-lg border transition-all text-left"
-            :class="form.type === t.value
-              ? 'border-primary bg-primary/5 text-primary'
-              : 'border-default bg-muted hover:border-primary/50'"
-            @click="form.type = t.value as ChannelPayload['type']"
-          >
-            <UIcon :name="t.icon" class="text-xl shrink-0" />
-            <div>
-              <p class="text-sm font-medium">{{ t.label }}</p>
-              <p class="text-xs text-muted">{{ t.desc }}</p>
-            </div>
-            <UIcon
-              v-if="form.type === t.value"
-              name="i-lucide-check-circle"
-              class="ml-auto text-primary"
-            />
-          </button>
-        </div>
-      </div>
-
-      <!-- Name -->
       <UFormField label="Channel Name" :error="errors.name" required>
         <UInput
           v-model="form.name"
@@ -108,12 +84,11 @@ function handleSubmit() {
           class="w-full"
         >
           <template #leading>
-            <span class="text-muted">#</span>
+            <span class="text-[var(--ui-text-muted)]">#</span>
           </template>
         </UInput>
       </UFormField>
 
-      <!-- Description -->
       <UFormField label="Description">
         <UInput
           v-model="form.description"
@@ -122,13 +97,12 @@ function handleSubmit() {
         />
       </UFormField>
 
-      <!-- Private -->
-      <div class="flex items-center justify-between p-3 rounded-lg bg-muted">
+      <div class="flex items-center justify-between p-3 rounded-lg bg-[var(--ui-bg-muted)] border border-[var(--ui-border)]">
         <div>
-          <p class="text-sm font-medium text-default">Private Channel</p>
-          <p class="text-xs text-muted">Only selected members can view this channel.</p>
+          <p class="text-sm font-medium text-[var(--ui-text)]">Private Channel</p>
+          <p class="text-xs text-[var(--ui-text-muted)]">Only selected members can view this channel.</p>
         </div>
-        <UToggle v-model="form.isPrivate" color="primary" />
+        <USwitch v-model="form.isPrivate" color="primary" />
       </div>
 
     </div>
