@@ -12,7 +12,7 @@ export interface Channel {
   name: string
   workspace_id: string
   team_id: string
-  type: 'public'
+  type: 'public' | 'private' | 'direct'
   direct_id: null
   created_id: string
   members: ChannelMember[]
@@ -44,10 +44,7 @@ export const useChannelStore = defineStore('channel-data', {
         const response = await getChannels(teamId, workspaceId)
         const data = response.data
 
-        console.log('Channels API response:', JSON.stringify(data).slice(0, 500))
-
-        if (data.success) {
-          // Handle multiple response shapes
+        if (data.success || data.data) {
           let channelsData: any[] = []
 
           if (Array.isArray(data.data)) {
@@ -58,8 +55,7 @@ export const useChannelStore = defineStore('channel-data', {
             channelsData = data.data.data
           }
 
-          // Normalize id field (some backends return _id only)
-          this.channels = channelsData.map((c: any) => ({
+          const newChannels = channelsData.map((c: any) => ({
             ...c,
             id: c.id || c._id,
             workspace_id: c.workspace_id || workspaceId || '',
@@ -67,14 +63,19 @@ export const useChannelStore = defineStore('channel-data', {
             members: c.members || [],
           }))
 
-          if (this.channels.length > 0 && !this.currentChannelId) {
-            this.currentChannelId = this.channels[0]?.id || null
-          }
+          // 1. PRESERVE DMs! Keep direct messages, but swap out the team channels.
+          const existingDms = this.channels.filter(c => c.type === 'direct')
+          this.channels = [...existingDms, ...newChannels]
 
-          console.log('Channels loaded:', this.channels.length, this.channels.map((c: any) => c.name))
+          // 2. Set a default channel if none is selected
+          if (newChannels.length > 0 && (!this.currentChannelId || !this.channels.find(c => c.id === this.currentChannelId))) {
+            this.currentChannelId = newChannels[0]?.id || null
+          }
         }
       } catch (error) {
         console.error('Failed to fetch channels:', error)
+        // If the API fails (e.g., 404 No channels in this team), clear the public channels but KEEP DMs
+        this.channels = this.channels.filter(c => c.type === 'direct')
       } finally {
         this.loading = false
       }
@@ -102,6 +103,49 @@ export const useChannelStore = defineStore('channel-data', {
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to create channel'
         return { success: false, error: message }
+      } finally {
+        this.loading = false
+      }
+    },
+    async createDirectChannel(workspaceId: string, targetUserId: string, targetUserName: string) {
+      this.loading = true
+      try {
+        // 1. Check if we already have a DM with this user in the UI
+        const existingDm = this.channels.find(c => 
+          c.type === 'direct' && 
+          c.workspace_id === workspaceId && 
+          c.name.includes(targetUserName)
+        )
+
+        // If it exists, just open it!
+        if (existingDm) {
+          this.setCurrentChannel(existingDm.id || (existingDm as any)._id)
+          return { success: true, channel: existingDm }
+        }
+
+        // 2. If not, ask the backend to create it
+        const response = await createChannel({
+          name: `DM: ${targetUserName}`,
+          workspace_id: workspaceId,
+          type: 'direct',
+          direct_user_id: targetUserId, 
+          members: [targetUserId] // We send both depending on what your Laravel API expects
+        })
+        const channelData = response.data
+        const newChannel = channelData.data?.channel || channelData.channel || channelData.data || channelData
+
+        // 3. Add to sidebar and open it
+        if (newChannel && (newChannel.id || newChannel._id)) {
+          newChannel.id = newChannel.id || newChannel._id
+          this.channels.push(newChannel)
+          this.setCurrentChannel(newChannel.id)
+          return { success: true, channel: newChannel }
+        }
+
+        return { success: false, error: channelData.message || 'Failed to start DM' }
+      } catch (error) {
+        console.error('DM Creation Error:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to start DM' }
       } finally {
         this.loading = false
       }
