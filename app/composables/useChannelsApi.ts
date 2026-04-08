@@ -41,8 +41,10 @@ const channelsApiClient = makeClient()
 export async function createChannel(data: {
   name: string
   workspace_id: string
-  team_id: string
-  type: 'public'
+  team_id?: string // Made optional for DMs
+  type: 'public' | 'private' | 'direct' // Added direct
+  direct_user_id?: string // Passed to backend to link the user
+  members?: string[] // Fallback array in case backend prefers this
 }): Promise<AxiosResponse> {
   try {
     return await channelsApiClient.post('/channels/create', data)
