@@ -59,4 +59,21 @@ export async function getWorkspace(workspaceId: string): Promise<AxiosResponse> 
   }
 }
 
+/**
+ * Search for members in a workspace by name or email.
+ * GET /api/workspaces/{workspace_id}/search-members?q={query}
+ */
+export async function searchWorkspaceMembers(workspaceId: string, query: string): Promise<AxiosResponse> {
+  try {
+    return await workspacesApiClient.get(`/${workspaceId}/search-members`, {
+      params: { q: query }
+    })
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
+  }
+}
+
 export { workspacesApiClient }
