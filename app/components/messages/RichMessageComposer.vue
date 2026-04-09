@@ -396,8 +396,8 @@ watch(() => props.initialContent, v => {
       <div
         v-if="showLinkDialog"
         class="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2
-               w-[360px] rounded-2xl border border-[var(--ui-border)]
-               bg-[var(--ui-bg)] shadow-2xl p-5"
+               w-[calc(100vw-1.5rem)] max-w-[360px] rounded-2xl border border-[var(--ui-border)]
+               bg-[var(--ui-bg)] shadow-2xl p-4 sm:p-5"
         @click.stop
       >
         <div class="flex items-center justify-between mb-4">
@@ -435,7 +435,7 @@ watch(() => props.initialContent, v => {
           </div>
         </div>
 
-        <div class="flex gap-2 mt-4">
+        <div class="mt-4 flex flex-col gap-2 sm:flex-row">
           <UButton
             v-if="editor?.isActive('link')"
             size="sm"
@@ -464,8 +464,8 @@ watch(() => props.initialContent, v => {
       <div
         v-if="showVoiceDialog"
         class="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2
-               w-[340px] rounded-2xl border border-[var(--ui-border)]
-               bg-[var(--ui-bg)] shadow-2xl p-5"
+               w-[calc(100vw-1.5rem)] max-w-[340px] rounded-2xl border border-[var(--ui-border)]
+               bg-[var(--ui-bg)] shadow-2xl p-4 sm:p-5"
         @click.stop
       >
         <div class="flex items-center justify-between mb-5">
@@ -548,7 +548,7 @@ watch(() => props.initialContent, v => {
             />
           </div>
 
-          <div class="flex gap-2">
+          <div class="flex flex-col gap-2 sm:flex-row">
             <UButton
               size="sm"
               color="neutral"
@@ -578,8 +578,8 @@ watch(() => props.initialContent, v => {
       <div
         v-if="showScheduler"
         class="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2
-               w-[360px] rounded-2xl border border-[var(--ui-border)]
-               bg-[var(--ui-bg)] shadow-2xl p-5"
+               w-[calc(100vw-1.5rem)] max-w-[360px] rounded-2xl border border-[var(--ui-border)]
+               bg-[var(--ui-bg)] shadow-2xl p-4 sm:p-5"
         @click.stop
       >
         <div class="flex items-center justify-between mb-4">
@@ -634,7 +634,7 @@ watch(() => props.initialContent, v => {
           </div>
         </Transition>
 
-        <div class="flex gap-2 mt-4">
+        <div class="mt-4 flex flex-col gap-2 sm:flex-row">
           <UButton
             size="sm"
             color="neutral"
@@ -663,7 +663,7 @@ watch(() => props.initialContent, v => {
       <div
         v-if="showEmojiPicker"
         class="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2
-               w-[380px] rounded-2xl border border-[var(--ui-border)]
+               w-[calc(100vw-1.5rem)] max-w-[380px] rounded-2xl border border-[var(--ui-border)]
                bg-[var(--ui-bg)] shadow-2xl p-4"
         @click.stop
       >
@@ -672,7 +672,7 @@ watch(() => props.initialContent, v => {
           <UButton icon="i-lucide-x" size="xs" color="neutral" variant="ghost" class="h-7 w-7 cursor-pointer" @click="showEmojiPicker = false" />
         </div>
 
-        <div class="grid grid-cols-8 gap-2 max-h-[300px] overflow-y-auto">
+        <div class="grid grid-cols-6 gap-2 max-h-[300px] overflow-y-auto sm:grid-cols-8">
           <button
             v-for="(emoji, idx) in emojis"
             :key="idx"
@@ -690,7 +690,7 @@ watch(() => props.initialContent, v => {
       <div
         v-if="showMentionModal"
         class="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2
-               w-[340px] rounded-2xl border border-[var(--ui-border)]
+               w-[calc(100vw-1.5rem)] max-w-[340px] rounded-2xl border border-[var(--ui-border)]
                bg-[var(--ui-bg)] shadow-2xl p-4"
         @click.stop
       >
@@ -746,7 +746,7 @@ watch(() => props.initialContent, v => {
   </Teleport>
 
   <!-- ─── Composer ─────────────────────────────────────────────────────────── -->
-  <div class="bg-[var(--ui-bg)] border-t border-[var(--ui-border)] relative z-20">
+  <div class="relative z-20 border-t border-[var(--ui-border)] bg-[var(--ui-bg)]">
     <div class="w-full">
       <div
         class="relative flex flex-col border border-[var(--ui-border)] border-t-0
@@ -756,7 +756,7 @@ watch(() => props.initialContent, v => {
       >
         <!-- Toolbar -->
         <div
-          class="flex items-center gap-2 px-3 py-2
+          class="flex items-center gap-2 px-2 py-2 sm:px-3
                  border-b border-[var(--ui-border)] bg-[var(--ui-bg-muted)]/30
                  "
         >
@@ -764,69 +764,83 @@ watch(() => props.initialContent, v => {
             class="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
             <div class="flex min-w-max items-center gap-1 whitespace-nowrap">
-              <UButton
-                icon="i-lucide-bold"
-                size="xs" color="neutral" variant="ghost"
-                class="h-8 w-8 shrink-0 cursor-pointer"
-                :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('bold') }"
-                title="Bold (Ctrl+B)"
-                @click="insertBold"
-              />
-              <UButton
-                icon="i-lucide-italic"
-                size="xs" color="neutral" variant="ghost"
-                class="h-8 w-8 shrink-0 cursor-pointer"
-                :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('italic') }"
-                title="Italic (Ctrl+I)"
-                @click="insertItalic"
-              />
+              <AppTooltip text="Bold (Ctrl+B)">
+                <UButton
+                  icon="i-lucide-bold"
+                  size="xs" color="neutral" variant="ghost"
+                  class="h-8 w-8 shrink-0 cursor-pointer"
+                  :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('bold') }"
+                  @click="insertBold"
+                />
+              </AppTooltip>
+              <AppTooltip text="Italic (Ctrl+I)">
+                <UButton
+                  icon="i-lucide-italic"
+                  size="xs" color="neutral" variant="ghost"
+                  class="h-8 w-8 shrink-0 cursor-pointer"
+                  :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('italic') }"
+                  @click="insertItalic"
+                />
+              </AppTooltip>
               <div class="mx-1 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
-              <UButton
-                icon="i-lucide-link"
-                size="xs" color="neutral" variant="ghost"
-                class="h-8 w-8 shrink-0 cursor-pointer"
-                :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('link') }"
-                title="Insert / Edit Link"
-                @click="openLinkDialog"
-              />
-              <UButton
-                icon="i-lucide-code"
-                size="xs" color="neutral" variant="ghost"
-                class="h-8 w-8 shrink-0 cursor-pointer"
-                :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('codeBlock') }"
-                title="Code Block"
-                @click="insertCodeBlock"
-              />
+              <AppTooltip text="Insert / Edit Link">
+                <UButton
+                  icon="i-lucide-link"
+                  size="xs" color="neutral" variant="ghost"
+                  class="h-8 w-8 shrink-0 cursor-pointer"
+                  :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('link') }"
+                  @click="openLinkDialog"
+                />
+              </AppTooltip>
+              <AppTooltip text="Code Block">
+                <UButton
+                  icon="i-lucide-code"
+                  size="xs" color="neutral" variant="ghost"
+                  class="h-8 w-8 shrink-0 cursor-pointer"
+                  :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('codeBlock') }"
+                  @click="insertCodeBlock"
+                />
+              </AppTooltip>
               <div class="mx-1 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
-              <UButton
-                icon="i-lucide-mic"
-                size="xs" color="neutral" variant="ghost"
-                class="h-8 w-8 shrink-0 cursor-pointer"
-                title="Voice Note"
-                @click="openVoiceDialog"
-              />
-              <UButton
-                icon="i-lucide-paperclip"
-                size="xs" color="neutral" variant="ghost"
-                class="h-8 w-8 shrink-0 cursor-pointer"
-                title="Attach File"
-                @click="fileInput?.click()"
-              />
+              <AppTooltip text="Voice Note">
+                <UButton
+                  icon="i-lucide-mic"
+                  size="xs" color="neutral" variant="ghost"
+                  class="h-8 w-8 shrink-0 cursor-pointer"
+                  @click="openVoiceDialog"
+                />
+              </AppTooltip>
+              <AppTooltip text="Attach File">
+                <UButton
+                  icon="i-lucide-paperclip"
+                  size="xs" color="neutral" variant="ghost"
+                  class="h-8 w-8 shrink-0 cursor-pointer"
+                  @click="fileInput?.click()"
+                />
+              </AppTooltip>
               <input ref="fileInput" type="file" class="hidden" @change="handleFileSelect" />
               <div class="mx-1 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
-              <UButton icon="i-lucide-smile" size="xs" color="neutral" variant="ghost" class="h-8 w-8 shrink-0 cursor-pointer" title="Add emoji" @click="showEmojiPicker = true" />
-              <UButton icon="i-lucide-at-sign" size="xs" color="neutral" variant="ghost" class="h-8 w-8 shrink-0 cursor-pointer" title="Mention member" @click="openMentionModal" />
-              <UButton icon="i-lucide-calendar-clock" size="xs" color="neutral" variant="ghost" class="h-8 w-8 shrink-0 cursor-pointer" title="Schedule send" @click="showScheduler = true" />
+              <AppTooltip text="Add emoji">
+                <UButton icon="i-lucide-smile" size="xs" color="neutral" variant="ghost" class="h-8 w-8 shrink-0 cursor-pointer" @click="showEmojiPicker = true" />
+              </AppTooltip>
+              <AppTooltip text="Mention member">
+                <UButton icon="i-lucide-at-sign" size="xs" color="neutral" variant="ghost" class="h-8 w-8 shrink-0 cursor-pointer" @click="openMentionModal" />
+              </AppTooltip>
+              <AppTooltip text="Schedule send">
+                <UButton icon="i-lucide-calendar-clock" size="xs" color="neutral" variant="ghost" class="h-8 w-8 shrink-0 cursor-pointer" @click="showScheduler = true" />
+              </AppTooltip>
             </div>
           </div>
-          <UButton icon="i-lucide-send" color="primary" size="xs" class="h-8 w-8 shrink-0 cursor-pointer rounded-full shadow-lg shadow-[var(--ui-primary)]/20" :loading="loading" title="Send message" @click="sendMessage()" />
+          <AppTooltip text="Send message">
+            <UButton icon="i-lucide-send" color="primary" size="xs" class="h-9 w-9 shrink-0 cursor-pointer rounded-full shadow-lg shadow-[var(--ui-primary)]/20" :loading="loading" @click="sendMessage()" />
+          </AppTooltip>
         </div>
 
         <!-- Rich-text editor area -->
-        <div class="relative min-h-[40px] max-h-[100px] flex flex-col overflow-y-auto">
+        <div class="relative flex min-h-[56px] max-h-[160px] flex-col overflow-y-auto sm:max-h-[120px]">
           <editor-content
             :editor="editor"
-            class="flex-1 px-4 py-2 text-sm focus:outline-none
+            class="flex-1 px-3 py-3 text-sm focus:outline-none sm:px-4 sm:py-2
                    prose prose-sm max-w-none dark:prose-invert
                    font-medium leading-relaxed custom-editor"
             @keydown="handleKeyDown"

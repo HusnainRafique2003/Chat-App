@@ -13,6 +13,9 @@ const workspaceStore = useWorkspaceStore()
 const teamStore = useTeamStore()
 const channelStore = useChannelStore()
 const userStore = useUserStore()
+const emit = defineEmits<{
+  navigate: []
+}>()
 
 const showCreateChannelModal = ref(false)
 const isWorkspaceDropdownOpen = ref(false)
@@ -168,12 +171,28 @@ async function handleStartDm(member: DmMember) {
     showDmModal.value = false
   }
 }
+
+function handleWorkspaceChange(workspaceId: string) {
+  workspaceStore.setCurrentWorkspace(workspaceId)
+  isWorkspaceDropdownOpen.value = false
+  emit('navigate')
+}
+
+function handleTeamChange(teamId: string) {
+  teamStore.setCurrentTeam(teamId)
+  emit('navigate')
+}
+
+function handleChannelSelect(channelId: string) {
+  channelStore.setCurrentChannel(channelId)
+  emit('navigate')
+}
 </script>
 
 <template>
-  <div class="flex flex-1 min-h-0 h-full w-full text-[var(--ui-text)]">
+  <div class="flex h-full min-h-0 w-full flex-1 text-[var(--ui-text)]">
     
-    <div class="flex w-16 flex-col items-center border-r border-[var(--ui-border)] px-2 py-5 overflow-y-auto shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+    <div class="flex w-16 shrink-0 flex-col items-center overflow-y-auto border-r border-[var(--ui-border)] px-2 py-4 sm:py-5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
       
       <p class="mb-3 text-[7px] font-bold uppercase tracking-[0.2em] text-[var(--ui-text-dimmed)] shrink-0">
         Workspace
@@ -181,18 +200,19 @@ async function handleStartDm(member: DmMember) {
       
       <div class="flex flex-col items-center mb-6 shrink-0 w-full">
         
-        <button
-          type="button"
-          @click="isWorkspaceDropdownOpen = !isWorkspaceDropdownOpen"
-          :title="workspaceStore.currentWorkspace?.name"
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition-all bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)] ring-2 ring-transparent hover:ring-[var(--ui-primary)]/50 relative z-[101]"
-        >
-          {{ workspaceStore.currentWorkspace?.name?.slice(0,2).toUpperCase() || 'WS' }}
-        </button>
+        <AppTooltip :text="workspaceStore.currentWorkspace?.name" side="right">
+          <button
+            type="button"
+            @click="isWorkspaceDropdownOpen = !isWorkspaceDropdownOpen"
+            class="relative z-[101] flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--ui-primary)] text-xs font-bold text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)] ring-2 ring-transparent transition-all hover:ring-[var(--ui-primary)]/50"
+          >
+            {{ workspaceStore.currentWorkspace?.name?.slice(0,2).toUpperCase() || 'WS' }}
+          </button>
+        </AppTooltip>
 
         <div 
           v-if="isWorkspaceDropdownOpen" 
-          class="fixed left-16 top-5 z-[100] ml-2 w-56 rounded-xl bg-[var(--ui-bg)] border border-[var(--ui-border)] shadow-xl overflow-hidden animate-in fade-in slide-in-from-left-2 duration-200"
+          class="absolute left-full top-4 z-[100] ml-2 w-56 overflow-hidden rounded-xl border border-[var(--ui-border)] bg-[var(--ui-bg)] shadow-xl"
         >
           <div class="px-4 py-3 text-[10px] font-bold text-[var(--ui-text-dimmed)] uppercase tracking-wider border-b border-[var(--ui-border)] bg-[var(--ui-bg-muted)]/50">
             Switch Workspace
@@ -202,13 +222,15 @@ async function handleStartDm(member: DmMember) {
             <button
               v-for="workspace in workspaceStore.workspaces"
               :key="workspace.id"
-              @click="workspaceStore.setCurrentWorkspace(workspace.id); isWorkspaceDropdownOpen = false"
+              @click="handleWorkspaceChange(workspace.id)"
               class="w-full flex items-center justify-between px-3 py-2.5 text-sm rounded-lg transition-colors text-left"
               :class="workspace.id === workspaceStore.currentWorkspaceId 
                 ? 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] font-bold' 
                 : 'text-[var(--ui-text)] hover:bg-[var(--ui-bg-muted)]'"
             >
-              <span class="truncate pr-2">{{ workspace.name }}</span>
+              <AppTooltip :text="workspace.name" side="right">
+                <span class="truncate pr-2">{{ workspace.name }}</span>
+              </AppTooltip>
               <UIcon 
                 v-if="workspace.id === workspaceStore.currentWorkspaceId" 
                 name="i-lucide-check-circle-2" 
@@ -229,23 +251,27 @@ async function handleStartDm(member: DmMember) {
         Teams
       </p>
       <div class="flex flex-col items-center gap-3 shrink-0">
-        <button
+        <AppTooltip
           v-for="team in teamItems"
           :key="team.id"
-          type="button"
-          :title="team.name"
-          @click="teamStore.setCurrentTeam(team.id)"
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition-all"
-          :class="team.active
-            ? 'bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)]'
-            : 'bg-[var(--ui-bg-muted)] text-[var(--ui-text)] hover:bg-[var(--ui-bg-elevated)]'"
+          :text="team.name"
+          side="right"
         >
-          {{ team.label }}
-        </button>
+          <button
+            type="button"
+            @click="handleTeamChange(team.id)"
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition-all"
+            :class="team.active
+              ? 'bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)]'
+              : 'bg-[var(--ui-bg-muted)] text-[var(--ui-text)] hover:bg-[var(--ui-bg-elevated)]'"
+          >
+            {{ team.label }}
+          </button>
+        </AppTooltip>
       </div>
     </div>
 
-    <div class="flex min-w-0 flex-1 flex-col px-4 py-5 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+    <div class="flex min-w-0 flex-1 flex-col overflow-y-auto px-3 py-4 sm:px-4 sm:py-5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
       <div class="mb-4 shrink-0 flex flex-col min-w-0">
         <div class="mb-3 flex items-center justify-between shrink-0">
           <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ui-text-dimmed)]">
@@ -270,14 +296,16 @@ async function handleStartDm(member: DmMember) {
             v-for="channel in channelItems"
             :key="channel.id"
             type="button"
-            @click="channelStore.setCurrentChannel(channel.id)"
+            @click="handleChannelSelect(channel.id)"
             class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors"
             :class="channel.active
               ? 'bg-[var(--ui-bg-muted)] font-semibold text-[var(--ui-text-highlighted)]'
               : 'text-[var(--ui-text-muted)] hover:bg-[var(--ui-bg-muted)]/70'"
           >
             <span class="opacity-50 shrink-0">#</span>
-            <span class="truncate">{{ channel.name }}</span>
+            <AppTooltip :text="channel.name" side="right">
+              <span class="truncate">{{ channel.name }}</span>
+            </AppTooltip>
           </button>
         </div>
       </div>
@@ -307,14 +335,16 @@ async function handleStartDm(member: DmMember) {
             v-for="dm in directMessages"
             :key="dm.id"
             type="button"
-            @click="channelStore.setCurrentChannel(dm.id)"
+            @click="handleChannelSelect(dm.id)"
             class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors"
             :class="dm.active 
               ? 'bg-[var(--ui-bg-muted)] font-semibold text-[var(--ui-text-highlighted)]' 
               : 'text-[var(--ui-text-muted)] hover:bg-[var(--ui-bg-muted)]/70'"
           >
             <span class="h-2.5 w-2.5 rounded-full shrink-0" :class="dm.online ? 'bg-[var(--ui-success)]' : 'bg-[var(--ui-border-accented)]'" />
-            <span class="truncate">{{ dm.name }}</span>
+            <AppTooltip :text="dm.name" side="right">
+              <span class="truncate">{{ dm.name }}</span>
+            </AppTooltip>
           </button>
         </div>
       </div>
