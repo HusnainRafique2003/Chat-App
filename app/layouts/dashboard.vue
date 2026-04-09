@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { navigateTo, useRoute } from '#app'
-import { onMounted, watch, computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import AppSidebar from '~/components/AppSidebar.vue'
-import ChannelHeader from '~/components/ChannelHeader.vue'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useTeamStore } from '~/stores/useTeamStore'
 import { useUserStore } from '~/stores/useUserStore'
