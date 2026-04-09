@@ -90,7 +90,8 @@ const channelItems = computed(() =>
 
 const directMessages = computed(() =>
   channelStore.channels
-    .filter(c => c.type === 'direct')
+    // Add the team_id check here to hide DMs from other teams
+    .filter(c => c.type === 'direct' && c.team_id === teamStore.currentTeamId)
     .map(c => ({
       id: c.id,
       name: getDirectChannelName(c),
