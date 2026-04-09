@@ -59,17 +59,17 @@ watch(() => teamStore.currentTeamId, (teamId) => {
 
 <template>
   <div class="h-screen h-[100dvh] w-full overflow-hidden bg-[var(--ui-bg-muted)] text-[var(--ui-text)]">
-    <div class="grid h-full w-full lg:grid-cols-[240px_minmax(0,1fr)]">
-      
+    <div class="grid h-full w-full lg:grid-cols-[275px_minmax(0,1fr)]">
       <aside class="flex h-full flex-col border-r border-[var(--ui-border)] bg-[var(--ui-bg)] min-h-0">
         <div class="shrink-0 border-b border-[var(--ui-border)] px-5 py-4">
-          <NuxtLink to="/dashboard" class="flex items-center gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)]">
-              <UIcon name="i-mdi-message-draw" class="h-5 w-5" />
-            </div>
-            <div class="min-w-0">
-              <p class="font-black text-[var(--ui-text-highlighted)] truncate">ChatSphere</p>
-              <p class="text-xs text-[var(--ui-text-muted)] truncate">Communication App</p>
+          <NuxtLink to="/dashboard" class="flex items-center">
+            <div class="min-w-0 flex-1">
+              <p class="font-black text-[var(--ui-text-highlighted)] truncate" :title="workspaceStore.currentWorkspace?.name">
+                {{ workspaceStore.currentWorkspace?.name || 'No Workspace' }}
+              </p>
+              <p class="text-xs text-[var(--ui-text-muted)] truncate" :title="teamStore.currentTeam?.name">
+                {{ teamStore.currentTeam?.name || 'No Team' }}
+              </p>
             </div>
           </NuxtLink>
         </div>

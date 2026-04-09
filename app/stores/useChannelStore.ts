@@ -66,11 +66,17 @@ export const useChannelStore = defineStore('channel-data', {
 
           // 1. PRESERVE DMs! Keep direct messages, but swap out the team channels.
           const existingDms = this.channels.filter(c => c.type === 'direct')
-          this.channels = [...existingDms, ...newChannels]
+          const combinedChannels = [...existingDms, ...newChannels]
 
-          // 2. Set a default channel if none is selected
-          if (newChannels.length > 0 && (!this.currentChannelId || !this.channels.find(c => c.id === this.currentChannelId))) {
-            this.currentChannelId = newChannels[0]?.id || null
+          // 2. DEDUPLICATE: Remove any duplicate channels/DMs using a Map based on the ID
+          const uniqueChannels = Array.from(new Map(combinedChannels.map(c => [c.id, c])).values())
+          
+          this.channels = uniqueChannels
+
+          // 3. Set a default channel if none is selected
+          if (this.channels.length > 0 && (!this.currentChannelId || !this.channels.find(c => c.id === this.currentChannelId))) {
+            // Try to default to a regular channel first, fallback to whatever is available
+            this.currentChannelId = this.channels.find(c => c.type !== 'direct')?.id || this.channels[0]?.id || null
           }
         }
       } catch (error) {
@@ -126,24 +132,29 @@ export const useChannelStore = defineStore('channel-data', {
     },
 
     // RESTORED DIRECT MESSAGE ACTION WITH TEAM SCOPING FIX
+    // RESTORED DIRECT MESSAGE ACTION WITH PROPER USER ID CHECK
     async createDirectChannel(workspaceId: string, teamId: string, targetUserId: string, targetUserName: string) {
       this.loading = true
       try {
-        // 1. Check if we already have a DM with this user in the UI FOR THIS TEAM
-        const existingDm = this.channels.find(c => 
-          c.type === 'direct' && 
-          c.workspace_id === workspaceId && 
-          c.team_id === teamId && 
-          c.name.includes(targetUserName)
-        )
+        // 1. Check if we already have a DM with this user by checking the MEMBERS array for their ID
+        const existingDm = this.channels.find(c => {
+          if (c.type !== 'direct' || c.workspace_id !== workspaceId || c.team_id !== teamId) return false
+          
+          // STRICT CHECK: Look for the target user's ID inside this channel's members array
+          return c.members?.some(m => 
+            m.user_id === targetUserId || 
+            (m as any).id === targetUserId || 
+            (m as any)._id === targetUserId
+          )
+        })
 
-        // If it exists, just open it!
+        // If it exists, just open it! This ensures previous messages are loaded.
         if (existingDm) {
           this.setCurrentChannel(existingDm.id || (existingDm as any)._id)
           return { success: true, channel: existingDm }
         }
 
-        // 2. If not, ask the backend to create it
+        // 2. If not, ask the backend to create a new one
         const response = await createChannel({
           name: `DM: ${targetUserName}`,
           workspace_id: workspaceId,
@@ -160,6 +171,12 @@ export const useChannelStore = defineStore('channel-data', {
           newChannel.id = newChannel.id || newChannel._id
           newChannel.team_id = newChannel.team_id || teamId // Ensure team_id is set locally
           
+          // Ensure members array has the target user locally so future searches work instantly
+          if (!newChannel.members) newChannel.members = []
+          if (!newChannel.members.find((m: any) => m.user_id === targetUserId || m.id === targetUserId)) {
+            newChannel.members.push({ user_id: targetUserId, role: 'member' })
+          }
+
           this.channels.push(newChannel)
           this.setCurrentChannel(newChannel.id)
           return { success: true, channel: newChannel }
