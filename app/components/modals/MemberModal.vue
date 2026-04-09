@@ -107,16 +107,16 @@ watch(open, (val) => {
 
       <!-- Email Input -->
       <UFormField label="Email Addresses" :error="emailError">
-        <div class="flex gap-2">
-          <UInput
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-start">
+          <BaseInput
             v-model="emailInput"
             placeholder="colleague@example.com"
             type="email"
+            input-class="w-full"
             class="flex-1"
-            :color="emailError ? 'error' : undefined"
-            @keyup.enter="addEmail"
+            @enter="addEmail"
           />
-          <UButton icon="i-lucide-plus" color="primary" @click="addEmail" />
+          <UButton icon="i-lucide-plus" color="primary" class="min-h-12 justify-center rounded-2xl px-4 sm:self-start" @click="addEmail" />
         </div>
       </UFormField>
 
@@ -125,11 +125,15 @@ watch(open, (val) => {
         <div
           v-for="email in emailList"
           :key="email"
-          class="flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs"
+          class="flex items-center gap-1.5 rounded-full border border-[var(--ui-primary)]/12 bg-[var(--ui-primary)]/8 px-3 py-1.5 text-xs font-medium text-[var(--ui-primary)]"
         >
-          <UIcon name="i-mdi-email" class="text-sm" />
-          {{ email }}
-          <button class="ml-1 hover:text-error" @click="removeEmail(email)">
+          <UIcon name="i-mdi-email" class="shrink-0 text-sm" />
+          <span class="break-all">{{ email }}</span>
+          <button
+            type="button"
+            class="ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[var(--ui-error)]/10 hover:text-[var(--ui-error)]"
+            @click="removeEmail(email)"
+          >
             <UIcon name="i-lucide-x" class="text-sm" />
           </button>
         </div>
@@ -138,11 +142,11 @@ watch(open, (val) => {
       <!-- Role Selector -->
       <div class="flex flex-col gap-2">
         <p class="text-sm font-medium text-default">Assign Role</p>
-        <div class="grid grid-cols-3 gap-2">
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <button
             v-for="role in roles"
             :key="role.value"
-            class="flex flex-col items-center gap-1 p-3 rounded-lg border transition-all"
+            class="flex items-center gap-3 rounded-lg border p-3 text-left transition-all sm:flex-col sm:items-center sm:gap-1 sm:text-center"
             :class="selectedRole === role.value
               ? 'border-primary bg-primary/5'
               : 'border-default bg-muted hover:border-primary/40'"
@@ -161,16 +165,16 @@ watch(open, (val) => {
         <p class="text-sm font-medium text-muted mb-2">
           Current Members ({{ existingMembers.length }})
         </p>
-        <div class="flex flex-col gap-1 max-h-32 overflow-y-auto">
+        <div class="flex max-h-40 flex-col gap-1 overflow-y-auto">
           <div
             v-for="m in existingMembers"
             :key="m.id"
-            class="flex items-center gap-2 p-2 rounded bg-muted"
+            class="flex flex-wrap items-center gap-2 rounded bg-muted p-2"
           >
             <UAvatar :alt="m.name" size="xs" />
-            <span class="text-xs text-default">{{ m.name }}</span>
-            <span class="text-xs text-muted">{{ m.email }}</span>
-            <UBadge :label="m.role ?? 'member'" variant="soft" size="sm" class="ml-auto" />
+            <span class="min-w-0 text-xs text-default sm:flex-1">{{ m.name }}</span>
+            <span class="w-full text-xs text-muted sm:w-auto">{{ m.email }}</span>
+            <UBadge :label="m.role ?? 'member'" variant="soft" size="sm" class="sm:ml-auto" />
           </div>
         </div>
       </div>
@@ -186,7 +190,7 @@ watch(open, (val) => {
         title="Confirm removal"
         :description="`${targetMember.name} will lose all access to ${entityType}: ${entityName}.`"
       />
-      <div class="flex items-center gap-3 p-3 rounded-lg bg-muted">
+      <div class="flex flex-col gap-3 rounded-lg bg-muted p-3 sm:flex-row sm:items-center">
         <UAvatar :alt="targetMember.name" size="md" />
         <div>
           <p class="text-sm font-semibold text-default">{{ targetMember.name }}</p>

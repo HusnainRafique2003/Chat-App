@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 interface Props {
   label?: string
   color?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'neutral'
@@ -29,6 +31,24 @@ const emit = defineEmits<{
   click: [event: MouseEvent]
 }>()
 
+const buttonClass = computed(() => {
+  const layout = props.block ? 'w-full' : ''
+  const shape = 'rounded-2xl font-semibold tracking-[0.01em]'
+  const motion = 'transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 disabled:hover:translate-y-0 disabled:opacity-60'
+  const shadow = props.variant === 'solid'
+    ? 'shadow-[0_14px_34px_rgba(var(--ui-primary-rgb),0.14)] hover:shadow-[0_18px_38px_rgba(var(--ui-primary-rgb),0.18)]'
+    : 'hover:shadow-[var(--shadow-sm)]'
+  const sizing = {
+    xs: 'min-h-8 px-3 text-xs',
+    sm: 'min-h-9 px-3.5 text-sm',
+    md: 'min-h-10 px-4 text-sm',
+    lg: 'min-h-11 px-5 text-sm',
+    xl: 'min-h-12 px-6 text-sm sm:text-base'
+  }[props.size]
+
+  return [layout, shape, motion, shadow, sizing].filter(Boolean).join(' ')
+})
+
 async function handleClick(event: MouseEvent) {
   emit('click', event)
 
@@ -52,6 +72,7 @@ async function handleClick(event: MouseEvent) {
     :loading="props.loading"
     :disabled="props.disabled"
     :block="props.block"
+    :class="buttonClass"
     @click="handleClick"
   >
     <slot>{{ props.label }}</slot>

@@ -95,40 +95,40 @@ async function handleDownload() {
 </script>
 
 <template>
-  <div :class="['flex gap-3 group', isOwn ? 'flex-row-reverse' : 'flex-row']">
+  <div :class="['group flex gap-2.5 sm:gap-3', isOwn ? 'flex-row-reverse' : 'flex-row']">
     <!-- Avatar -->
     <div class="flex-shrink-0">
-      <div class="h-8 w-8 rounded-full bg-gradient-to-br from-[var(--ui-primary)] to-[var(--ui-secondary)] flex items-center justify-center text-xs font-bold text-white">
+      <div class="flex h-8 w-8 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--ui-primary)] to-[var(--ui-secondary)] text-[11px] font-bold text-white shadow-[var(--shadow-sm)]">
         {{ message.sender.name.charAt(0).toUpperCase() }}
       </div>
     </div>
 
     <!-- Message Content -->
-    <div :class="['flex flex-col gap-1', isOwn ? 'items-end' : 'items-start']">
+    <div :class="['flex min-w-0 flex-col gap-1.5', isOwn ? 'items-end' : 'items-start']">
       <!-- Header -->
-      <div :class="['flex items-center gap-2 text-xs', isOwn ? 'flex-row-reverse' : 'flex-row']">
+      <div :class="['flex items-center gap-2 text-[11px]', isOwn ? 'flex-row-reverse' : 'flex-row']">
         <span class="font-semibold text-[var(--ui-text-highlighted)]">{{ message.sender.name }}</span>
         <span class="text-[var(--ui-text-dimmed)]">{{ formatTime(message.created_at) }}</span>
       </div>
 
       <!-- Message Bubble -->
       <div :class="[
-        'max-w-xs lg:max-w-md px-4 py-2 rounded-2xl break-words',
+        'max-w-[min(82vw,40rem)] rounded-[1.35rem] px-4 py-3 break-words shadow-[var(--shadow-sm)] transition-all duration-300',
         isOwn
-          ? 'bg-[var(--ui-primary)] text-white rounded-br-none'
-          : 'bg-[var(--ui-bg-elevated)] text-[var(--ui-text)] rounded-bl-none'
+          ? 'rounded-br-md bg-[linear-gradient(180deg,rgba(55,27,23,0.96),rgba(55,27,23,0.88))] text-white'
+          : 'rounded-bl-md border border-[var(--ui-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,255,255,0.78))] text-[var(--ui-text)] dark:bg-[linear-gradient(180deg,rgba(24,24,27,0.94),rgba(24,24,27,0.86))]'
       ]">
-        <p class="text-sm leading-relaxed whitespace-pre-wrap">
+        <p class="whitespace-pre-wrap text-sm leading-6">
           {{ cleanContent }}
         </p>
 
         <!-- File Attachment -->
-        <div v-if="message.file_name" class="mt-2 pt-2 border-t border-current border-opacity-20">
+        <div v-if="message.file_name" class="mt-3 border-t border-current border-opacity-15 pt-3">
           <a
             v-if="message.file_download_url"
             :href="message.file_download_url"
             target="_blank"
-            class="flex items-center gap-2 text-xs hover:opacity-80 transition-opacity"
+            class="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80 dark:bg-white/5"
           >
             <UIcon name="i-mdi-file-download" class="w-4 h-4" />
             {{ message.file_name }}
@@ -137,7 +137,7 @@ async function handleDownload() {
           <button
             v-else
             type="button"
-            class="flex items-center gap-2 text-xs hover:opacity-80 transition-opacity"
+            class="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80 dark:bg-white/5"
             @click="handleDownload"
           >
             <UIcon name="i-mdi-file-download" class="w-4 h-4" />
@@ -146,15 +146,15 @@ async function handleDownload() {
         </div>
 
         <!-- Reactions Inside Bubble -->
-        <div v-if="message.reactions_summary.length > 0" :class="['flex flex-wrap gap-1 mt-2', isOwn ? 'justify-end' : 'justify-start']">
+        <div v-if="message.reactions_summary.length > 0" :class="['mt-3 flex flex-wrap gap-1.5', isOwn ? 'justify-end' : 'justify-start']">
           <button
             v-for="reaction in message.reactions_summary"
             :key="reaction.emoji"
-            class="px-2 py-1 rounded-full text-xs transition-colors cursor-pointer"
+            class="cursor-pointer rounded-full px-2.5 py-1 text-xs font-medium transition-colors"
             :class="[
               isOwn
-                ? 'bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30'
-                : 'bg-white bg-opacity-50 hover:bg-opacity-70 border border-[var(--ui-border)]'
+                ? 'border border-white/20 bg-white/15 hover:bg-white/25'
+                : 'border border-[var(--ui-border)] bg-white/65 hover:bg-white/90 dark:bg-white/8 dark:hover:bg-white/14'
             ]"
             :title="`${reaction.reacted_by.length} reaction${reaction.reacted_by.length !== 1 ? 's' : ''}`"
           >
@@ -164,41 +164,41 @@ async function handleDownload() {
       </div>
 
       <!-- Actions -->
-      <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-1">
+      <div class="mt-1 flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
         <UButton
           icon="i-mdi-emoticon-plus-outline"
           size="xs"
-          color="gray"
+          color="neutral"
           variant="ghost"
-          class="cursor-pointer"
+          class="cursor-pointer rounded-xl"
           @click="showReactions = !showReactions"
         />
         <UButton
           v-if="isOwn"
           icon="i-mdi-pencil"
           size="xs"
-          color="gray"
+          color="neutral"
           variant="ghost"
-          class="cursor-pointer"
+          class="cursor-pointer rounded-xl"
           @click="$emit('edit')"
         />
         <UButton
           v-if="isOwn"
           icon="i-mdi-trash-can-outline"
           size="xs"
-          color="red"
+          color="error"
           variant="ghost"
-          class="cursor-pointer"
+          class="cursor-pointer rounded-xl"
           @click="$emit('delete')"
         />
       </div>
 
       <!-- Emoji Picker -->
-      <div v-if="showReactions" class="flex flex-wrap gap-2 mt-2 p-3 bg-[var(--ui-bg-elevated)] rounded-lg border border-[var(--ui-border)] shadow-lg">
+      <div v-if="showReactions" class="mt-2 flex flex-wrap gap-2 rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg-elevated)] p-3 shadow-[var(--shadow-md)]">
         <button
           v-for="emoji in emojis"
           :key="emoji"
-          class="text-lg hover:scale-125 transition-transform cursor-pointer"
+          class="cursor-pointer rounded-xl p-1 text-lg transition-transform hover:scale-125 hover:bg-[var(--ui-bg)]"
           @click="$emit('react', emoji); showReactions = false"
           :title="`React with ${emoji}`"
         >

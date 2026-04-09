@@ -75,9 +75,9 @@ async function handleSubmit() {
     badge="Reset access securely"
     gradient="from-[var(--ui-warning)]/7 via-transparent to-[var(--ui-secondary)]/10"
   >
-    <div class="mb-8">
-      <h2 class="text-2xl font-black text-[var(--ui-text-highlighted)]">Set a new password</h2>
-      <p class="mt-2 text-[var(--ui-text-muted)]">Use a strong password that you have not used elsewhere.</p>
+    <div class="mb-7">
+      <h2 class="text-xl font-black text-[var(--ui-text-highlighted)] sm:text-2xl">Set a new password</h2>
+      <p class="mt-2 text-sm leading-6 text-[var(--ui-text-muted)] sm:text-[0.95rem]">Use a strong password that you have not used elsewhere.</p>
     </div>
 
     <div
@@ -98,6 +98,7 @@ async function handleSubmit() {
         color="primary"
         size="lg"
         :block="true"
+        class="transition-transform duration-300 hover:-translate-y-0.5"
       />
     </div>
 
@@ -196,12 +197,13 @@ async function handleSubmit() {
         :block="true"
         :loading="loading"
         :disabled="isSubmitDisabled"
+        class="transition-transform duration-300 hover:-translate-y-0.5"
       />
     </form>
 
     <div v-if="!successMessage" class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]">
       Return to
-      <NuxtLink to="/auth/login" class="ml-1 font-semibold text-[var(--ui-primary)] hover:opacity-75">
+      <NuxtLink to="/auth/login" class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80">
         sign in
       </NuxtLink>
     </div>
