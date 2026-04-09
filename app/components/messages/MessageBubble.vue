@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { downloadMessageFile } from '~/composables/useMessagesApi'
 import type { Message } from '~/composables/useMessagesApi'
 import { useUserStore } from '~/stores/useUserStore'
+import { useToast } from '#ui/composables/useToast'
+import FileViewerModal from '~/components/modals/FileViewerModal.vue'
 
 interface Props {
   message: Message
@@ -13,42 +16,41 @@ interface Emits {
   (e: 'react', emoji: string): void
 }
 
-defineEmits<Emits>()
+const emit = defineEmits<Emits>()
 
 const userStore = useUserStore()
 const showReactions = ref(false)
-const showMenu = ref(false)
+const showFileModal = ref(false) 
 const toast = useToast()
 
 const props = defineProps<Props>()
-const isOwn = computed(() => props.message.sender_id === userStore.user?.id)
+
+/**
+ * FIXED COMPUTED PROPERTY
+ * Handles both standard ID and MongoDB-style _id for comparison 
+ */
+const isOwn = computed(() => {
+  const currentUserId = userStore.user?.id || (userStore.user as any)?._id;
+  const messageSenderId = props.message.sender_id || props.message.sender?.id || (props.message.sender as any)?._id;
+  return messageSenderId === currentUserId;
+})
 
 const emojis = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '✨']
 
-/**
- * Get the emoji that the current user has reacted with (if any)
- */
 const userReactionEmoji = computed(() => {
   const userReaction = props.message.reactions_summary.find(r => r.reacted_by_me)
   return userReaction?.emoji || null
 })
 
-/**
- * Strip HTML tags and convert HTML entities to plain text while preserving line breaks
- */
 function stripHtmlTags(html: string): string {
+  if (!html) return ''
   const temp = document.createElement('div')
   temp.innerHTML = html
-  let text = temp.textContent || temp.innerText || ''
-  // Preserve newlines but trim trailing whitespace
-  text = text.trim()
-  return text
+  const text = temp.textContent || temp.innerText || ''
+  return text.trim()
 }
 
-/**
- * Get clean message content (plain text without HTML tags)
- */
-const cleanContent = computed(() => stripHtmlTags(props.message.content))
+const cleanContent = computed(() => stripHtmlTags(props.message.content || ''))
 
 function formatTime(date: string) {
   return new Date(date).toLocaleTimeString('en-US', {
@@ -57,29 +59,81 @@ function formatTime(date: string) {
   })
 }
 
-function formatDate(date: string) {
-  const d = new Date(date)
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
+const isImage = computed(() => {
+  const mime = props.message.file_mime
+  if (mime && mime.startsWith('image/')) return true
 
-  if (d.toDateString() === today.toDateString()) {
-    return 'Today'
-  } else if (d.toDateString() === yesterday.toDateString()) {
-    return 'Yesterday'
+  const name = props.message.file_name
+  if (name) {
+    const ext = name.split('.').pop()?.toLowerCase()
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext || '')
   }
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return false
+})
+
+const imageUrl = ref<string | null>(null)
+const isLoadingImage = ref(false)
+
+/**
+ * Image fetcher logic
+ * Uses Blob URLs for secure local rendering of server-stored images [cite: 809, 810]
+ */
+ watch(() => props.message, async (newMsg) => {
+  // If it's an image and we don't have a local blob yet
+  if (isImage.value && !imageUrl.value) {
+    isLoadingImage.value = true
+    try {
+      const workspaceId = newMsg.workspace_id
+      const filename = newMsg.file_name
+      // Generate the path exactly as the API expects it
+      const path = newMsg.file_path || (workspaceId && filename ? `workspaces/${workspaceId}/messages/${filename}` : '')
+
+      if (path) {
+        // This call uses your axios interceptor to provide the required TOKEN
+        const response = await downloadMessageFile(path) 
+        
+        // Convert the raw data into a local Blob URL the browser can render without headers
+        const blob = new Blob([response.data], {
+          type: response.headers['content-type'] || newMsg.file_mime || 'image/png'
+        })
+        imageUrl.value = URL.createObjectURL(blob) 
+        
+        console.log('[MessageBubble] Successfully created local Blob URL:', imageUrl.value)
+      }
+    } catch (e) {
+      console.error('[MessageBubble] Failed to fetch image data for blob:', e)
+    } finally {
+      isLoadingImage.value = false
+    }
+  }
+}, { immediate: true })
+/**
+ * Memory Management
+ * Ensures Blob URLs are not revoked while the FileViewerModal is still using them
+ */
+onUnmounted(() => {
+  if (imageUrl.value && !props.message.file_download_url && !showFileModal.value) {
+     URL.revokeObjectURL(imageUrl.value)
+  }
+})
+
+/**
+ * Robust preview trigger
+ * Allows opening the modal for non-image files to provide download options
+ */
+function openPreview() {
+  if (imageUrl.value || !isImage.value) {
+    showFileModal.value = true
+  } else if (isImage.value && isLoadingImage.value) {
+    toast.add({ title: 'Still processing image preview...', color: 'neutral' })
+  }
 }
 
 async function handleDownload() {
-  // Backend doc: GET /download?path=workspaces/{workspace_id}/messages/{filename}
   const workspaceId = props.message.workspace_id
   const filename = props.message.file_name
-  const fallbackPath = workspaceId && filename
-    ? `workspaces/${workspaceId}/messages/${filename}`
-    : ''
+  const path = props.message.file_path || (workspaceId && filename ? `workspaces/${workspaceId}/messages/${filename}` : '')
 
-  const path = props.message.file_path || fallbackPath
   if (!path) return
 
   try {
@@ -93,9 +147,9 @@ async function handleDownload() {
     link.download = filename || 'attachment'
     link.click()
     URL.revokeObjectURL(downloadUrl)
-  } catch (error) {
+  } catch (error: any) {
     toast.add({
-      title: error instanceof Error ? error.message : 'Unable to download file',
+      title: error.message || 'Unable to download file',
       color: 'error'
     })
   }
@@ -104,16 +158,13 @@ async function handleDownload() {
 
 <template>
   <div :class="['group flex gap-2.5 sm:gap-3', isOwn ? 'flex-row-reverse' : 'flex-row']">
-    <!-- Avatar -->
     <div class="flex-shrink-0">
       <div class="flex h-8 w-8 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--ui-primary)] to-[var(--ui-secondary)] text-[11px] font-bold text-white shadow-[var(--shadow-sm)]">
-        {{ message.sender.name.charAt(0).toUpperCase() }}
+        {{ message.sender?.name?.charAt(0).toUpperCase() || 'U' }}
       </div>
     </div>
 
-    <!-- Message Content -->
     <div :class="['flex flex-col gap-1 relative', isOwn ? 'items-end' : 'items-start']">
-      <!-- Emoji Picker (Positioned Above) -->
       <div v-if="showReactions" :class="['absolute bottom-full mb-2 flex whitespace-nowrap overflow-x-auto gap-2 p-3 bg-[var(--ui-bg-elevated)] rounded-lg border border-[var(--ui-border)] shadow-lg z-10', isOwn ? 'right-0' : 'left-0']">
         <button
           v-for="emoji in emojis"
@@ -126,52 +177,58 @@ async function handleDownload() {
           @click="$emit('react', emoji); showReactions = false"
         >
           {{ emoji }}
-          <!-- Show indicator for user's current reaction -->
           <div v-if="userReactionEmoji === emoji" class="absolute -top-1 -right-1 w-2 h-2 bg-[var(--ui-primary)] rounded-full"></div>
         </button>
       </div>
 
-      <!-- Header -->
       <div :class="['flex items-center gap-2 text-[11px]', isOwn ? 'flex-row-reverse' : 'flex-row']">
-        <span class="font-semibold text-[var(--ui-text-highlighted)]">{{ message.sender.name }}</span>
+        <span class="font-semibold text-[var(--ui-text-highlighted)]">{{ message.sender?.name || 'Unknown' }}</span>
         <span class="text-[var(--ui-text-dimmed)]">{{ formatTime(message.created_at) }}</span>
       </div>
 
-      <!-- Message Bubble -->
       <div :class="[
         'max-w-[min(82vw,40rem)] rounded-[1.35rem] px-4 py-3 break-words shadow-[var(--shadow-sm)] transition-all duration-300',
         isOwn
           ? 'rounded-br-md bg-[linear-gradient(180deg,rgba(55,27,23,0.96),rgba(55,27,23,0.88))] text-white'
           : 'rounded-bl-md border border-[var(--ui-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,255,255,0.78))] text-[var(--ui-text)] dark:bg-[linear-gradient(180deg,rgba(24,24,27,0.94),rgba(24,24,27,0.86))]'
       ]">
-        <p class="whitespace-pre-wrap text-sm leading-6">
+        
+        <p v-if="cleanContent" class="whitespace-pre-wrap text-sm leading-6">
           {{ cleanContent }}
         </p>
 
-        <!-- File Attachment -->
-        <div v-if="message.file_name" class="mt-3 border-t border-current border-opacity-15 pt-3">
-          <a
-            v-if="message.file_download_url"
-            :href="message.file_download_url"
-            target="_blank"
-            class="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80 dark:bg-white/5"
-          >
-            <UIcon name="i-mdi-file-download" class="w-4 h-4" />
-            {{ message.file_name }}
-          </a>
+        <div v-if="message.file_name" :class="{ 'mt-3': cleanContent }">
+          <div v-if="isImage" class="relative inline-block overflow-hidden rounded-xl bg-black/10 dark:bg-white/10 max-w-[280px] sm:max-w-sm">
+            <div v-if="isLoadingImage" class="flex h-32 w-48 items-center justify-center">
+              <UIcon name="i-lucide-loader" class="h-6 w-6 animate-spin opacity-50" />
+            </div>
+            <img
+              v-else-if="imageUrl"
+              :src="imageUrl"
+              :alt="message.file_name"
+              class="max-h-[320px] w-auto rounded-lg object-contain cursor-pointer transition-transform duration-300 hover:scale-[1.02] block"
+              @click="openPreview" 
+              :title="`Click to preview ${message.file_name}`"
+            />
+          </div>
 
           <button
             v-else
             type="button"
-            class="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80 dark:bg-white/5"
-            @click="handleDownload"
+            @click="openPreview"
+            class="flex w-fit items-center gap-3 rounded-xl border border-current border-opacity-20 bg-black/5 px-4 py-3 text-left transition-colors hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"
+            :class="{ 'border-t border-current border-opacity-15 pt-3': cleanContent }"
           >
-            <UIcon name="i-mdi-file-download" class="w-4 h-4" />
-            {{ message.file_name }}
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-current bg-opacity-10">
+              <UIcon name="i-mdi-file-document-outline" class="h-5 w-5" />
+            </div>
+            <div class="min-w-0 pr-2">
+              <p class="truncate text-sm font-semibold max-w-[200px]">{{ message.file_name }}</p>
+              <p class="text-[10px] uppercase tracking-wider opacity-70">Click to preview</p>
+            </div>
           </button>
         </div>
 
-        <!-- Reactions Inside Bubble -->
         <div v-if="message.reactions_summary.length > 0" :class="['flex flex-wrap gap-1 mt-2', isOwn ? 'justify-end' : 'justify-start']">
           <span
             v-for="reaction in message.reactions_summary"
@@ -190,7 +247,6 @@ async function handleDownload() {
         </div>
       </div>
 
-      <!-- Actions -->
       <div class="mt-1 flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
         <UButton
           icon="i-mdi-emoticon-plus-outline"
@@ -221,4 +277,13 @@ async function handleDownload() {
       </div>
     </div>
   </div>
+
+  <FileViewerModal
+    v-model:open="showFileModal"
+    :file-name="message.file_name"
+    :file-path="message.file_path"
+    :file-mime="message.file_mime"
+    :image-url="imageUrl"
+    @download="handleDownload"
+  />
 </template>
