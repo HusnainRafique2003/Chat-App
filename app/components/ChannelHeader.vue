@@ -2,10 +2,12 @@
 import { ref, computed } from 'vue'
 import { useChannelStore, type Channel } from '~/stores/useChannelStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
+import { useUserStore } from '~/stores/useUserStore'
 import MemberManagementModal from '~/components/modals/MemberManagementModal.vue'
 
 const channelStore = useChannelStore()
 const workspaceStore = useWorkspaceStore()
+const userStore = useUserStore()
 
 const showMemberModal = ref(false)
 const maxVisibleMembers = 5
@@ -28,6 +30,33 @@ const channelMembers = computed(() => {
       avatar: memberData?.avatar
     }
   })
+})
+
+// Dynamically calculate the channel name (handles DMs vs regular channels)
+const channelDisplayName = computed(() => {
+  if (!channel.value) return ''
+
+  if (channel.value.type !== 'direct') {
+    return `# ${channel.value.name}`
+  }
+
+  // It's a Direct Message. Find the other user's name.
+  const currentUserId = userStore.user?.id || (userStore.user as any)?._id
+  
+  const otherMember = channelMembers.value.find(m => {
+    const memberId = m.user_id || (m as any).id || (m as any)._id
+    return memberId && memberId !== currentUserId
+  })
+
+  if (otherMember && otherMember.name !== 'Unknown') {
+    return `💬 ${otherMember.name}`
+  }
+
+  // Fallback if member details aren't loaded yet
+  const fallbackName = channel.value.name.replace('DM: ', '')
+  const looksLikeUserId = Boolean(fallbackName && /^[a-f0-9]{24}$/i.test(fallbackName))
+  
+  return `💬 ${looksLikeUserId ? 'Unknown User' : fallbackName}`
 })
 
 const visibleMembers = computed(() => {
@@ -61,10 +90,9 @@ const getAvatarColor = (index: number) => {
 
 <template>
   <div v-if="channel" class="flex items-start gap-4 min-w-0">
-    <!-- Channel Title and Description -->
     <div class="min-w-0 flex-1">
       <h2 class="text-lg font-bold text-[var(--ui-text-highlighted)] truncate">
-        {{ channel.type === 'direct' ? '💬 Direct Message' : `# ${channel.name}` }}
+        {{ channelDisplayName }}
       </h2>
       <p v-if="channel.description" class="text-sm text-[var(--ui-text-muted)] truncate">
         {{ channel.description }}
@@ -74,9 +102,7 @@ const getAvatarColor = (index: number) => {
       </p>
     </div>
 
-    <!-- Member Avatars -->
     <div class="flex items-center gap-1.5 shrink-0">
-      <!-- Visible Member Avatars -->
       <div class="flex items-center gap-1">
         <div
           v-for="(member, index) in visibleMembers"
@@ -89,7 +115,6 @@ const getAvatarColor = (index: number) => {
         </div>
       </div>
 
-      <!-- Plus Icon for Hidden Members or Settings -->
       <button
         v-if="hiddenMembersCount > 0 || channel.type !== 'direct'"
         type="button"
@@ -102,7 +127,6 @@ const getAvatarColor = (index: number) => {
     </div>
   </div>
 
-  <!-- Member Management Modal -->
   <MemberManagementModal
     v-model:open="showMemberModal"
     :channel-id="channel?.id || ''"
