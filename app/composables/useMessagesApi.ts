@@ -391,12 +391,34 @@ export async function markMessagesAsRead(data: {
  * React to a message with an emoji.
  * POST /api/messages/react  (from Postman "Emoji React")
  */
+/**
+ * React to a message with emoji (WhatsApp-like behavior).
+ * POST /messages/react
+ * 
+ * Implements WhatsApp-like reaction logic:
+ * - User can only have ONE active reaction per message
+ * - Reacting with different emoji replaces the previous one
+ * - Reacting with the SAME emoji removes the reaction (toggle)
+ * 
+ * @param data - Reaction data including channel, messages, emoji, and optional previous emoji
+ * @returns Updated message with new reaction state
+ */
 export async function reactToMessage(data: {
   channel_id: string
   message_ids: string[]
   emoji: string
+  previous_emoji?: string | null  // The user's current reaction emoji (if any)
 }): Promise<AxiosResponse> {
   try {
+    console.log('[Messages API] Reacting to message:', {
+      channel_id: data.channel_id,
+      message_ids: data.message_ids,
+      emoji: data.emoji,
+      previous_emoji: data.previous_emoji,
+      isToggle: data.emoji === data.previous_emoji,
+      isReplace: data.previous_emoji && data.emoji !== data.previous_emoji
+    })
+
     return await apiClient.post('/react', data)
   } catch (error) {
     if (axios.isAxiosError(error)) {

@@ -35,6 +35,9 @@ const showEditModal = ref(false)
 const deletingMessageId = ref<string | null>(null)
 const showDeleteModal = ref(false)
 const toast = useToast()
+const scrollThreshold = ref(100) // pixels from top to trigger loading more
+const shouldAutoScroll = ref(true) // Flag to control auto-scrolling to bottom
+const previousMessageCount = ref(0) // Track message count to detect new messages
 
 const sortedMessages = computed(() => {
   const messages = messageStore.sortedMessages
@@ -60,6 +63,8 @@ watch(
     console.log('[MessageList] Switching to channel:', trimmed)
     console.log('[MessageList] Clearing store and fetching messages')
 
+    shouldAutoScroll.value = true // Reset when switching channels
+    previousMessageCount.value = 0 // Reset message count tracker
     await messageStore.fetchMessages(trimmed)
     // Wait for DOM updates and then scroll to bottom with requestAnimationFrame
     await nextTick()
@@ -73,13 +78,25 @@ watch(
   { immediate: true }
 )
 
-watch(() => sortedMessages.value.length, () => {
-  nextTick(() => {
-    requestAnimationFrame(() => {
-      scrollToBottom()
-    })
-  })
-})
+// New watcher to auto-scroll when messages are added (including new messages sent)
+watch(
+  () => sortedMessages.value.length,
+  async (newLength, oldLength) => {
+    if (newLength > oldLength && shouldAutoScroll.value) {
+      console.log('[MessageList] New message detected, auto-scrolling to bottom', {
+        oldLength,
+        newLength,
+        difference: newLength - oldLength
+      })
+      
+      // Wait for DOM to update before scrolling
+      await nextTick()
+      requestAnimationFrame(() => {
+        scrollToBottom()
+      })
+    }
+  }
+)
 
 function scrollToBottom() {
   if (messagesContainer.value) {
@@ -91,6 +108,47 @@ function scrollToBottom() {
     })
   }
 }
+
+async function handleScroll() {
+  if (!messagesContainer.value) return
+
+  const scrollTop = messagesContainer.value.scrollTop
+
+  // When user scrolls near the top, load more messages
+  if (scrollTop < scrollThreshold.value && messageStore.hasMoreMessages && !messageStore.loadingMore) {
+    console.log('[MessageList] User scrolled to top, loading more messages')
+    
+    // Disable auto-scroll when loading more messages
+    shouldAutoScroll.value = false
+    
+    // Store current scroll state before loading more messages
+    const scrollHeightBefore = messagesContainer.value.scrollHeight
+
+    const result = await messageStore.loadMoreMessages()
+    
+    if (result.success) {
+      // Wait for DOM update
+      await nextTick()
+      
+      // Restore scroll position by adjusting for the new content
+      requestAnimationFrame(() => {
+        if (messagesContainer.value) {
+          const scrollHeightAfter = messagesContainer.value.scrollHeight
+          const heightDifference = scrollHeightAfter - scrollHeightBefore
+          messagesContainer.value.scrollTop = scrollTop + heightDifference
+          console.log('[MessageList] Scroll position restored:', {
+            scrollTop,
+            heightDifference,
+            newScrollTop: scrollTop + heightDifference
+          })
+        }
+      })
+    }
+  }
+}
+
+// Remove the unused ref
+// const lastCalculatedScrollHeight = ref({ current: 0 })
 
 function startEdit(message: Message) {
   editingMessage.value = message
@@ -162,8 +220,29 @@ async function handleDeleteMessage() {
 }
 
 async function handleReaction(messageId: string, emoji: string) {
-  await messageStore.addReaction(props.channelId, messageId, emoji)
+  const result = await messageStore.addReaction(props.channelId, messageId, emoji)
+  
+  if (!result.success && result.error) {
+    // Only show errors from actual API failures, not prevention errors
+    toast.add({
+      title: 'Reaction error',
+      description: result.error,
+      color: 'error'
+    })
+    return
+  }
+  
   emit('reaction-added', { messageId, emoji })
+}
+
+async function handleMessageSent(data: { content: string; file?: File }) {
+  // Emit the message-sent event to parent component
+  emit('message-sent', data)
+  
+  // Re-enable auto-scroll so the watcher will scroll when the message appears
+  shouldAutoScroll.value = true
+  
+  console.log('[MessageList] Message sent, auto-scroll enabled. Watcher will handle scrolling when message is added to store.')
 }
 </script>
 
@@ -173,7 +252,16 @@ async function handleReaction(messageId: string, emoji: string) {
     <div
       ref="messagesContainer"
       class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4"
+      @scroll="handleScroll"
     >
+      <!-- Load More Indicator -->
+      <div v-if="messageStore.loadingMore" class="flex items-center justify-center py-4">
+        <div class="text-center">
+          <UIcon name="i-mdi-chevron-up" class="w-6 h-6 animate-bounce text-[var(--ui-primary)] mx-auto mb-2" />
+          <p class="text-sm text-[var(--ui-text-muted)]">Loading earlier messages...</p>
+        </div>
+      </div>
+
       <!-- Loading State -->
       <div v-if="loading" class="flex items-center justify-center h-full">
         <div class="text-center">
@@ -192,7 +280,7 @@ async function handleReaction(messageId: string, emoji: string) {
 
       <!-- Messages -->
       <template v-else>
-        <div v-for="message in sortedMessages" :key="message.id">
+        <div v-for="message in sortedMessages" :key="message.id" :data-message-id="message.id">
           <MessageBubble
             :message="message"
             @edit="startEdit(message)"
@@ -205,7 +293,7 @@ async function handleReaction(messageId: string, emoji: string) {
 
     <!-- Message Composer (sticky at bottom) -->
     <div class="shrink-0 border-t border-[var(--ui-border)]">
-      <RichMessageComposer @send="$emit('message-sent', $event)" />
+      <RichMessageComposer @send="handleMessageSent" />
     </div>
 
     <!-- Edit Message Modal -->

@@ -52,9 +52,8 @@ const sizeClass = computed(() => {
 <template>
   <UModal v-model:open="open" :dismissible="!loading">
     <template #content>
-      <div :class="sizeClass" class="flex max-h-[min(88vh,52rem)] w-[calc(100vw-1.5rem)] flex-col gap-4 overflow-y-auto p-4 sm:p-6">
+      <div :class="sizeClass" class="flex w-full max-h-[min(88vh,52rem)] flex-col gap-4 overflow-y-auto p-4 sm:p-6">
 
-        <!-- Header -->
         <div class="flex items-start gap-3">
           <div
             v-if="icon"
@@ -68,8 +67,8 @@ const sizeClass = computed(() => {
             />
           </div>
           <div class="flex-1 min-w-0">
-            <p v-if="title" class="font-bold text-lg text-default">{{ title }}</p>
-            <p v-if="description" class="text-sm text-muted mt-0.5">{{ description }}</p>
+            <p v-if="title" class="font-bold text-lg text-[var(--ui-text)]">{{ title }}</p>
+            <p v-if="description" class="text-sm text-[var(--ui-text-muted)] mt-0.5">{{ description }}</p>
           </div>
           <UButton
             icon="i-lucide-x"
@@ -81,11 +80,9 @@ const sizeClass = computed(() => {
           />
         </div>
 
-        <!-- Body slot -->
         <slot />
 
-        <!-- Footer -->
-        <div v-if="!hideFooter" class="flex flex-col-reverse justify-end gap-2 border-t border-default pt-2 sm:flex-row">
+        <div v-if="!hideFooter" class="flex flex-col-reverse justify-end gap-2 border-t border-[var(--ui-border)] pt-4 mt-2 sm:flex-row">
           <slot name="footer">
             <UButton
               :label="cancelLabel"

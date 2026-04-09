@@ -15,6 +15,13 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
+      // ADDED: Meta configuration to allow Blob URLs for images
+      meta: [
+        { 
+          'http-equiv': 'Content-Security-Policy', 
+          content: "img-src 'self' blob: data: http://178.104.58.236;" 
+        }
+      ],
       link: [
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
@@ -40,11 +47,10 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
-  // colorMode config (optional - these are the defaults)
   colorMode: {
-    preference: 'system',   // default: follow OS setting
-    fallback: 'light',      // fallback if system preference unknown
-    classSuffix: '',        // adds 'dark' class (not 'dark-mode')
+    preference: 'system',
+    fallback: 'light',
+    classSuffix: '',
   },
 
   i18n: {
@@ -53,7 +59,7 @@ export default defineNuxtConfig({
       { code: 'en', name: 'English' },
       { code: 'fr', name: 'Français' },
       { code: 'de', name: 'Deutsch' },
-      { code: 'ar', name: 'العربية' }  // RTL example
+      { code: 'ar', name: 'العربية' }
     ]
   },
 

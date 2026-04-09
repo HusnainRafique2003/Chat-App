@@ -8,6 +8,7 @@ interface MessageState {
   messages: Message[]
   localScheduledMessages: Message[]
   loading: boolean
+  loadingMore: boolean
   searching: boolean
   currentChannelId: string | null
   userNameCache: Record<string, string>
@@ -47,6 +48,7 @@ export const useMessageStore = defineStore('messages', {
     messages: [],
     localScheduledMessages: [],
     loading: false,
+    loadingMore: false,
     searching: false,
     currentChannelId: null,
     userNameCache: {},
@@ -63,6 +65,11 @@ export const useMessageStore = defineStore('messages', {
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     ),
     unreadCount: (state) => state.messages.filter(m => !m.is_read_by_me).length,
+    
+    /**
+     * Check if there are more messages to load
+     */
+    hasMoreMessages: (state) => state.pagination.current_page < state.pagination.last_page,
     
     /**
      * Returns a function to check if the current user owns a message
@@ -425,8 +432,53 @@ export const useMessageStore = defineStore('messages', {
         const data = response.data
 
         if (data.success) {
+          console.log('[Message Store] Message creation successful, response data:', {
+            hasData: !!data.data,
+            dataType: typeof data.data,
+            dataKeys: data.data ? Object.keys(data.data) : [],
+            dataMessage: data.data?.message ? 'found at data.message' : 'not found'
+          })
+
           // Extract the newly created message from response
-          const newMessage = data.data?.message || data.data
+          let newMessage = data.data?.message || data.data
+          
+          // If extraction still fails, construct message from request data + current user
+          if (!newMessage || typeof newMessage !== 'object') {
+            console.log('[Message Store] Message not found in response, constructing from request data')
+            const currentUserId = userStore.user?.id || (userStore.user as any)?._id
+            const currentUserName = userStore.user?.name || 'You'
+            
+            // Construct a minimal message object with the data we have
+            newMessage = {
+              id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              _id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              channel_id: channelId,
+              sender_id: currentUserId,
+              content: content,
+              message: content,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              workspace_id: '',
+              receiver_id: null,
+              message_type: 'text',
+              file_path: null,
+              file_name: null,
+              file_mime: null,
+              file_download_url: null,
+              sender: {
+                id: currentUserId,
+                name: currentUserName,
+                email: userStore.user?.email || '',
+                is_active: true
+              },
+              receiver: null,
+              channel: { id: channelId, name: '' },
+              read_by_count: 0,
+              is_read_by_me: true,
+              reactions_summary: []
+            }
+          }
+          
           if (newMessage) {
             const senderName = this.getSenderName(newMessage.sender_id, newMessage.sender?.name, true)
             
@@ -444,12 +496,23 @@ export const useMessageStore = defineStore('messages', {
             }
             // Only add message if we're currently viewing this channel
             if (this.currentChannelId === channelId) {
+              console.log('[Message Store] Adding message to current channel view:', {
+                messageId: normalized.id,
+                content: normalized.content?.slice(0, 30),
+                currentChannelId: this.currentChannelId
+              })
               this.messages.push(normalized)
+            } else {
+              console.log('[Message Store] Not adding message - viewing different channel', {
+                messageChannelId: channelId,
+                currentChannelId: this.currentChannelId
+              })
             }
             return { success: true, message: normalized }
           }
 
-          // If we can't extract the message, just re-fetch
+          // Fallback: re-fetch if still no message
+          console.log('[Message Store] Could not construct message, falling back to refetch')
           await this.fetchMessages(channelId)
           return { success: true }
         }
@@ -650,19 +713,61 @@ export const useMessageStore = defineStore('messages', {
       }
     },
 
+    /**
+     * Add or toggle a reaction on a message (WhatsApp-like behavior).
+     * 
+     * Logic:
+     * - If user hasn't reacted: Add new reaction
+     * - If user reacted with SAME emoji: Remove reaction (toggle)
+     * - If user reacted with DIFFERENT emoji: Replace with new emoji
+     * 
+     * @param channelId - The channel containing the message
+     * @param messageId - The message to react to
+     * @param emoji - The emoji to react with
+     */
     async addReaction(channelId: string, messageId: string, emoji: string) {
       try {
+        // Find the message
+        const message = this.messages.find(m => m.id === messageId && m.channel_id === channelId)
+        if (!message) {
+          return { success: false, error: 'Message not found' }
+        }
+
+        // Deduplicate reactions on client side (if backend has duplicates)
+        message.reactions_summary = this.deduplicateReactions(message.reactions_summary)
+
+        // Find user's current reaction emoji (if any)
+        const userReaction = message.reactions_summary.find(r => r.reacted_by_me)
+        const previousEmoji = userReaction?.emoji || null
+
+        console.log('[Message Store] Reaction action:', {
+          messageId,
+          newEmoji: emoji,
+          previousEmoji,
+          action: emoji === previousEmoji ? 'TOGGLE/REMOVE' : previousEmoji ? 'REPLACE' : 'ADD'
+        })
+
+        // Call API with previous emoji info so backend can implement toggle/replace logic
         const response = await reactToMessage({
           channel_id: channelId,
           message_ids: [messageId],
-          emoji
+          emoji,
+          previous_emoji: previousEmoji
         })
         const data = response.data
 
         if (data.success && data.data?.message) {
           const index = this.messages.findIndex(m => m.id === messageId && m.channel_id === channelId)
           if (index > -1) {
-            this.messages[index] = data.data.message
+            // Deduplicate reactions from API response
+            const updatedMessage = data.data.message
+            updatedMessage.reactions_summary = this.deduplicateReactions(updatedMessage.reactions_summary)
+            this.messages[index] = updatedMessage
+
+            console.log('[Message Store] Reaction updated successfully:', {
+              messageId,
+              newReactions: this.messages[index].reactions_summary
+            })
           }
           return { success: true, message: data.data.message }
         }
@@ -670,7 +775,210 @@ export const useMessageStore = defineStore('messages', {
         return { success: false, error: data.message || 'Failed to add reaction' }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to add reaction'
+        console.error('[Message Store] Reaction error:', message)
         return { success: false, error: message }
+      }
+    },
+
+    /**
+     * Deduplicate reactions to ensure only one reaction per user per message.
+     * This is a CLIENT-SIDE workaround until backend implements the unique constraint.
+     * 
+     * @param reactions - Array of reaction summaries from API
+     * @returns Deduplicated reactions with only the latest emoji per user
+     */
+    deduplicateReactions(reactions: any[]): any[] {
+      if (!reactions || reactions.length === 0) return reactions
+
+      const userReactionMap = new Map<string, any>()
+      const currentUserId = useUserStore().user?.id
+
+      // For each reaction, check if this user appears in reacted_by
+      reactions.forEach((reaction) => {
+        if (reaction.reacted_by && Array.isArray(reaction.reacted_by)) {
+          reaction.reacted_by.forEach((userId: string) => {
+            // Keep track of the latest reaction for this user
+            // (In case of duplicates, keep this emoji)
+            userReactionMap.set(userId, reaction.emoji)
+          })
+        }
+      })
+
+      // Now rebuild reactions_summary with deduplicated data
+      const deduplicatedMap = new Map<string, any>()
+
+      reactions.forEach((reaction) => {
+        if (reaction.reacted_by && Array.isArray(reaction.reacted_by)) {
+          // Filter reacted_by to remove users who have reactions on other emojis
+          const dedupReactedBy = reaction.reacted_by.filter((userId: string) => {
+            return userReactionMap.get(userId) === reaction.emoji
+          })
+
+          if (dedupReactedBy.length > 0) {
+            // Rebuild this reaction with deduplicated users
+            deduplicatedMap.set(reaction.emoji, {
+              emoji: reaction.emoji,
+              count: dedupReactedBy.length,
+              reacted_by_me: dedupReactedBy.includes(currentUserId),
+              reacted_by: dedupReactedBy
+            })
+          }
+        }
+      })
+
+      const result = Array.from(deduplicatedMap.values())
+
+      if (result.length !== reactions.length) {
+        console.warn('[Message Store] Deduplicating reactions:', {
+          before: reactions.length,
+          after: result.length,
+          userReactionMap: Array.from(userReactionMap.entries())
+        })
+      }
+
+      return result
+    },
+
+    async loadMoreMessages(): Promise<StoreActionResult> {
+      if (!this.currentChannelId) {
+        return { success: false, error: 'No channel selected' }
+      }
+
+      if (!this.hasMoreMessages || this.loadingMore) {
+        return { success: false, error: 'No more messages to load' }
+      }
+
+      this.loadingMore = true
+
+      try {
+        const nextPage = this.pagination.current_page + 1
+        console.log('[Message Store] Loading more messages:', {
+          channelId: this.currentChannelId,
+          nextPage,
+          lastPage: this.pagination.last_page
+        })
+
+        const response = await readMessages({
+          channel_id: this.currentChannelId,
+          page: nextPage,
+          per_page: 20
+        })
+        const data = response.data
+
+        // Extract messages from response using same logic as fetchMessages
+        let messagesArray: Message[] = []
+
+        if (data.success || data.data) {
+          if (data.data?.messages && Array.isArray(data.data.messages)) {
+            messagesArray = data.data.messages
+          } else if (data.data?.messages?.data && Array.isArray(data.data.messages.data)) {
+            messagesArray = data.data.messages.data
+          } else if (data.data?.data && Array.isArray(data.data.data)) {
+            messagesArray = data.data.data
+          } else if (Array.isArray(data.data)) {
+            messagesArray = data.data
+          } else if (data.data?.result && Array.isArray(data.data.result)) {
+            messagesArray = data.data.result
+          } else if (data.data?.items && Array.isArray(data.data.items)) {
+            messagesArray = data.data.items
+          } else if (typeof data.data === 'object' && data.data !== null) {
+            const recordData = data.data as Record<string, unknown>
+            const arrayKeys = Object.keys(recordData).filter(key => Array.isArray(recordData[key]) && !['links', 'meta', 'pagination'].includes(key))
+            const firstArrayKey = arrayKeys[0]
+            if (firstArrayKey) {
+              messagesArray = recordData[firstArrayKey] as Message[]
+            }
+          }
+        } else if (Array.isArray(data)) {
+          messagesArray = data
+        }
+
+        if (messagesArray.length === 0) {
+          console.log('[Message Store] No messages in response')
+          return { success: true }
+        }
+
+        // Normalize messages
+        const userStore = useUserStore()
+        const workspaceStore = useWorkspaceStore()
+        const currentUserId = userStore.user?.id
+        const currentUserName = userStore.user?.name
+        const workspaceMembers = workspaceStore.currentWorkspace?.members || []
+        const userNameMap = new Map<string, string>()
+
+        workspaceMembers.forEach((member: any) => {
+          const ids = [member?.id, member?._id, member?.user_id].filter(Boolean)
+          const name = member?.name || member?.user?.name
+
+          if (name) {
+            ids.forEach((id: string) => userNameMap.set(id, name))
+          }
+        })
+
+        const looksLikeUserId = (value?: string | null) => Boolean(value && /^[a-f0-9]{24}$/i.test(value))
+
+        const normalizedMessages: Message[] = messagesArray
+          .filter((m: any) => !m.channel_id || m.channel_id === this.currentChannelId)
+          .map((m: any) => {
+            const senderId = m.sender?.id || m.sender?._id || m.sender_id || ''
+            const backendSenderName = m.sender?.name
+            let senderName = backendSenderName
+
+            if ((!senderName || looksLikeUserId(senderName)) && senderId === currentUserId) {
+              senderName = currentUserName || 'You'
+            } else if (!senderName || looksLikeUserId(senderName)) {
+              senderName = userNameMap.get(senderId) || senderName
+            }
+
+            if (!senderName) {
+              senderName = 'Unknown'
+            }
+
+            return {
+              ...m,
+              id: m.id || m._id,
+              channel_id: m.channel_id || this.currentChannelId,
+              sender: {
+                ...(m.sender || {}),
+                id: senderId,
+                name: senderName,
+                email: m.sender?.email || '',
+                is_active: m.sender?.is_active ?? true
+              },
+              reactions_summary: m.reactions_summary || [],
+              is_read_by_me: m.is_read_by_me ?? false,
+              read_by_count: m.read_by_count ?? 0,
+              content: m.content || m.message || m.text || m.body || '',
+            }
+          })
+
+        // Prepend messages to the beginning (oldest first)
+        this.messages = [...normalizedMessages, ...this.messages]
+
+        // Update pagination
+        const paginationSource = data.data?.messages || data.data
+        this.pagination = {
+          current_page: paginationSource?.current_page ?? nextPage,
+          per_page: paginationSource?.per_page ?? 20,
+          total: paginationSource?.total ?? this.pagination.total,
+          last_page: paginationSource?.last_page ?? this.pagination.last_page
+        }
+
+        console.log('[Message Store] More messages loaded:', {
+          newMessagesCount: normalizedMessages.length,
+          totalMessages: this.messages.length,
+          currentPage: this.pagination.current_page,
+          lastPage: this.pagination.last_page,
+          hasMore: this.hasMoreMessages
+        })
+
+        return { success: true }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load more messages'
+        console.error('[Message Store] Error loading more messages:', message)
+        return { success: false, error: message }
+      } finally {
+        this.loadingMore = false
       }
     },
 
