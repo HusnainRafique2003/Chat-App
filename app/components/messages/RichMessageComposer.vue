@@ -672,11 +672,11 @@ watch(() => props.initialContent, v => {
           <UButton icon="i-lucide-x" size="xs" color="neutral" variant="ghost" class="h-7 w-7 cursor-pointer" @click="showEmojiPicker = false" />
         </div>
 
-        <div class="grid grid-cols-6 gap-2 max-h-[300px] overflow-y-auto sm:grid-cols-8">
+        <div class="flex gap-2 whitespace-nowrap overflow-x-auto">
           <button
             v-for="(emoji, idx) in emojis"
             :key="idx"
-            class="h-10 w-10 rounded-lg hover:bg-[var(--ui-primary)]/10 transition-all flex items-center justify-center text-xl cursor-pointer"
+            class="h-10 w-10 rounded-lg hover:bg-[var(--ui-primary)]/10 transition-all flex items-center justify-center text-xl cursor-pointer flex-shrink-0"
             @click="insertEmoji(emoji)"
           >
             {{ emoji }}
