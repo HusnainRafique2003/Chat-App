@@ -13,7 +13,7 @@ const teamStore = useTeamStore()
 const channelStore = useChannelStore()
 const route = useRoute()
 
-// --- State for Workspace Member Dropdown ---
+// --- State for Workspace Member Dropdown & Mobile ---
 const isWorkspaceMenuOpen = ref(false)
 const isMobileSidebarOpen = ref(false)
 
@@ -82,9 +82,10 @@ watch(() => route.fullPath, () => {
 <template>
   <div class="h-screen h-[100dvh] w-full overflow-hidden bg-[var(--ui-bg-muted)] text-[var(--ui-text)]">
     <div class="grid h-full w-full lg:grid-cols-[275px_minmax(0,1fr)]">
+      
       <aside class="flex h-full flex-col border-r border-[var(--ui-border)] bg-[var(--ui-bg)] min-h-0">
-        <div class="shrink-0 border-b border-[var(--ui-border)] px-5 py-4">
-          <NuxtLink to="/dashboard" class="flex items-center">
+        <div class="shrink-0 flex items-center border-b border-[var(--ui-border)] px-5 h-[72px]">
+          <NuxtLink to="/dashboard" class="flex items-center w-full">
             <div class="min-w-0 flex-1">
               <p class="font-black text-[var(--ui-text-highlighted)] truncate" :title="workspaceStore.currentWorkspace?.name">
                 {{ workspaceStore.currentWorkspace?.name || 'No Workspace' }}
@@ -112,10 +113,11 @@ watch(() => route.fullPath, () => {
         </div>
       </aside>
 
-      <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-        <header class="relative z-30 shrink-0 border-b border-[var(--ui-border)] bg-[var(--ui-bg)]/92 px-4 py-3 backdrop-blur-md sm:px-6">
-          <div class="flex items-start justify-between gap-3 sm:items-center">
-            <div class="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
+      <div class="flex h-full flex-col min-w-0 min-h-0">
+        <header class="shrink-0 flex items-center border-b border-[var(--ui-border)] bg-[var(--ui-bg)]/90 px-5 sm:px-8 h-[72px] backdrop-blur-md relative z-50">
+          <div class="flex items-center justify-between gap-4 w-full">
+            
+            <div class="min-w-0 flex items-center gap-3 flex-1">
               <button
                 type="button"
                 class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg-muted)] text-[var(--ui-text)] transition-colors hover:bg-[var(--ui-bg-elevated)] lg:hidden"
@@ -124,90 +126,24 @@ watch(() => route.fullPath, () => {
                 <UIcon name="i-lucide-menu" class="h-5 w-5" />
               </button>
 
-              <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
-                  <AppTooltip :text="currentWorkspaceName">
-                    <h1 class="max-w-full truncate text-lg font-black text-[var(--ui-text-highlighted)] sm:text-xl">
-                      {{ currentWorkspaceName }}
-                    </h1>
-                  </AppTooltip>
-
-                  <div class="relative">
-                    <button
-                      @click="isWorkspaceMenuOpen = !isWorkspaceMenuOpen"
-                      type="button"
-                      class="flex items-center gap-1 rounded-full border border-[var(--ui-primary)]/20 bg-[var(--ui-primary)]/10 px-2 py-1 shadow-sm transition-all hover:bg-[var(--ui-primary)]/20"
-                    >
-                      <span class="text-[10px] font-bold uppercase tracking-tight text-[var(--ui-primary)]">
-                        {{ workspaceMembers.length }} members
-                      </span>
-                      <UIcon name="i-lucide-chevron-down" class="h-3 w-3 text-[var(--ui-primary)] transition-transform" :class="{ 'rotate-180': isWorkspaceMenuOpen }" />
-                    </button>
-
-                    <div
-                      v-if="isWorkspaceMenuOpen"
-                      class="absolute left-0 top-full z-[60] mt-2 w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-[var(--ui-border)] bg-[var(--ui-bg)] shadow-2xl"
-                    >
-                      <div class="border-b border-[var(--ui-border)] bg-[var(--ui-bg-muted)]/50 px-3 py-2 text-[10px] font-bold uppercase text-[var(--ui-text-dimmed)]">
-                        Workspace Members
-                      </div>
-                      <div class="max-h-64 overflow-y-auto p-1.5">
-                        <div v-for="m in workspaceMembers" :key="m.id" class="group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-[var(--ui-bg-muted)]">
-                          <div class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--ui-primary)]/10 text-xs font-bold text-[var(--ui-primary)]">
-                            {{ (m.name || 'U').charAt(0).toUpperCase() }}
-                          </div>
-                          <div class="min-w-0">
-                            <AppTooltip :text="m.name">
-                              <p class="truncate text-sm font-medium text-[var(--ui-text)]">{{ m.name }}</p>
-                            </AppTooltip>
-                            <AppTooltip :text="m.email">
-                              <p class="truncate text-[10px] text-[var(--ui-text-muted)]">{{ m.email }}</p>
-                            </AppTooltip>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div v-if="isWorkspaceMenuOpen" @click="isWorkspaceMenuOpen = false" class="fixed inset-0 z-[55]" />
-                  </div>
-                </div>
-
-                <div class="mt-0.5">
-                  <AppTooltip :text="currentTeamName">
-                    <p class="max-w-[16rem] truncate text-xs font-medium text-[var(--ui-text-muted)] sm:max-w-[22rem] sm:text-sm">
-                      {{ currentTeamName }}
-                    </p>
-                  </AppTooltip>
-                </div>
+              <div class="min-w-0 flex-1">
+                <ChannelHeader />
               </div>
             </div>
-
-            <div class="hidden shrink-0 border-l border-[var(--ui-border)] pl-4 text-right sm:block">
-              <AppTooltip :text="userStore.user?.name">
-                <p class="max-w-[170px] truncate text-sm font-semibold text-[var(--ui-text)]">{{ userStore.user?.name }}</p>
-              </AppTooltip>
-              <AppTooltip :text="userStore.user?.email">
-                <p class="max-w-[170px] truncate text-xs text-[var(--ui-text-muted)]">{{ userStore.user?.email }}</p>
-              </AppTooltip>
+            
+            <div class="text-right shrink-0 border-l border-[var(--ui-border)] pl-4 ml-2 hidden sm:block">
+              <p class="text-sm font-semibold text-[var(--ui-text)] truncate max-w-[150px]">{{ userStore.user?.name }}</p>
+              <p class="text-xs text-[var(--ui-text-muted)] truncate max-w-[150px]">{{ userStore.user?.email }}</p>
             </div>
-          </div>
-
-          <div class="mt-3 flex items-center justify-between gap-3 border-t border-[var(--ui-border)]/70 pt-3 sm:hidden">
-            <div class="min-w-0">
-              <AppTooltip :text="userStore.user?.name">
-                <p class="truncate text-sm font-semibold text-[var(--ui-text)]">{{ userStore.user?.name }}</p>
-              </AppTooltip>
-              <AppTooltip :text="userStore.user?.email">
-                <p class="truncate text-xs text-[var(--ui-text-muted)]">{{ userStore.user?.email }}</p>
-              </AppTooltip>
-            </div>
+            
             <button
               type="button"
-              class="inline-flex items-center gap-2 rounded-xl border border-[var(--ui-border)] px-3 py-2 text-xs font-semibold text-[var(--ui-text)] transition-colors hover:bg-[var(--ui-bg-muted)]"
+              class="inline-flex items-center gap-2 rounded-xl border border-[var(--ui-border)] px-3 py-2 text-xs font-semibold text-[var(--ui-text)] transition-colors hover:bg-[var(--ui-bg-muted)] sm:hidden"
               @click="handleLogout"
             >
               <UIcon name="i-lucide-log-out" class="h-4 w-4" />
-              Logout
             </button>
+
           </div>
         </header>
 
@@ -215,6 +151,7 @@ watch(() => route.fullPath, () => {
           <slot />
         </main>
       </div>
+
     </div>
   </div>
 </template>
