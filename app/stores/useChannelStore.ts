@@ -85,18 +85,34 @@ export const useChannelStore = defineStore('channel-data', {
       name: string
       workspace_id: string
       team_id: string
+      type?: string
+      isPrivate?: boolean
+      description?: string
     }) {
       this.loading = true
       try {
+        // Pass the actual data so 'private' channels work properly
         const response = await createChannel({
-          ...data,
-          type: 'public'
+          type: 'public', // Default fallback
+          ...data 
         })
+        
         const channelData = response.data
 
-        if (channelData.success && channelData.data?.channel) {
-          this.channels.push(channelData.data.channel)
-          return { success: true, channel: channelData.data.channel }
+        // Robust extraction (handles different backend response shapes)
+        const newChannel = channelData.data?.channel || channelData.channel || channelData.data || channelData
+
+        if (channelData.success && newChannel && (newChannel.id || newChannel._id)) {
+          // Normalize the ID just like you do in fetchChannels
+          newChannel.id = newChannel.id || newChannel._id
+          
+          // Push to state
+          this.channels.push(newChannel)
+          
+          // Optional: automatically switch the user to the newly created channel
+          this.setCurrentChannel(newChannel.id)
+          
+          return { success: true, channel: newChannel }
         }
 
         return { success: false, error: channelData.message || 'Failed to create channel' }
@@ -107,13 +123,16 @@ export const useChannelStore = defineStore('channel-data', {
         this.loading = false
       }
     },
-    async createDirectChannel(workspaceId: string, targetUserId: string, targetUserName: string) {
+
+    // RESTORED DIRECT MESSAGE ACTION WITH TEAM SCOPING FIX
+    async createDirectChannel(workspaceId: string, teamId: string, targetUserId: string, targetUserName: string) {
       this.loading = true
       try {
-        // 1. Check if we already have a DM with this user in the UI
+        // 1. Check if we already have a DM with this user in the UI FOR THIS TEAM
         const existingDm = this.channels.find(c => 
           c.type === 'direct' && 
           c.workspace_id === workspaceId && 
+          c.team_id === teamId && 
           c.name.includes(targetUserName)
         )
 
@@ -127,9 +146,10 @@ export const useChannelStore = defineStore('channel-data', {
         const response = await createChannel({
           name: `DM: ${targetUserName}`,
           workspace_id: workspaceId,
+          team_id: teamId, 
           type: 'direct',
           direct_user_id: targetUserId, 
-          members: [targetUserId] // We send both depending on what your Laravel API expects
+          members: [targetUserId]
         })
         const channelData = response.data
         const newChannel = channelData.data?.channel || channelData.channel || channelData.data || channelData
@@ -137,6 +157,8 @@ export const useChannelStore = defineStore('channel-data', {
         // 3. Add to sidebar and open it
         if (newChannel && (newChannel.id || newChannel._id)) {
           newChannel.id = newChannel.id || newChannel._id
+          newChannel.team_id = newChannel.team_id || teamId // Ensure team_id is set locally
+          
           this.channels.push(newChannel)
           this.setCurrentChannel(newChannel.id)
           return { success: true, channel: newChannel }
