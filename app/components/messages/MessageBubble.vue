@@ -25,6 +25,62 @@ const toast = useToast()
 
 const props = defineProps<Props>()
 
+function sanitizeMessageHtml(html: string): string {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html || '', 'text/html')
+  const allowedTags = new Set(['A', 'P', 'BR', 'STRONG', 'EM', 'CODE', 'PRE', 'UL', 'OL', 'LI', 'BLOCKQUOTE'])
+
+  function escapeHtml(value: string) {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  }
+
+  function walk(node: Node): string {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return escapeHtml(node.textContent || '')
+    }
+
+    if (!(node instanceof HTMLElement)) {
+      return ''
+    }
+
+    const tagName = node.tagName.toUpperCase()
+    const children = Array.from(node.childNodes).map(walk).join('')
+
+    if (!allowedTags.has(tagName)) {
+      return children
+    }
+
+    if (tagName === 'A') {
+      const href = node.getAttribute('href') || ''
+      if (!/^https?:\/\//i.test(href)) {
+        return children
+      }
+
+      return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer nofollow" class="underline underline-offset-2">${children || escapeHtml(href)}</a>`
+    }
+
+    if (tagName === 'BR') {
+      return '<br>'
+    }
+
+    const safeTag = tagName.toLowerCase()
+    return `<${safeTag}>${children}</${safeTag}>`
+  }
+
+  return Array.from(doc.body.childNodes).map(walk).join('').trim()
+}
+
+const renderedContent = computed(() => sanitizeMessageHtml(props.message.content))
+const isAudioAttachment = computed(() => {
+  if (props.message.file_mime?.startsWith('audio/')) return true
+  return /\.(wav|mp3|m4a|ogg|webm)$/i.test(props.message.file_name || '')
+})
+const audioSource = computed(() => props.message.file_download_url || '')
 /**
  * FIXED COMPUTED PROPERTY
  * Handles both standard ID and MongoDB-style _id for comparison 
@@ -129,6 +185,15 @@ function openPreview() {
   }
 }
 
+function formatScheduledTime(date: string) {
+  return new Date(date).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 async function handleDownload() {
   const workspaceId = props.message.workspace_id
   const filename = props.message.file_name
@@ -192,25 +257,47 @@ async function handleDownload() {
           ? 'rounded-br-md bg-[linear-gradient(180deg,rgba(55,27,23,0.96),rgba(55,27,23,0.88))] text-white'
           : 'rounded-bl-md border border-[var(--ui-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,255,255,0.78))] text-[var(--ui-text)] dark:bg-[linear-gradient(180deg,rgba(24,24,27,0.94),rgba(24,24,27,0.86))]'
       ]">
-        
-        <p v-if="cleanContent" class="whitespace-pre-wrap text-sm leading-6">
-          {{ cleanContent }}
-        </p>
+        <div class="message-content text-sm leading-6" v-html="renderedContent" />
 
-        <div v-if="message.file_name" :class="{ 'mt-3': cleanContent }">
-          <div v-if="isImage" class="relative inline-block overflow-hidden rounded-xl bg-black/10 dark:bg-white/10 max-w-[280px] sm:max-w-sm">
-            <div v-if="isLoadingImage" class="flex h-32 w-48 items-center justify-center">
-              <UIcon name="i-lucide-loader" class="h-6 w-6 animate-spin opacity-50" />
-            </div>
-            <img
-              v-else-if="imageUrl"
-              :src="imageUrl"
-              :alt="message.file_name"
-              class="max-h-[320px] w-auto rounded-lg object-contain cursor-pointer transition-transform duration-300 hover:scale-[1.02] block"
-              @click="openPreview" 
-              :title="`Click to preview ${message.file_name}`"
+        <div
+          v-if="message.status === 'scheduled' && message.schedule_time"
+          :class="[
+            'mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
+            isOwn
+              ? 'bg-white/12 text-white/90'
+              : 'border border-[var(--ui-border)] bg-[var(--ui-bg-elevated)] text-[var(--ui-text-muted)]'
+          ]"
+        >
+          <UIcon name="i-lucide-calendar-clock" class="h-3.5 w-3.5" />
+          Scheduled for {{ formatScheduledTime(message.schedule_time) }}
+        </div>
+
+        <!-- File Attachment -->
+        <div v-if="message.file_name" class="mt-3 border-t border-current border-opacity-15 pt-3">
+          <div
+            v-if="isAudioAttachment && audioSource"
+            class="rounded-2xl bg-black/5 p-3 dark:bg-white/5"
+          >
+            <audio
+              :src="audioSource"
+              controls
+              preload="metadata"
+              class="w-full max-w-xs"
             />
+            <p class="mt-2 text-xs font-medium opacity-80">
+              {{ message.file_name }}
+            </p>
           </div>
+
+          <a
+            v-else-if="message.file_download_url"
+            :href="message.file_download_url"
+            target="_blank"
+            class="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80 dark:bg-white/5"
+          >
+            <UIcon name="i-mdi-file-download" class="w-4 h-4" />
+            {{ message.file_name }}
+          </a>
 
           <button
             v-else
@@ -277,6 +364,76 @@ async function handleDownload() {
       </div>
     </div>
   </div>
+</template>
+
+<style scoped>
+.message-content :deep(p) {
+  margin: 0;
+}
+
+.message-content :deep(p + p) {
+  margin-top: 0.65rem;
+}
+
+.message-content :deep(a) {
+  font-weight: 600;
+}
+
+.message-content :deep(strong em),
+.message-content :deep(em strong) {
+  font-style: italic;
+  font-weight: 800;
+  color: var(--ui-primary);
+}
+
+.message-content :deep(code) {
+  border: 1px solid color-mix(in srgb, var(--ui-border) 75%, transparent);
+  background: color-mix(in srgb, var(--ui-bg-elevated) 88%, transparent);
+  border-radius: 0.55rem;
+  padding: 0.15rem 0.4rem;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.82em;
+}
+
+.message-content :deep(pre) {
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid color-mix(in srgb, var(--ui-border) 80%, transparent);
+  background: #101827;
+  color: #e5eefc;
+  border-radius: 1rem;
+  margin-top: 0.85rem;
+  padding: 1rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.message-content :deep(pre code) {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  white-space: pre;
+  display: block;
+}
+
+.message-content :deep(pre)::before {
+  content: "Code";
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+</style>
 
   <FileViewerModal
     v-model:open="showFileModal"

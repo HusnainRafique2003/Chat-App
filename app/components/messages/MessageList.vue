@@ -15,7 +15,7 @@ interface Props {
 }
 
 interface Emits {
-  (e: 'message-sent', data: { content: string; file?: File }): void
+  (e: 'message-sent', data: { content: string; file?: File; scheduledAt?: Date }): void
   (e: 'message-deleted', messageId: string): void
   (e: 'message-edited', data: { messageId: string; content: string; file?: File }): void
   (e: 'reaction-added', data: { messageId: string; emoji: string }): void

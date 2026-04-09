@@ -5,6 +5,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import axios from 'axios'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useToast } from '#ui/composables/useToast'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
@@ -19,6 +20,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<Emits>()
+const toast = useToast()
 
 // ─── File ────────────────────────────────────────────────────────────────────
 const selectedFile = ref<File | null>(null)
@@ -175,7 +177,7 @@ async function openMentionModal() {
 
 function insertMention(userName: string) {
   if (!editor.value) return
-  editor.value.chain().focus().insertContent(`@${userName} `).run()
+  editor.value.chain().focus().insertContent(`<strong><em>@${userName}</em></strong> `).run()
   showMentionModal.value = false
 }
 
@@ -198,11 +200,12 @@ function openLinkDialog() {
 function applyLink() {
   if (!editor.value || !linkUrl.value.trim()) return
   const url = /^https?:\/\//i.test(linkUrl.value) ? linkUrl.value : `https://${linkUrl.value}`
+  const label = linkText.value.trim() || url
 
-  if (editor.value.state.selection.empty && linkText.value.trim()) {
+  if (editor.value.state.selection.empty) {
     editor.value
       .chain().focus()
-      .insertContent(`<a href="${url}">${linkText.value}</a>`)
+      .insertContent(`<a href="${url}">${label}</a>`)
       .run()
   } else {
     editor.value.chain().focus().setLink({ href: url }).run()
@@ -237,6 +240,62 @@ const recordingTime = computed(() => {
   return `${m}:${s}`
 })
 
+function encodeWavFromAudioBuffer(audioBuffer: AudioBuffer): ArrayBuffer {
+  const channelCount = audioBuffer.numberOfChannels
+  const sampleRate = audioBuffer.sampleRate
+  const samples = audioBuffer.length
+  const bytesPerSample = 2
+  const blockAlign = channelCount * bytesPerSample
+  const buffer = new ArrayBuffer(44 + samples * blockAlign)
+  const view = new DataView(buffer)
+
+  function writeString(offset: number, value: string) {
+    for (let i = 0; i < value.length; i++) {
+      view.setUint8(offset + i, value.charCodeAt(i))
+    }
+  }
+
+  writeString(0, 'RIFF')
+  view.setUint32(4, 36 + samples * blockAlign, true)
+  writeString(8, 'WAVE')
+  writeString(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, channelCount, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * blockAlign, true)
+  view.setUint16(32, blockAlign, true)
+  view.setUint16(34, 16, true)
+  writeString(36, 'data')
+  view.setUint32(40, samples * blockAlign, true)
+
+  const channelData = Array.from({ length: channelCount }, (_, index) => audioBuffer.getChannelData(index))
+  let offset = 44
+
+  for (let sampleIndex = 0; sampleIndex < samples; sampleIndex++) {
+    for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
+      const sample = Math.max(-1, Math.min(1, channelData[channelIndex]?.[sampleIndex] ?? 0))
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true)
+      offset += bytesPerSample
+    }
+  }
+
+  return buffer
+}
+
+async function convertRecordedAudioToWavFile(blob: Blob) {
+  const audioContext = new AudioContext()
+
+  try {
+    const arrayBuffer = await blob.arrayBuffer()
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0))
+    const wavBuffer = encodeWavFromAudioBuffer(audioBuffer)
+    return new File([wavBuffer], `voice-${Date.now()}.wav`, { type: 'audio/wav' })
+  } finally {
+    await audioContext.close()
+  }
+}
+
 async function openVoiceDialog() {
   showVoiceDialog.value = true
 }
@@ -244,7 +303,16 @@ async function openVoiceDialog() {
 async function startRecording() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    mediaRecorder.value  = new MediaRecorder(stream)
+    const preferredMimeType = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/ogg;codecs=opus',
+      'audio/ogg'
+    ].find(type => MediaRecorder.isTypeSupported(type))
+
+    mediaRecorder.value  = preferredMimeType
+      ? new MediaRecorder(stream, { mimeType: preferredMimeType })
+      : new MediaRecorder(stream)
     recordedAudio.value  = null
     audioUrl.value       = null
     isRecording.value    = true
@@ -255,7 +323,7 @@ async function startRecording() {
     const chunks: BlobPart[] = []
     mediaRecorder.value.ondataavailable = e => chunks.push(e.data)
     mediaRecorder.value.onstop = () => {
-      const blob = new Blob(chunks, { type: 'audio/webm' })
+      const blob = new Blob(chunks, { type: mediaRecorder.value?.mimeType || 'audio/webm' })
       recordedAudio.value = blob
       audioUrl.value = URL.createObjectURL(blob)
       isRecording.value = false
@@ -274,9 +342,26 @@ function stopRecording() {
   }
 }
 
-function attachVoiceNote() {
+async function attachVoiceNote() {
   if (!recordedAudio.value) return
-  selectedFile.value = new File([recordedAudio.value], `voice-${Date.now()}.webm`, { type: 'audio/webm' })
+
+  try {
+    selectedFile.value = await convertRecordedAudioToWavFile(recordedAudio.value)
+  } catch (error) {
+    console.warn('[Voice Note] Falling back to original recording format:', error)
+    selectedFile.value = new File(
+      [recordedAudio.value],
+      `voice-${Date.now()}.webm`,
+      { type: recordedAudio.value.type || 'audio/webm' }
+    )
+  }
+
+  toast.add({
+    title: 'Voice note attached locally',
+    description: 'This server currently rejects audio uploads, so voice notes cannot be sent until backend file rules allow audio types.',
+    color: 'warning'
+  })
+
   closeVoiceDialog()
 }
 
@@ -302,11 +387,34 @@ const showScheduler  = ref(false)
 const scheduledDate  = ref('')
 const scheduledTime  = ref('')
 
-const minDate = new Date().toISOString().slice(0, 10)
+function formatLocalDateInput(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const minDate = formatLocalDateInput(new Date())
+
+const scheduledDateTime = computed(() => {
+  if (!scheduledDate.value || !scheduledTime.value) return null
+  return new Date(`${scheduledDate.value}T${scheduledTime.value}`)
+})
+
+const scheduleError = computed(() => {
+  if (!scheduledDateTime.value) return null
+  if (Number.isNaN(scheduledDateTime.value.getTime())) {
+    return 'Choose a valid date and time.'
+  }
+  if (scheduledDateTime.value.getTime() <= Date.now()) {
+    return 'Scheduled time must be in the future.'
+  }
+  return null
+})
 
 const scheduleLabel = computed(() => {
-  if (!scheduledDate.value || !scheduledTime.value) return null
-  const dt = new Date(`${scheduledDate.value}T${scheduledTime.value}`)
+  if (!scheduledDateTime.value || scheduleError.value) return null
+  const dt = scheduledDateTime.value
   return dt.toLocaleString('en-US', {
     month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit'
@@ -314,9 +422,8 @@ const scheduleLabel = computed(() => {
 })
 
 function handleScheduleSend() {
-  if (!scheduledDate.value || !scheduledTime.value) return
-  const dt = new Date(`${scheduledDate.value}T${scheduledTime.value}`)
-  sendMessage(dt)
+  if (!scheduledDateTime.value || scheduleError.value) return
+  sendMessage(scheduledDateTime.value)
   showScheduler.value = false
   scheduledDate.value = ''
   scheduledTime.value = ''
@@ -332,10 +439,16 @@ function cancelSchedule() {
 async function sendMessage(scheduledAt?: Date) {
   if (!editor.value) return
   const text = editor.value.getText()
-  if (!text.trim() && !selectedFile.value) return
+  const html = editor.value.getHTML()
+  const hasHtmlContent = /<(a|p|div|strong|em|code|pre|ul|ol|li|blockquote)\b/i.test(html)
+  if (!text.trim() && !hasHtmlContent && !selectedFile.value) return
 
-  // Preserve line breaks - only trim leading/trailing whitespace
-  const content = text.replace(/^\s+|\s+$/g, '')
+  const isVoiceNote = selectedFile.value?.type.startsWith('audio/')
+  const content = text.trim() || hasHtmlContent
+    ? html.trim()
+    : isVoiceNote
+      ? '<p>Voice note</p>'
+      : ''
 
   emit('send', {
     content,
@@ -634,6 +747,10 @@ watch(() => props.initialContent, v => {
           </div>
         </Transition>
 
+        <p v-if="scheduleError" class="mt-3 text-xs font-medium text-[var(--ui-error)]">
+          {{ scheduleError }}
+        </p>
+
         <div class="mt-4 flex flex-col gap-2 sm:flex-row">
           <UButton
             size="sm"
@@ -648,7 +765,7 @@ watch(() => props.initialContent, v => {
             size="sm"
             color="primary"
             class="flex-1 cursor-pointer"
-            :disabled="!scheduledDate || !scheduledTime"
+            :disabled="!scheduledDate || !scheduledTime || Boolean(scheduleError)"
             @click="handleScheduleSend"
           >
             <UIcon name="i-lucide-send" class="h-3.5 w-3.5 mr-1" />
@@ -802,14 +919,6 @@ watch(() => props.initialContent, v => {
                 />
               </AppTooltip>
               <div class="mx-1 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
-              <AppTooltip text="Voice Note">
-                <UButton
-                  icon="i-lucide-mic"
-                  size="xs" color="neutral" variant="ghost"
-                  class="h-8 w-8 shrink-0 cursor-pointer"
-                  @click="openVoiceDialog"
-                />
-              </AppTooltip>
               <AppTooltip text="Attach File">
                 <UButton
                   icon="i-lucide-paperclip"

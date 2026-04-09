@@ -6,6 +6,7 @@ import { useUserStore } from '~/stores/useUserStore'
 
 interface MessageState {
   messages: Message[]
+  localScheduledMessages: Message[]
   loading: boolean
   loadingMore: boolean
   searching: boolean
@@ -32,9 +33,20 @@ interface SearchMessagesResult extends StoreActionResult {
   messages?: Message[]
 }
 
+function normalizeDateValue(value: unknown): string | null {
+  if (!value) return null
+  if (typeof value === 'string') return value
+  if (typeof value === 'object' && value !== null && '$date' in value) {
+    const dateValue = (value as { $date?: unknown }).$date
+    return typeof dateValue === 'string' ? dateValue : null
+  }
+  return null
+}
+
 export const useMessageStore = defineStore('messages', {
   state: (): MessageState => ({
     messages: [],
+    localScheduledMessages: [],
     loading: false,
     loadingMore: false,
     searching: false,
@@ -49,7 +61,7 @@ export const useMessageStore = defineStore('messages', {
   }),
 
   getters: {
-    sortedMessages: (state) => [...state.messages].sort((a, b) =>
+    sortedMessages: (state) => [...state.messages, ...state.localScheduledMessages].sort((a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     ),
     unreadCount: (state) => state.messages.filter(m => !m.is_read_by_me).length,
@@ -89,6 +101,21 @@ export const useMessageStore = defineStore('messages', {
         })
         console.log('[Message Store] Built user name cache:', Object.keys(this.userNameCache).length, 'users')
       }
+    },
+
+    setLocalScheduledMessages(messages: Message[]) {
+      this.localScheduledMessages = messages
+    },
+
+    addLocalScheduledMessage(message: Message) {
+      const exists = this.localScheduledMessages.some(existing => existing.id === message.id)
+      if (!exists) {
+        this.localScheduledMessages.push(message)
+      }
+    },
+
+    removeLocalScheduledMessage(messageId: string) {
+      this.localScheduledMessages = this.localScheduledMessages.filter(message => message.id !== messageId)
     },
 
     /**
@@ -282,6 +309,8 @@ export const useMessageStore = defineStore('messages', {
               ...m,
               id: m.id || m._id,
               channel_id: m.channel_id || channelId,
+              schedule_time: normalizeDateValue(m.schedule_time),
+              status: m.status || 'sent',
               sender: {
                 ...(m.sender || {}),
                 id: senderId,
@@ -390,14 +419,15 @@ export const useMessageStore = defineStore('messages', {
       }
     },
 
-    async createMessage(channelId: string, content: string, file?: File, retryCount = 0): Promise<MessageActionResult> {
+    async createMessage(channelId: string, content: string, file?: File, scheduledAt?: Date, retryCount = 0): Promise<MessageActionResult> {
       try {
         const userStore = useUserStore()
         
         const response = await createMessage({
           channel_id: channelId,
           message: content,
-          file
+          file,
+          schedule_time: scheduledAt?.toISOString()
         })
         const data = response.data
 
@@ -456,6 +486,8 @@ export const useMessageStore = defineStore('messages', {
               ...newMessage,
               id: newMessage.id || newMessage._id,
               channel_id: channelId,
+              schedule_time: normalizeDateValue(newMessage.schedule_time) || scheduledAt?.toISOString() || null,
+              status: newMessage.status || 'sent',
               sender: newMessage.sender || { id: newMessage.sender_id, name: senderName, email: '', is_active: true },
               reactions_summary: newMessage.reactions_summary || [],
               is_read_by_me: true,
@@ -512,14 +544,14 @@ export const useMessageStore = defineStore('messages', {
             console.log('[Message Store] User successfully added to channel, retrying message creation')
             
             // Retry creating message (with retryCount = 1 to prevent infinite retries)
-            return this.createMessage(channelId, content, file, retryCount + 1)
+            return this.createMessage(channelId, content, file, scheduledAt, retryCount + 1)
           } catch (memberError) {
             const memberErrorMessage = memberError instanceof Error ? memberError.message : 'Unknown error'
             
             // If already a member, try creating message anyway
             if (memberErrorMessage.includes('already a member')) {
               console.log('[Message Store] User already a member, retrying message creation')
-              return this.createMessage(channelId, content, file, retryCount + 1)
+              return this.createMessage(channelId, content, file, scheduledAt, retryCount + 1)
             }
             
             console.error('[Message Store] Failed to add user to channel:', { 
