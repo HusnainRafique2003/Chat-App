@@ -83,6 +83,7 @@ export default defineNuxtConfig({
         '@vue/shared',
         'axios',
         '@tiptap/extension-code-block-lowlight',
+        '@tiptap/extension-link',
         '@tiptap/extension-placeholder',
         '@tiptap/starter-kit',
         '@tiptap/vue-3',

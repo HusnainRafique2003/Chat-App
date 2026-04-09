@@ -103,10 +103,10 @@ async function handleDownload() {
 </script>
 
 <template>
-  <div :class="['flex gap-3 group', isOwn ? 'flex-row-reverse' : 'flex-row']">
+  <div :class="['group flex gap-2.5 sm:gap-3', isOwn ? 'flex-row-reverse' : 'flex-row']">
     <!-- Avatar -->
     <div class="flex-shrink-0">
-      <div class="h-8 w-8 rounded-full bg-gradient-to-br from-[var(--ui-primary)] to-[var(--ui-secondary)] flex items-center justify-center text-xs font-bold text-white">
+      <div class="flex h-8 w-8 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--ui-primary)] to-[var(--ui-secondary)] text-[11px] font-bold text-white shadow-[var(--shadow-sm)]">
         {{ message.sender.name.charAt(0).toUpperCase() }}
       </div>
     </div>
@@ -132,29 +132,29 @@ async function handleDownload() {
       </div>
 
       <!-- Header -->
-      <div :class="['flex items-center gap-2 text-xs', isOwn ? 'flex-row-reverse' : 'flex-row']">
+      <div :class="['flex items-center gap-2 text-[11px]', isOwn ? 'flex-row-reverse' : 'flex-row']">
         <span class="font-semibold text-[var(--ui-text-highlighted)]">{{ message.sender.name }}</span>
         <span class="text-[var(--ui-text-dimmed)]">{{ formatTime(message.created_at) }}</span>
       </div>
 
       <!-- Message Bubble -->
       <div :class="[
-        'max-w-xs lg:max-w-md px-4 py-2 rounded-2xl break-words',
+        'max-w-[min(82vw,40rem)] rounded-[1.35rem] px-4 py-3 break-words shadow-[var(--shadow-sm)] transition-all duration-300',
         isOwn
-          ? 'bg-[var(--ui-primary)] text-white rounded-br-none'
-          : 'bg-[var(--ui-bg-elevated)] text-[var(--ui-text)] rounded-bl-none'
+          ? 'rounded-br-md bg-[linear-gradient(180deg,rgba(55,27,23,0.96),rgba(55,27,23,0.88))] text-white'
+          : 'rounded-bl-md border border-[var(--ui-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,255,255,0.78))] text-[var(--ui-text)] dark:bg-[linear-gradient(180deg,rgba(24,24,27,0.94),rgba(24,24,27,0.86))]'
       ]">
-        <p class="text-sm leading-relaxed whitespace-pre-wrap">
+        <p class="whitespace-pre-wrap text-sm leading-6">
           {{ cleanContent }}
         </p>
 
         <!-- File Attachment -->
-        <div v-if="message.file_name" class="mt-2 pt-2 border-t border-current border-opacity-20">
+        <div v-if="message.file_name" class="mt-3 border-t border-current border-opacity-15 pt-3">
           <a
             v-if="message.file_download_url"
             :href="message.file_download_url"
             target="_blank"
-            class="flex items-center gap-2 text-xs hover:opacity-80 transition-opacity"
+            class="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80 dark:bg-white/5"
           >
             <UIcon name="i-mdi-file-download" class="w-4 h-4" />
             {{ message.file_name }}
@@ -163,7 +163,7 @@ async function handleDownload() {
           <button
             v-else
             type="button"
-            class="flex items-center gap-2 text-xs hover:opacity-80 transition-opacity"
+            class="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80 dark:bg-white/5"
             @click="handleDownload"
           >
             <UIcon name="i-mdi-file-download" class="w-4 h-4" />
@@ -191,31 +191,31 @@ async function handleDownload() {
       </div>
 
       <!-- Actions -->
-      <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-1">
+      <div class="mt-1 flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
         <UButton
           icon="i-mdi-emoticon-plus-outline"
           size="xs"
-          color="gray"
+          color="neutral"
           variant="ghost"
-          class="cursor-pointer"
+          class="cursor-pointer rounded-xl"
           @click="showReactions = !showReactions"
         />
         <UButton
           v-if="isOwn"
           icon="i-mdi-pencil"
           size="xs"
-          color="gray"
+          color="neutral"
           variant="ghost"
-          class="cursor-pointer"
+          class="cursor-pointer rounded-xl"
           @click="$emit('edit')"
         />
         <UButton
           v-if="isOwn"
           icon="i-mdi-trash-can-outline"
           size="xs"
-          color="red"
+          color="error"
           variant="ghost"
-          class="cursor-pointer"
+          class="cursor-pointer rounded-xl"
           @click="$emit('delete')"
         />
       </div>

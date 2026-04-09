@@ -15,7 +15,12 @@ withDefaults(defineProps<Props>(), {
 </script>
 
 <template>
-  <UBadge :color="color" :variant="variant" :size="size">
+  <UBadge
+    :color="color"
+    :variant="variant"
+    :size="size"
+    class="rounded-full px-2.5 py-1 font-semibold tracking-[0.08em] uppercase"
+  >
     <UIcon v-if="icon" :name="icon" class="mr-1" />
     {{ label }}
   </UBadge>

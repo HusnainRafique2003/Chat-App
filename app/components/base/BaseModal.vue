@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 interface Props {
   title?: string
   description?: string
@@ -13,7 +15,7 @@ interface Props {
   confirmDisabled?: boolean
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   size: 'md',
   loading: false,
   hideFooter: false,
@@ -29,14 +31,29 @@ const emit = defineEmits<{
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
+
+const sizeClass = computed(() => {
+  switch (props.size) {
+    case 'sm':
+      return 'max-w-md'
+    case 'lg':
+      return 'max-w-3xl'
+    case 'xl':
+      return 'max-w-5xl'
+    case 'full':
+      return 'max-w-[min(96vw,72rem)]'
+    case 'md':
+    default:
+      return 'max-w-xl'
+  }
+})
 </script>
 
 <template>
   <UModal v-model:open="open" :dismissible="!loading">
     <template #content>
-      <div class="p-6 flex flex-col gap-4">
+      <div :class="sizeClass" class="flex w-full max-h-[min(88vh,52rem)] flex-col gap-4 overflow-y-auto p-4 sm:p-6">
 
-        <!-- Header -->
         <div class="flex items-start gap-3">
           <div
             v-if="icon"
@@ -50,8 +67,8 @@ const open = defineModel<boolean>('open', { default: false })
             />
           </div>
           <div class="flex-1 min-w-0">
-            <p v-if="title" class="font-bold text-lg text-default">{{ title }}</p>
-            <p v-if="description" class="text-sm text-muted mt-0.5">{{ description }}</p>
+            <p v-if="title" class="font-bold text-lg text-[var(--ui-text)]">{{ title }}</p>
+            <p v-if="description" class="text-sm text-[var(--ui-text-muted)] mt-0.5">{{ description }}</p>
           </div>
           <UButton
             icon="i-lucide-x"
@@ -63,17 +80,16 @@ const open = defineModel<boolean>('open', { default: false })
           />
         </div>
 
-        <!-- Body slot -->
         <slot />
 
-        <!-- Footer -->
-        <div v-if="!hideFooter" class="flex gap-2 justify-end pt-2 border-t border-default">
+        <div v-if="!hideFooter" class="flex flex-col-reverse justify-end gap-2 border-t border-[var(--ui-border)] pt-4 mt-2 sm:flex-row">
           <slot name="footer">
             <UButton
               :label="cancelLabel"
               color="neutral"
               variant="outline"
               :disabled="loading"
+              class="justify-center"
               @click="emit('cancel'); open = false"
             />
             <UButton
@@ -81,6 +97,7 @@ const open = defineModel<boolean>('open', { default: false })
               :color="confirmColor"
               :loading="loading"
               :disabled="confirmDisabled"
+              class="justify-center"
               @click="emit('confirm')"
             />
           </slot>

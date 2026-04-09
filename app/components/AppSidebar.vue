@@ -4,8 +4,11 @@ import { useChannelStore } from '~/stores/useChannelStore'
 import { useTeamStore } from '~/stores/useTeamStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
+import { useToast } from '#ui/composables/useToast'
+
 import ChannelModal from './modals/ChannelModal.vue'
 import DmModal from './modals/DmModal.vue'
+import ConfirmDeleteModal from './modals/ConfirmDeleteModal.vue'
 import type { ChannelPayload } from './modals/ChannelModal.vue'
 import type { DmMember } from './modals/DmModal.vue'
 
@@ -13,11 +16,19 @@ const workspaceStore = useWorkspaceStore()
 const teamStore = useTeamStore()
 const channelStore = useChannelStore()
 const userStore = useUserStore()
+const toast = useToast()
 
 const showCreateChannelModal = ref(false)
 const isWorkspaceDropdownOpen = ref(false)
 const showDmModal = ref(false)
-const newChannelName = ref('')
+
+// Edit & Delete state
+const showEditChannelModal = ref(false)
+const showDeleteChannelModal = ref(false)
+const activeChannelForAction = ref<any>(null)
+
+// Track DMs opened during this session
+const activeDmIds = ref<Set<string>>(new Set())
 
 const workspaceItems = computed(() =>
   workspaceStore.workspaces.map(w => ({
@@ -54,17 +65,21 @@ function looksLikeUserId(value?: string | null) {
   return Boolean(value && /^[a-f0-9]{24}$/i.test(value))
 }
 
-function getDirectChannelName(channel: { name: string, members?: Array<{ user_id?: string, id?: string }> }) {
+function getDirectChannelName(channel: { name: string, members?: Array<{ user_id?: string, id?: string }>, direct_user_id?: string, user_id?: string }) {
   const currentUserId = userStore.user?.id || (userStore.user as any)?._id
   const fallbackName = channel.name.replace('DM: ', '')
 
-  const otherMemberId = channel.members?.find(member => {
-    const memberId = member.user_id || member.id
-    return memberId && memberId !== currentUserId
-  })?.user_id || channel.members?.find(member => {
-    const memberId = member.user_id || member.id
-    return memberId && memberId !== currentUserId
-  })?.id
+  let otherMemberId = channel.direct_user_id || channel.user_id
+
+  if (!otherMemberId && channel.members) {
+    const otherMember = channel.members.find((member: any) => {
+      const memberId = member.user_id || member.id || member._id
+      return memberId && memberId !== currentUserId
+    })
+    if (otherMember) {
+      otherMemberId = otherMember.user_id || otherMember.id || otherMember._id
+    }
+  }
 
   if (otherMemberId) {
     return workspaceMemberNameMap.value.get(otherMemberId) || fallbackName
@@ -79,18 +94,23 @@ function getDirectChannelName(channel: { name: string, members?: Array<{ user_id
 
 const channelItems = computed(() =>
   channelStore.channels
-    // STRICT FILTER: Only show public/private channels that belong to the active team!
     .filter(c => c.type !== 'direct' && c.team_id === teamStore.currentTeamId)
     .map(c => ({
       id: c.id,
       name: c.name,
+      description: c.description,
+      type: c.type,
       active: c.id === channelStore.currentChannelId
     }))
 )
 
 const directMessages = computed(() =>
   channelStore.channels
-    .filter(c => c.type === 'direct')
+    .filter(c => 
+      c.type === 'direct' && 
+      c.team_id === teamStore.currentTeamId && 
+      (activeDmIds.value.has(c.id) || c.id === channelStore.currentChannelId)
+    )
     .map(c => ({
       id: c.id,
       name: getDirectChannelName(c),
@@ -106,40 +126,24 @@ const availableWorkspaceMembers = computed(() => {
   const myId = userStore.user?.id || (userStore.user as any)?._id
   
   return workspace.members
-    // Filter out the logged-in user
     .filter(member => member && (member.id !== myId && (member as any)._id !== myId))
-    // Standardize the object shape for the DmModal
     .map(member => ({
       id: member.id || (member as any)._id || '',
       name: member.name || 'Unknown User',
       email: member.email || 'No email provided'
     }))
 })
-// Formats workspaces into Nuxt UI Dropdown items
-const workspaceDropdownItems = computed(() => {
-  return [
-    workspaceStore.workspaces.map(w => ({
-      label: w.name,
-      // Adds a checkmark next to the active one
-      icon: w.id === workspaceStore.currentWorkspaceId ? 'i-lucide-check-circle' : 'i-lucide-building',
-      click: () => workspaceStore.setCurrentWorkspace(w.id)
-    }))
-  ]
-})
 
-// INSTANT OPEN - Fetches data in the background
 function openDmModal() {
   showDmModal.value = true 
-  
   if (workspaceStore.currentWorkspaceId) {
     workspaceStore.refreshWorkspaceMembers(workspaceStore.currentWorkspaceId).catch(console.error)
   }
 }
 
+// Actions
 async function handleCreateChannel(payload: ChannelPayload) {
-  if (!teamStore.currentTeamId || !workspaceStore.currentWorkspaceId) {
-    return
-  }
+  if (!teamStore.currentTeamId || !workspaceStore.currentWorkspaceId) return
 
   const result = await channelStore.createChannel({
     name: payload.name,
@@ -150,23 +154,56 @@ async function handleCreateChannel(payload: ChannelPayload) {
     isPrivate: payload.isPrivate
   } as any)
 
+  if (result.success) showCreateChannelModal.value = false
+}
+
+async function submitUpdateChannel(payload: ChannelPayload) {
+  if (!activeChannelForAction.value) return
+  const result = await channelStore.updateChannel(activeChannelForAction.value.id, payload.name)
   if (result.success) {
-    showCreateChannelModal.value = false
+    showEditChannelModal.value = false
+    toast.add({ title: 'Channel updated successfully', color: 'success' })
+  } else {
+    toast.add({ title: result.error || 'Failed to update channel', color: 'error' })
+  }
+}
+
+async function submitDeleteChannel() {
+  if (!activeChannelForAction.value) return
+  const result = await channelStore.deleteChannel(activeChannelForAction.value.id)
+  if (result.success) {
+    showDeleteChannelModal.value = false
+    toast.add({ title: 'Channel deleted successfully', color: 'success' })
+  } else {
+    toast.add({ title: result.error || 'Failed to delete channel', color: 'error' })
   }
 }
 
 async function handleStartDm(member: DmMember) {
-  if (!workspaceStore.currentWorkspaceId) return
+  if (!workspaceStore.currentWorkspaceId || !teamStore.currentTeamId) return
   
   const result = await channelStore.createDirectChannel(
     workspaceStore.currentWorkspaceId,
+    teamStore.currentTeamId,
     member.id,
     member.name
   )
   
-  if (result.success) {
+  if (result.success && result.channel) {
+    activeDmIds.value.add(result.channel.id)
     showDmModal.value = false
   }
+}
+
+// Open modals for a specific channel
+function openEditModal(channel: any) {
+  activeChannelForAction.value = channel
+  showEditChannelModal.value = true
+}
+
+function openDeleteModal(channel: any) {
+  activeChannelForAction.value = channel
+  showDeleteChannelModal.value = true
 }
 </script>
 
@@ -180,7 +217,6 @@ async function handleStartDm(member: DmMember) {
       </p>
       
       <div class="flex flex-col items-center mb-6 shrink-0 w-full">
-        
         <button
           type="button"
           @click="isWorkspaceDropdownOpen = !isWorkspaceDropdownOpen"
@@ -245,7 +281,8 @@ async function handleStartDm(member: DmMember) {
       </div>
     </div>
 
-    <div class="flex min-w-0 flex-1 flex-col px-4 py-5 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+    <div class="flex min-w-0 flex-1 flex-col px-4 py-5 overflow-hidden">
+      
       <div class="mb-4 shrink-0 flex flex-col min-w-0">
         <div class="mb-3 flex items-center justify-between shrink-0">
           <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ui-text-dimmed)]">
@@ -266,23 +303,52 @@ async function handleStartDm(member: DmMember) {
           <div v-if="channelItems.length === 0" class="text-sm text-[var(--ui-text-muted)] pl-3">
             No channels yet
           </div>
-          <button
+          
+          <div
             v-for="channel in channelItems"
             :key="channel.id"
-            type="button"
-            @click="channelStore.setCurrentChannel(channel.id)"
-            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors"
+            class="group flex w-full items-center justify-between rounded-lg px-2 py-1 text-sm transition-colors relative"
             :class="channel.active
               ? 'bg-[var(--ui-bg-muted)] font-semibold text-[var(--ui-text-highlighted)]'
               : 'text-[var(--ui-text-muted)] hover:bg-[var(--ui-bg-muted)]/70'"
           >
-            <span class="opacity-50 shrink-0">#</span>
-            <span class="truncate">{{ channel.name }}</span>
-          </button>
+            <button
+              type="button"
+              @click="channelStore.setCurrentChannel(channel.id)"
+              class="flex flex-1 items-center gap-2 truncate text-left px-1 py-1"
+            >
+              <span class="opacity-50 shrink-0">#</span>
+              <span class="truncate">{{ channel.name }}</span>
+            </button>
+
+            <div 
+              class="shrink-0 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+              :class="{ 'opacity-100': channel.active }"
+            >
+              <button
+                type="button"
+                @click.stop="openEditModal(channel)"
+                class="flex h-6 w-6 items-center justify-center rounded-md hover:bg-[var(--ui-bg-elevated)] text-[var(--ui-text-muted)] hover:text-[var(--ui-text)] transition-colors cursor-pointer"
+                title="Edit Channel"
+              >
+                <UIcon name="i-mdi-pencil" class="h-3.5 w-3.5 pointer-events-none" />
+              </button>
+              
+              <button
+                type="button"
+                @click.stop="openDeleteModal(channel)"
+                class="flex h-6 w-6 items-center justify-center rounded-md hover:bg-red-500/10 text-[var(--ui-text-muted)] hover:text-red-500 transition-colors cursor-pointer"
+                title="Delete Channel"
+              >
+                <UIcon name="i-mdi-trash-can-outline" class="h-3.5 w-3.5 pointer-events-none" />
+              </button>
+            </div>
+            
+          </div>
         </div>
       </div>
 
-      <div class="shrink-0 min-w-0">
+      <div class="flex flex-col flex-1 min-h-0">
         <div class="mb-3 flex items-center justify-between shrink-0">
           <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ui-text-dimmed)]">
             Direct messages
@@ -298,7 +364,7 @@ async function handleStartDm(member: DmMember) {
           </button>
         </div>
 
-        <div class="space-y-1 max-h-[120px] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div class="space-y-1 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <div v-if="directMessages.length === 0" class="text-sm text-[var(--ui-text-muted)] pl-3">
             No direct messages
           </div>
@@ -318,6 +384,7 @@ async function handleStartDm(member: DmMember) {
           </button>
         </div>
       </div>
+
     </div>
   </div>
 
@@ -328,6 +395,24 @@ async function handleStartDm(member: DmMember) {
     :loading="channelStore.loading"
     @submit="handleCreateChannel"
     @cancel="showCreateChannelModal = false"
+  />
+
+  <ChannelModal
+    v-model:open="showEditChannelModal"
+    mode="update"
+    :initial="{ name: activeChannelForAction?.name || '', description: activeChannelForAction?.description || '', type: activeChannelForAction?.type as any }"
+    :loading="channelStore.loading"
+    @submit="submitUpdateChannel"
+    @cancel="showEditChannelModal = false"
+  />
+
+  <ConfirmDeleteModal
+    v-model:open="showDeleteChannelModal"
+    entity-type="channel"
+    :entity-name="activeChannelForAction?.name || ''"
+    :loading="channelStore.loading"
+    @confirm="submitDeleteChannel"
+    @cancel="showDeleteChannelModal = false"
   />
 
   <DmModal
