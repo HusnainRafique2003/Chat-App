@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useTeamStore } from '~/stores/useTeamStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
@@ -27,8 +27,20 @@ const showEditChannelModal = ref(false)
 const showDeleteChannelModal = ref(false)
 const activeChannelForAction = ref<any>(null)
 
-// Track DMs opened during this session
-const activeDmIds = ref<Set<string>>(new Set())
+// Track DMs opened during this session (Persisted to LocalStorage)
+const activeDmIds = ref<string[]>([])
+
+onMounted(() => {
+  // Load saved DMs from the browser so they survive a refresh
+  try {
+    const saved = localStorage.getItem('chat-active-dms')
+    if (saved) {
+      activeDmIds.value = JSON.parse(saved)
+    }
+  } catch (e) {
+    console.error('Failed to load active DMs')
+  }
+})
 
 const workspaceItems = computed(() =>
   workspaceStore.workspaces.map(w => ({
@@ -109,7 +121,8 @@ const directMessages = computed(() =>
     .filter(c => 
       c.type === 'direct' && 
       c.team_id === teamStore.currentTeamId && 
-      (activeDmIds.value.has(c.id) || c.id === channelStore.currentChannelId)
+      // Changed to .includes()
+      (activeDmIds.value.includes(c.id) || c.id === channelStore.currentChannelId)
     )
     .map(c => ({
       id: c.id,
@@ -190,7 +203,11 @@ async function handleStartDm(member: DmMember) {
   )
   
   if (result.success && result.channel) {
-    activeDmIds.value.add(result.channel.id)
+    // Save the new DM to LocalStorage so it persists
+    if (!activeDmIds.value.includes(result.channel.id)) {
+      activeDmIds.value.push(result.channel.id)
+      localStorage.setItem('chat-active-dms', JSON.stringify(activeDmIds.value))
+    }
     showDmModal.value = false
   }
 }
