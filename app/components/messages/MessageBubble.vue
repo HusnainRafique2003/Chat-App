@@ -26,6 +26,14 @@ const isOwn = computed(() => props.message.sender_id === userStore.user?.id)
 const emojis = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '✨']
 
 /**
+ * Get the emoji that the current user has reacted with (if any)
+ */
+const userReactionEmoji = computed(() => {
+  const userReaction = props.message.reactions_summary.find(r => r.reacted_by_me)
+  return userReaction?.emoji || null
+})
+
+/**
  * Strip HTML tags and convert HTML entities to plain text while preserving line breaks
  */
 function stripHtmlTags(html: string): string {
@@ -104,7 +112,25 @@ async function handleDownload() {
     </div>
 
     <!-- Message Content -->
-    <div :class="['flex flex-col gap-1', isOwn ? 'items-end' : 'items-start']">
+    <div :class="['flex flex-col gap-1 relative', isOwn ? 'items-end' : 'items-start']">
+      <!-- Emoji Picker (Positioned Above) -->
+      <div v-if="showReactions" :class="['absolute bottom-full mb-2 flex whitespace-nowrap overflow-x-auto gap-2 p-3 bg-[var(--ui-bg-elevated)] rounded-lg border border-[var(--ui-border)] shadow-lg z-10', isOwn ? 'right-0' : 'left-0']">
+        <button
+          v-for="emoji in emojis"
+          :key="emoji"
+          :class="[
+            'text-lg hover:scale-125 transition-all cursor-pointer relative',
+            userReactionEmoji === emoji ? 'scale-125 opacity-100' : 'opacity-75 hover:opacity-100'
+          ]"
+          :title="userReactionEmoji === emoji ? `Click to remove ${emoji}` : `React with ${emoji}`"
+          @click="$emit('react', emoji); showReactions = false"
+        >
+          {{ emoji }}
+          <!-- Show indicator for user's current reaction -->
+          <div v-if="userReactionEmoji === emoji" class="absolute -top-1 -right-1 w-2 h-2 bg-[var(--ui-primary)] rounded-full"></div>
+        </button>
+      </div>
+
       <!-- Header -->
       <div :class="['flex items-center gap-2 text-xs', isOwn ? 'flex-row-reverse' : 'flex-row']">
         <span class="font-semibold text-[var(--ui-text-highlighted)]">{{ message.sender.name }}</span>
@@ -147,19 +173,20 @@ async function handleDownload() {
 
         <!-- Reactions Inside Bubble -->
         <div v-if="message.reactions_summary.length > 0" :class="['flex flex-wrap gap-1 mt-2', isOwn ? 'justify-end' : 'justify-start']">
-          <button
+          <span
             v-for="reaction in message.reactions_summary"
             :key="reaction.emoji"
-            class="px-2 py-1 rounded-full text-xs transition-colors cursor-pointer"
             :class="[
+              'px-1 py-0 rounded-full text-xs font-medium inline-flex items-center gap-0',
               isOwn
-                ? 'bg-white bg-opacity-20 hover:bg-opacity-30 border border-white border-opacity-30'
-                : 'bg-white bg-opacity-50 hover:bg-opacity-70 border border-[var(--ui-border)]'
+                ? 'bg-white bg-opacity-20 border border-white border-opacity-30'
+                : 'bg-white bg-opacity-50 border border-[var(--ui-border)]',
+              reaction.reacted_by_me && 'ring-1 ring-offset-0 ring-[var(--ui-primary)] font-bold'
             ]"
-            :title="`${reaction.reacted_by.length} reaction${reaction.reacted_by.length !== 1 ? 's' : ''}`"
           >
             {{ reaction.emoji }} {{ reaction.count }}
-          </button>
+            <span v-if="reaction.reacted_by_me" class="text-white opacity-75 ml-0.5">✓</span>
+          </span>
         </div>
       </div>
 
@@ -191,19 +218,6 @@ async function handleDownload() {
           class="cursor-pointer"
           @click="$emit('delete')"
         />
-      </div>
-
-      <!-- Emoji Picker -->
-      <div v-if="showReactions" class="flex flex-wrap gap-2 mt-2 p-3 bg-[var(--ui-bg-elevated)] rounded-lg border border-[var(--ui-border)] shadow-lg">
-        <button
-          v-for="emoji in emojis"
-          :key="emoji"
-          class="text-lg hover:scale-125 transition-transform cursor-pointer"
-          @click="$emit('react', emoji); showReactions = false"
-          :title="`React with ${emoji}`"
-        >
-          {{ emoji }}
-        </button>
       </div>
     </div>
   </div>
