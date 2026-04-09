@@ -105,30 +105,11 @@ function getCurrentChannelDisplayName() {
 </script>
 
 <template>
-  <!-- AppSidebar is already rendered by `layouts/dashboard.vue`. This page renders only the chat area. -->
   <div class="h-full w-full flex flex-col overflow-hidden">
-    <!-- Chat Messages Area -->
     <div
       v-if="showMessaging && channelStore.currentChannelId"
       class="flex h-full w-full flex-col overflow-hidden"
     >
-      <div class="shrink-0 border-b border-[var(--ui-border)] bg-[var(--ui-bg)]/75 px-4 py-3 backdrop-blur-sm sm:px-6">
-        <div class="flex min-w-0 items-center gap-3">
-          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]">
-            <UIcon :name="channelStore.currentChannel?.type === 'direct' ? 'i-lucide-message-circle' : 'i-lucide-hash'" class="h-4 w-4" />
-          </div>
-          <div class="min-w-0">
-            <p class="truncate text-sm font-black text-[var(--ui-text-highlighted)] sm:text-base">
-              {{ getCurrentChannelDisplayName() }}
-            </p>
-            <p class="truncate text-xs text-[var(--ui-text-muted)]">
-              {{ channelStore.currentChannel?.type === 'direct' ? 'Direct conversation' : 'Team channel' }}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Messages List (takes remaining space with overflow) -->
       <div class="flex-1 min-h-0 overflow-hidden">
         <MessageList
           :channel-id="channelStore.currentChannelId"
@@ -139,7 +120,6 @@ function getCurrentChannelDisplayName() {
       </div>
     </div>
 
-    <!-- Empty State -->
     <div
       v-else
       class="flex h-full w-full flex-col items-center justify-center px-6 text-center"
