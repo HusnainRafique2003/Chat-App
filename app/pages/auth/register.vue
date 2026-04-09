@@ -136,11 +136,11 @@ function goBackToSignup() {
     badge="Secure workspace onboarding"
     gradient="from-[var(--ui-secondary)]/7 via-transparent to-[var(--ui-success)]/10"
   >
-    <div class="mb-8">
-      <h2 class="text-2xl font-black text-[var(--ui-text-highlighted)]">
+    <div class="mb-7">
+      <h2 class="text-xl font-black text-[var(--ui-text-highlighted)] sm:text-2xl">
         {{ step === 'signup' ? 'Get started' : 'Email verification' }}
       </h2>
-      <p class="mt-2 text-[var(--ui-text-muted)]">
+      <p class="mt-2 text-sm leading-6 text-[var(--ui-text-muted)] sm:text-[0.95rem]">
         {{ step === 'signup'
           ? 'Create your account with a strong password and a clear workspace name.'
           : 'Verification completes activation and signs you into the app.' }}
@@ -275,6 +275,7 @@ function goBackToSignup() {
         :block="true"
         :loading="loading"
         :disabled="isSignupDisabled"
+        class="transition-transform duration-300 hover:-translate-y-0.5"
       />
     </form>
 
@@ -320,6 +321,7 @@ function goBackToSignup() {
           :block="true"
           :loading="loading"
           :disabled="isVerifyDisabled"
+          class="transition-transform duration-300 hover:-translate-y-0.5"
         />
         <BaseButton
           type="button"
@@ -328,6 +330,7 @@ function goBackToSignup() {
           variant="soft"
           size="lg"
           :block="true"
+          class="transition-transform duration-300 hover:-translate-y-0.5"
           @click="goBackToSignup"
         />
       </div>
@@ -335,14 +338,14 @@ function goBackToSignup() {
 
     <div v-if="step === 'signup'" class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]">
       Already have an account?
-      <NuxtLink to="/auth/login" class="ml-1 font-semibold text-[var(--ui-primary)] hover:opacity-75">
+      <NuxtLink to="/auth/login" class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80">
         Sign in
       </NuxtLink>
     </div>
 
     <div v-else class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]">
       Need a different email?
-      <button type="button" class="ml-1 font-semibold text-[var(--ui-primary)] hover:opacity-75" @click="goBackToSignup">
+      <button type="button" class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80" @click="goBackToSignup">
         Edit details
       </button>
     </div>

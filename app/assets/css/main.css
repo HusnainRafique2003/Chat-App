@@ -271,28 +271,28 @@ h1, h2, h3, h4, h5, h6,
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.55rem 0.95rem;
+  padding: 0.5rem 0.9rem;
   border-radius: 999px;
   border: 1px solid rgba(var(--ui-primary-rgb), 0.14);
   background: rgba(var(--ui-primary-rgb), 0.07);
   color: var(--ui-primary);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .section-title {
-  font-size: clamp(2.8rem, 5vw, 4.9rem);
-  line-height: 0.95;
-  letter-spacing: -0.045em;
+  font-size: clamp(2.2rem, 4.2vw, 4rem);
+  line-height: 1.02;
+  letter-spacing: -0.038em;
   color: var(--ui-text-highlighted);
 }
 
 .section-copy {
   color: var(--ui-text-muted);
-  font-size: clamp(1rem, 1.6vw, 1.2rem);
-  line-height: 1.75;
+  font-size: clamp(0.98rem, 1.2vw, 1.08rem);
+  line-height: 1.7;
 }
 
 .hero-panel,
@@ -336,6 +336,11 @@ h1, h2, h3, h4, h5, h6,
   position: relative;
   overflow: hidden;
   border-radius: 1.5rem;
+  transition:
+    transform var(--transition-spring),
+    box-shadow var(--transition-base),
+    border-color var(--transition-base),
+    background-color var(--transition-base);
 }
 
 .metric-card {
@@ -365,15 +370,36 @@ h1, h2, h3, h4, h5, h6,
   pointer-events: none;
 }
 
+.metric-card:hover,
+.feature-panel:hover,
+.review-panel:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 28px 60px rgba(55, 27, 23, 0.14), 0 10px 24px rgba(55, 27, 23, 0.08);
+  border-color: rgba(var(--ui-primary-rgb), 0.18);
+}
+
+.dark .metric-card:hover,
+.dark .feature-panel:hover,
+.dark .review-panel:hover {
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.48), 0 8px 20px rgba(0, 0, 0, 0.34);
+}
+
 .feature-icon-shell {
   display: inline-flex;
-  width: 4.25rem;
-  height: 4.25rem;
+  width: 3.6rem;
+  height: 3.6rem;
   align-items: center;
   justify-content: center;
-  border-radius: 1.35rem;
+  border-radius: 1.1rem;
   border: 1px solid rgba(var(--ui-primary-rgb), 0.16);
   background: linear-gradient(135deg, rgba(var(--ui-primary-rgb), 0.12), rgba(var(--ui-secondary-rgb), 0.14));
+  transition: transform var(--transition-spring), box-shadow var(--transition-base);
+}
+
+.feature-panel:hover .feature-icon-shell,
+.metric-card:hover .feature-icon-shell {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: var(--shadow-md);
 }
 
 .cta-panel {
@@ -394,6 +420,41 @@ h1, h2, h3, h4, h5, h6,
 
 .float-soft {
   animation: floatY 6s ease-in-out infinite;
+}
+
+.auth-shell {
+  position: relative;
+}
+
+.auth-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(var(--ui-primary-rgb), 0.09), transparent 28%),
+    radial-gradient(circle at 85% 82%, rgba(var(--ui-secondary-rgb), 0.07), transparent 24%);
+}
+
+.auth-showcase,
+.auth-form-panel {
+  transition:
+    transform var(--transition-spring),
+    box-shadow var(--transition-base),
+    border-color var(--transition-base);
+}
+
+.auth-showcase:hover,
+.auth-form-panel:hover {
+  transform: translateY(-4px);
+}
+
+.auth-form-panel:hover {
+  box-shadow: 0 22px 48px rgba(55, 27, 23, 0.12), 0 8px 20px rgba(55, 27, 23, 0.07);
+}
+
+.dark .auth-form-panel:hover {
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.42), 0 8px 18px rgba(0, 0, 0, 0.28);
 }
 
 /* ============================================================

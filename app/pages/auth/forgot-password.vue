@@ -48,9 +48,9 @@ async function handleSubmit() {
     badge="Password recovery"
     gradient="from-[var(--ui-warning)]/7 via-transparent to-[var(--ui-error)]/10"
   >
-    <div class="mb-8">
-      <h2 class="text-2xl font-black text-[var(--ui-text-highlighted)]">Forgot password</h2>
-      <p class="mt-2 text-[var(--ui-text-muted)]">Enter your work email and we&apos;ll guide you back into the app.</p>
+    <div class="mb-7">
+      <h2 class="text-xl font-black text-[var(--ui-text-highlighted)] sm:text-2xl">Forgot password</h2>
+      <p class="mt-2 text-sm leading-6 text-[var(--ui-text-muted)] sm:text-[0.95rem]">Enter your work email and we&apos;ll guide you back into the app.</p>
     </div>
 
     <div
@@ -90,12 +90,13 @@ async function handleSubmit() {
         :block="true"
         :loading="loading"
         :disabled="isSubmitDisabled"
+        class="transition-transform duration-300 hover:-translate-y-0.5"
       />
     </form>
 
     <div class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]">
       Remembered your password?
-      <NuxtLink to="/auth/login" class="ml-1 font-semibold text-[var(--ui-primary)] hover:opacity-75">
+      <NuxtLink to="/auth/login" class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80">
         Sign in
       </NuxtLink>
     </div>
