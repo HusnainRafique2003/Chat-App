@@ -82,37 +82,19 @@ watch(() => route.fullPath, () => {
 
 <template>
   <div class="h-screen h-[100dvh] w-full overflow-hidden bg-[var(--ui-bg-muted)] text-[var(--ui-text)]">
-    <div class="relative flex h-full w-full overflow-hidden">
-      <div
-        v-if="isMobileSidebarOpen"
-        class="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px] lg:hidden"
-        @click="closeMobilePanels"
-      />
-
-      <aside
-        class="fixed inset-y-0 left-0 z-50 flex h-full w-[min(22rem,calc(100vw-1rem))] flex-col border-r border-[var(--ui-border)] bg-[var(--ui-bg)] min-h-0 shadow-2xl transition-transform duration-300 ease-out lg:static lg:z-auto lg:w-[240px] lg:translate-x-0 lg:shadow-none"
-        :class="isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'"
-      >
+    <div class="grid h-full w-full lg:grid-cols-[275px_minmax(0,1fr)]">
+      <aside class="flex h-full flex-col border-r border-[var(--ui-border)] bg-[var(--ui-bg)] min-h-0">
         <div class="shrink-0 border-b border-[var(--ui-border)] px-5 py-4">
-          <div class="flex items-center justify-between gap-3">
-            <NuxtLink to="/dashboard" class="flex min-w-0 items-center gap-3" @click="closeMobilePanels">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)]">
-                <UIcon name="i-mdi-message-draw" class="h-5 w-5" />
-              </div>
-              <div class="min-w-0">
-                <p class="truncate font-black text-[var(--ui-text-highlighted)]">ChatSphere</p>
-                <p class="truncate text-xs text-[var(--ui-text-muted)]">Communication App</p>
-              </div>
-            </NuxtLink>
-
-            <button
-              type="button"
-              class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--ui-border)] text-[var(--ui-text-muted)] transition-colors hover:bg-[var(--ui-bg-muted)] hover:text-[var(--ui-text)] lg:hidden"
-              @click="closeMobilePanels"
-            >
-              <UIcon name="i-lucide-x" class="h-4 w-4" />
-            </button>
-          </div>
+          <NuxtLink to="/dashboard" class="flex items-center">
+            <div class="min-w-0 flex-1">
+              <p class="font-black text-[var(--ui-text-highlighted)] truncate" :title="workspaceStore.currentWorkspace?.name">
+                {{ workspaceStore.currentWorkspace?.name || 'No Workspace' }}
+              </p>
+              <p class="text-xs text-[var(--ui-text-muted)] truncate" :title="teamStore.currentTeam?.name">
+                {{ teamStore.currentTeam?.name || 'No Team' }}
+              </p>
+            </div>
+          </NuxtLink>
         </div>
 
         <div class="flex-1 min-h-0 overflow-hidden flex flex-col">

@@ -22,6 +22,9 @@ const isWorkspaceDropdownOpen = ref(false)
 const showDmModal = ref(false)
 const newChannelName = ref('')
 
+// Track DMs opened during this session
+const activeDmIds = ref<Set<string>>(new Set())
+
 const workspaceItems = computed(() =>
   workspaceStore.workspaces.map(w => ({
     id: w.id,
@@ -93,8 +96,12 @@ const channelItems = computed(() =>
 
 const directMessages = computed(() =>
   channelStore.channels
-    // Add the team_id check here to hide DMs from other teams
-    .filter(c => c.type === 'direct' && c.team_id === teamStore.currentTeamId)
+    .filter(c => 
+      c.type === 'direct' && 
+      c.team_id === teamStore.currentTeamId && 
+      // ONLY show if we clicked it from the modal OR if it's the currently active channel
+      (activeDmIds.value.has(c.id) || c.id === channelStore.currentChannelId)
+    )
     .map(c => ({
       id: c.id,
       name: getDirectChannelName(c),
@@ -160,15 +167,22 @@ async function handleCreateChannel(payload: ChannelPayload) {
 }
 
 async function handleStartDm(member: DmMember) {
-  if (!workspaceStore.currentWorkspaceId) return
+  // Make sure we have BOTH a workspace and a team selected
+  if (!workspaceStore.currentWorkspaceId || !teamStore.currentTeamId) {
+    console.error("Missing workspace or team ID")
+    return
+  }
   
   const result = await channelStore.createDirectChannel(
     workspaceStore.currentWorkspaceId,
+    teamStore.currentTeamId,
     member.id,
     member.name
   )
   
-  if (result.success) {
+  if (result.success && result.channel) {
+    // Add the channel to our visible list so it stays in the sidebar
+    activeDmIds.value.add(result.channel.id)
     showDmModal.value = false
   }
 }
@@ -272,7 +286,7 @@ function handleChannelSelect(channelId: string) {
       </div>
     </div>
 
-    <div class="flex min-w-0 flex-1 flex-col overflow-y-auto px-3 py-4 sm:px-4 sm:py-5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+    <div class="flex min-w-0 flex-1 flex-col px-4 py-5 overflow-hidden">
       <div class="mb-4 shrink-0 flex flex-col min-w-0">
         <div class="mb-3 flex items-center justify-between shrink-0">
           <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ui-text-dimmed)]">
@@ -311,7 +325,7 @@ function handleChannelSelect(channelId: string) {
         </div>
       </div>
 
-      <div class="shrink-0 min-w-0">
+      <div class="flex flex-col flex-1 min-h-0">
         <div class="mb-3 flex items-center justify-between shrink-0">
           <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--ui-text-dimmed)]">
             Direct messages
@@ -327,7 +341,7 @@ function handleChannelSelect(channelId: string) {
           </button>
         </div>
 
-        <div class="space-y-1 max-h-[120px] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div class="space-y-1 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <div v-if="directMessages.length === 0" class="text-sm text-[var(--ui-text-muted)] pl-3">
             No direct messages
           </div>
