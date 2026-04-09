@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { createChannel, getChannels, updateChannel } from '~/composables/useChannelsApi'
+import { createChannel, getChannels, updateChannel, deleteChannel } from '~/composables/useChannelsApi'
 
 export interface ChannelMember {
   user_id: string
@@ -130,66 +130,84 @@ export const useChannelStore = defineStore('channel-data', {
         this.loading = false
       }
     },
+// RESTORED DIRECT MESSAGE ACTION WITH PROPER USER ID CHECK
+async createDirectChannel(workspaceId: string, teamId: string, targetUserId: string, targetUserName: string) {
+  this.loading = true
+  try {
+    // 1. Check if we already have a DM with this user
+    const existingDm = this.channels.find(c => {
+      if (c.type !== 'direct' || c.workspace_id !== workspaceId || c.team_id !== teamId) return false
+      
+      // STRICT CHECK: Look at direct_user_id or user_id on the root object
+      if ((c as any).direct_user_id === targetUserId || (c as any).user_id === targetUserId) return true;
 
-    // RESTORED DIRECT MESSAGE ACTION WITH TEAM SCOPING FIX
-    // RESTORED DIRECT MESSAGE ACTION WITH PROPER USER ID CHECK
-    async createDirectChannel(workspaceId: string, teamId: string, targetUserId: string, targetUserName: string) {
-      this.loading = true
-      try {
-        // 1. Check if we already have a DM with this user by checking the MEMBERS array for their ID
-        const existingDm = this.channels.find(c => {
-          if (c.type !== 'direct' || c.workspace_id !== workspaceId || c.team_id !== teamId) return false
-          
-          // STRICT CHECK: Look for the target user's ID inside this channel's members array
-          return c.members?.some(m => 
-            m.user_id === targetUserId || 
-            (m as any).id === targetUserId || 
-            (m as any)._id === targetUserId
-          )
-        })
+      // Fallback: Check inside members array
+      return c.members?.some(m => 
+        m.user_id === targetUserId || 
+        (m as any).id === targetUserId || 
+        (m as any)._id === targetUserId
+      )
+    })
 
-        // If it exists, just open it! This ensures previous messages are loaded.
-        if (existingDm) {
-          this.setCurrentChannel(existingDm.id || (existingDm as any)._id)
-          return { success: true, channel: existingDm }
-        }
+    if (existingDm) {
+      this.setCurrentChannel(existingDm.id || (existingDm as any)._id)
+      return { success: true, channel: existingDm }
+    }
 
-        // 2. If not, ask the backend to create a new one
-        const response = await createChannel({
-          name: `DM: ${targetUserName}`,
-          workspace_id: workspaceId,
-          team_id: teamId, 
-          type: 'direct',
-          direct_user_id: targetUserId, 
-          members: [targetUserId]
-        })
-        const channelData = response.data
-        const newChannel = channelData.data?.channel || channelData.channel || channelData.data || channelData
+    // 2. Ask the backend to create a new one (SENDING BOTH ID FORMATS)
+    const response = await createChannel({
+      name: `DM: ${targetUserName}`,
+      workspace_id: workspaceId,
+      team_id: teamId, 
+      type: 'direct',
+      direct_user_id: targetUserId, 
+      user_id: targetUserId, // Safely pass both depending on what the backend prefers
+      members: [targetUserId]
+    } as any)
+    
+    const channelData = response.data
+    const newChannel = channelData.data?.channel || channelData.channel || channelData.data || channelData
 
-        // 3. Add to sidebar and open it
-        if (newChannel && (newChannel.id || newChannel._id)) {
-          newChannel.id = newChannel.id || newChannel._id
-          newChannel.team_id = newChannel.team_id || teamId // Ensure team_id is set locally
-          
-          // Ensure members array has the target user locally so future searches work instantly
-          if (!newChannel.members) newChannel.members = []
-          if (!newChannel.members.find((m: any) => m.user_id === targetUserId || m.id === targetUserId)) {
-            newChannel.members.push({ user_id: targetUserId, role: 'member' })
-          }
+    // 3. Add to sidebar and open it
+    if (newChannel && (newChannel.id || newChannel._id)) {
+      newChannel.id = newChannel.id || newChannel._id
+      newChannel.team_id = newChannel.team_id || teamId 
+      
+      // Ensure the target user ID is attached to the object so our UI can read it
+      newChannel.direct_user_id = newChannel.direct_user_id || targetUserId
 
-          this.channels.push(newChannel)
-          this.setCurrentChannel(newChannel.id)
-          return { success: true, channel: newChannel }
-        }
+      this.channels.push(newChannel)
+      this.setCurrentChannel(newChannel.id)
+      return { success: true, channel: newChannel }
+    }
 
-        return { success: false, error: channelData.message || 'Failed to start DM' }
-      } catch (error) {
-        console.error('DM Creation Error:', error)
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to start DM' }
-      } finally {
-        this.loading = false
-      }
-    },
+    return { success: false, error: channelData.message || 'Failed to start DM' }
+  } catch (error) {
+    console.error('DM Creation Error:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to start DM' }
+  } finally {
+    this.loading = false
+  }
+},
+async deleteChannel(channelId: string) {
+  this.loading = true
+  try {
+    const response = await deleteChannel({ channel_id: channelId })
+    const channelData = response.data
+
+    if (channelData.success) {
+      this.removeChannel(channelId)
+      return { success: true }
+    }
+
+    return { success: false, error: channelData.message || 'Failed to delete channel' }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to delete channel'
+    return { success: false, error: message }
+  } finally {
+    this.loading = false
+  }
+},
 
     async updateChannel(channelId: string, name: string) {
       this.loading = true
