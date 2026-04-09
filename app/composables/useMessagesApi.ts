@@ -109,6 +109,8 @@ export interface Message {
   file_name: string | null
   file_mime: string | null
   file_download_url: string | null
+  schedule_time?: string | null
+  status?: string
   sender: MessageSender
   receiver: MessageSender | null
   channel: MessageChannel
@@ -117,6 +119,7 @@ export interface Message {
   read_by_count: number
   is_read_by_me: boolean
   reactions_summary: ReactionSummary[]
+  is_local_only?: boolean
 }
 
 /**
@@ -130,9 +133,14 @@ export async function createMessage(data: {
   channel_id: string
   message: string
   file?: File
+  schedule_time?: string
 }): Promise<AxiosResponse> {
   try {
-    console.log('[Messages API] Creating message:', { channel_id: data.channel_id, hasFile: !!data.file })
+    console.log('[Messages API] Creating message:', {
+      channel_id: data.channel_id,
+      hasFile: !!data.file,
+      schedule_time: data.schedule_time || null
+    })
 
     // File upload uses multipart/form-data
     if (data.file) {
@@ -140,6 +148,9 @@ export async function createMessage(data: {
       formData.append('channel_id', data.channel_id)
       formData.append('message', data.message)
       formData.append('file', data.file)
+      if (data.schedule_time) {
+        formData.append('schedule_time', data.schedule_time)
+      }
 
       const response = await apiClient.post('/create', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -153,17 +164,23 @@ export async function createMessage(data: {
     const response = await apiClient.post('/create', {
       channel_id: data.channel_id,
       message: data.message,
+      schedule_time: data.schedule_time,
     })
 
     console.log('[Messages API] Text message created successfully')
     return response
   } catch (error) {
     if (axios.isAxiosError(error)) {
+      const errorDetails = error.response?.data?.errors
+      const fileError = Array.isArray(errorDetails?.file) ? errorDetails.file[0] : ''
+      const detailedMessage = fileError || error.response?.data?.message || error.message
+
       console.error('[Messages API] Failed to create message:', {
         status: error.response?.status,
         message: error.response?.data?.message,
+        errors: errorDetails,
       })
-      throw new Error(error.response?.data?.message || error.message)
+      throw new Error(detailedMessage)
     }
     throw error
   }

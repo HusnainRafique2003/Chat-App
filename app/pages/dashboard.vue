@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useToast } from '#ui/composables/useToast'
+import { useScheduledMessages, type ScheduledMessageJob } from '~/composables/useScheduledMessages'
 import MessageList from '~/components/messages/MessageList.vue'
+import type { Message } from '~/composables/useMessagesApi'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useMessageStore } from '~/stores/useMessageStore'
 import { useTeamStore } from '~/stores/useTeamStore'
@@ -18,8 +20,10 @@ const channelStore = useChannelStore()
 const messageStore = useMessageStore()
 const workspaceStore = useWorkspaceStore()
 const toast = useToast()
+const { enqueueScheduledMessage, getScheduledMessages, processDueScheduledMessages } = useScheduledMessages()
 
 const showMessaging = ref(false)
+let scheduledMessageInterval: ReturnType<typeof setInterval> | null = null
 
 // Auto-open the chat area when channels finish loading and a current channel becomes available.
 watch(
@@ -31,13 +35,120 @@ watch(
   }
 )
 
-async function handleMessageSent(data: { content: string; file?: File }) {
+async function sendScheduledJob(job: ScheduledMessageJob) {
+  const result = await messageStore.createMessage(
+    job.channelId,
+    job.content,
+    undefined
+  )
+
+  if (!result.success) {
+    toast.add({
+      title: result.error || 'Failed to send scheduled message',
+      color: 'error'
+    })
+    return false
+  }
+
+  messageStore.removeLocalScheduledMessage(job.id)
+  return true
+}
+
+function toLocalScheduledMessage(job: ScheduledMessageJob): Message {
+  return {
+    id: job.id,
+    _id: job.id,
+    workspace_id: job.workspaceId,
+    sender_id: job.senderId,
+    receiver_id: null,
+    channel_id: job.channelId,
+    message_type: 'text',
+    content: job.content,
+    file_path: null,
+    file_name: null,
+    file_mime: null,
+    file_download_url: null,
+    schedule_time: job.scheduledAt,
+    status: 'scheduled',
+    sender: {
+      id: job.senderId,
+      name: job.senderName || 'You',
+      email: job.senderEmail,
+      is_active: true
+    },
+    receiver: null,
+    channel: {
+      id: job.channelId,
+      name: job.channelName || 'Scheduled message'
+    },
+    created_at: job.createdAt,
+    updated_at: job.createdAt,
+    read_by_count: 0,
+    is_read_by_me: true,
+    reactions_summary: [],
+    is_local_only: true
+  }
+}
+
+function syncScheduledMessagesFromStorage() {
+  const jobs = getScheduledMessages()
+  messageStore.setLocalScheduledMessages(jobs.map(toLocalScheduledMessage))
+}
+
+async function handleMessageSent(data: { content: string; file?: File; scheduledAt?: Date }) {
   if (!channelStore.currentChannelId) return
+
+  if (data.scheduledAt) {
+    if (data.file) {
+      toast.add({
+        title: 'Scheduled attachments are not supported yet',
+        description: 'Send the file now or schedule a text-only message.',
+        color: 'warning'
+      })
+      return
+    }
+
+    const createdAt = new Date().toISOString()
+    const scheduledJob = enqueueScheduledMessage({
+      channelId: channelStore.currentChannelId,
+      content: data.content,
+      scheduledAt: data.scheduledAt.toISOString(),
+      createdAt,
+      workspaceId: workspaceStore.currentWorkspace?.id || (workspaceStore.currentWorkspace as any)?._id || '',
+      senderId: userStore.user?.id || '',
+      senderName: userStore.user?.name || 'You',
+      senderEmail: userStore.user?.email || '',
+      channelName: channelStore.currentChannel?.name || ''
+    })
+    messageStore.addLocalScheduledMessage(toLocalScheduledMessage(scheduledJob))
+
+    toast.add({
+      title: 'Message scheduled',
+      description: `It will send at ${data.scheduledAt.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })}.`,
+      color: 'success'
+    })
+    return
+  }
+
+  if (data.file?.type.startsWith('audio/')) {
+    toast.add({
+      title: 'Voice notes are not supported by the current server',
+      description: 'The API is rejecting audio uploads with "File type not allowed." Please enable audio file types on the backend to send voice notes.',
+      color: 'warning'
+    })
+    return
+  }
 
   const result = await messageStore.createMessage(
     channelStore.currentChannelId,
     data.content,
-    data.file
+    data.file,
+    data.scheduledAt
   )
 
   if (!result.success) {
@@ -102,6 +213,21 @@ function getCurrentChannelDisplayName() {
   const fallbackName = channel.name?.replace('DM: ', '') || channel.id
   return looksLikeUserId(fallbackName) ? channel.id : fallbackName
 }
+
+onMounted(() => {
+  syncScheduledMessagesFromStorage()
+  processDueScheduledMessages(sendScheduledJob)
+  scheduledMessageInterval = setInterval(() => {
+    processDueScheduledMessages(sendScheduledJob)
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (scheduledMessageInterval) {
+    clearInterval(scheduledMessageInterval)
+    scheduledMessageInterval = null
+  }
+})
 </script>
 
 <template>
