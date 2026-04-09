@@ -10,6 +10,7 @@ export interface Channel {
   id: string
   _id: string
   name: string
+  description?: string
   workspace_id: string
   team_id: string
   type: 'public' | 'private' | 'direct'
