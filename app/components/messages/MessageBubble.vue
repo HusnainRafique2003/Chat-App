@@ -164,7 +164,7 @@ async function handleDownload() {
       <div :class="[
         'max-w-[min(82vw,40rem)] rounded-[1.35rem] px-4 py-3 break-words shadow-[var(--shadow-sm)] transition-all duration-300',
         isOwn
-          ? 'rounded-br-md border border-[rgba(217,196,168,0.95)] bg-[linear-gradient(180deg,rgba(248,241,232,0.98),rgba(238,224,205,0.96))] text-[rgb(82,59,38)] shadow-[0_12px_32px_-18px_rgba(120,85,45,0.28)]'
+          ? 'rounded-br-md bg-[linear-gradient(180deg,rgba(55,27,23,0.96),rgba(55,27,23,0.88))] text-white'
           : 'rounded-bl-md border border-[var(--ui-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,255,255,0.78))] text-[var(--ui-text)] dark:bg-[linear-gradient(180deg,rgba(24,24,27,0.94),rgba(24,24,27,0.86))]'
       ]">
         <div class="message-content text-sm leading-6" v-html="renderedContent" />
@@ -174,7 +174,7 @@ async function handleDownload() {
           :class="[
             'mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
             isOwn
-              ? 'bg-[rgba(255,248,240,0.9)] text-[rgb(112,82,54)]'
+              ? 'bg-white/12 text-white/90'
               : 'border border-[var(--ui-border)] bg-[var(--ui-bg-elevated)] text-[var(--ui-text-muted)]'
           ]"
         >
