@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useChannelStore, type Channel } from '~/stores/useChannelStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
+
 import MemberManagementModal from '~/components/modals/MemberManagementModal.vue'
 
 const channelStore = useChannelStore()
@@ -40,7 +41,6 @@ const channelDisplayName = computed(() => {
     return `# ${channel.value.name}`
   }
 
-  // It's a Direct Message. Find the other user's name.
   const currentUserId = userStore.user?.id || (userStore.user as any)?._id
   
   const otherMember = channelMembers.value.find(m => {
@@ -52,11 +52,20 @@ const channelDisplayName = computed(() => {
     return `💬 ${otherMember.name}`
   }
 
-  // Fallback if member details aren't loaded yet
+  const otherId = (channel.value as any).direct_user_id || (channel.value as any).user_id
+  if (otherId) {
+    const workspaceMembers = workspaceStore.currentWorkspace?.members || []
+    const found = workspaceMembers.find((wm: any) => wm.id === otherId || wm._id === otherId || wm.user_id === otherId)
+    
+    if (found) {
+      return `💬 ${found.name || found.user?.name || 'Unknown'}`
+    }
+  }
+
   const fallbackName = channel.value.name.replace('DM: ', '')
-  const looksLikeUserId = Boolean(fallbackName && /^[a-f0-9]{24}$/i.test(fallbackName))
+  const isId = Boolean(fallbackName && /^[a-f0-9]{24}$/i.test(fallbackName))
   
-  return `💬 ${looksLikeUserId ? 'Unknown User' : fallbackName}`
+  return `💬 ${isId ? 'Unknown User' : fallbackName}`
 })
 
 const visibleMembers = computed(() => {
@@ -77,32 +86,31 @@ const getInitials = (name: string) => {
 
 const getAvatarColor = (index: number) => {
   const colors = [
-    'bg-blue-500',
-    'bg-purple-500',
-    'bg-pink-500',
-    'bg-green-500',
-    'bg-orange-500',
-    'bg-red-500',
+    'bg-blue-500', 'bg-purple-500', 'bg-pink-500',
+    'bg-green-500', 'bg-orange-500', 'bg-red-500',
   ]
   return colors[index % colors.length]
 }
 </script>
 
 <template>
-  <div v-if="channel" class="flex items-start gap-4 min-w-0">
+  <div v-if="channel" class="flex items-start justify-between gap-4 min-w-0 w-full">
     <div class="min-w-0 flex-1">
-      <h2 class="text-lg font-bold text-[var(--ui-text-highlighted)] truncate">
-        {{ channelDisplayName }}
-      </h2>
-      <p v-if="channel.description" class="text-sm text-[var(--ui-text-muted)] truncate">
+      <div class="flex items-center gap-2">
+        <h2 class="text-lg font-bold text-[var(--ui-text-highlighted)] truncate">
+          {{ channelDisplayName }}
+        </h2>
+      </div>
+
+      <p v-if="channel.description" class="text-sm text-[var(--ui-text-muted)] truncate mt-0.5">
         {{ channel.description }}
       </p>
-      <p v-else class="text-sm text-[var(--ui-text-muted)]">
+      <p v-else class="text-sm text-[var(--ui-text-muted)] mt-0.5">
         {{ channelMembers.length }} {{ channelMembers.length === 1 ? 'member' : 'members' }}
       </p>
     </div>
 
-    <div class="flex items-center gap-1.5 shrink-0">
+    <div class="flex items-center gap-1.5 shrink-0 mt-1">
       <div class="flex items-center gap-1">
         <div
           v-for="(member, index) in visibleMembers"
