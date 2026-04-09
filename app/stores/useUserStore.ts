@@ -22,6 +22,28 @@ interface UserState {
   isLoading: boolean
 }
 
+interface UserGetters {
+  isLoggedIn: (state: UserState) => boolean
+}
+
+interface UserActions {
+  setAuth(user: ApiUser, authToken?: string): void
+  clearAuth(): void
+  login(email: string, password: string): Promise<{ success: boolean; error?: string; message?: string }>
+  register(form: {
+    name: string
+    email: string
+    workspace: string
+    password: string
+    password_confirmation: string
+  }): Promise<{ success: boolean; error?: string; message?: string; user?: ApiUser | null }>
+  verifySignup(email: string, token: string): Promise<{ success: boolean; error?: string; message?: string }>
+  forgotPassword(email: string): Promise<{ success: boolean; error?: string; message?: string }>
+  resetPassword(token: string, password: string, password_confirmation: string): Promise<{ success: boolean; error?: string; message?: string }>
+  logout(): Promise<{ success: boolean }>
+  validateAuth(): Promise<{ valid: boolean }>
+}
+
 const LOGIN_REQUEST_TIMEOUT_MS = 15000
 let activeLoginController: AbortController | null = null
 
@@ -35,7 +57,7 @@ function extractMessage(error: unknown, fallback: string) {
 
 
 
-export const useUserStore = defineStore('user', {
+export const useUserStore = defineStore<'user', UserState, UserGetters, UserActions>('user', {
   state: (): UserState => ({
     user: null,
     token: null,

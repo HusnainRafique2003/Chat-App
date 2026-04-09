@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { navigateTo, useRoute } from '#app'
-import { onMounted, watch, computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import AppSidebar from '~/components/AppSidebar.vue'
-import ChannelHeader from '~/components/ChannelHeader.vue'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useTeamStore } from '~/stores/useTeamStore'
 import { useUserStore } from '~/stores/useUserStore'
@@ -173,14 +172,14 @@ watch(() => route.fullPath, () => {
                       <div class="max-h-64 overflow-y-auto p-1.5">
                         <div v-for="m in workspaceMembers" :key="m.id" class="group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-[var(--ui-bg-muted)]">
                           <div class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--ui-primary)]/10 text-xs font-bold text-[var(--ui-primary)]">
-                            {{ (m.name || m.user?.name || 'U').charAt(0).toUpperCase() }}
+                            {{ (m.name || 'U').charAt(0).toUpperCase() }}
                           </div>
                           <div class="min-w-0">
-                            <AppTooltip :text="m.name || m.user?.name">
-                              <p class="truncate text-sm font-medium text-[var(--ui-text)]">{{ m.name || m.user?.name }}</p>
+                            <AppTooltip :text="m.name">
+                              <p class="truncate text-sm font-medium text-[var(--ui-text)]">{{ m.name }}</p>
                             </AppTooltip>
-                            <AppTooltip :text="m.email || m.user?.email">
-                              <p class="truncate text-[10px] text-[var(--ui-text-muted)]">{{ m.email || m.user?.email }}</p>
+                            <AppTooltip :text="m.email">
+                              <p class="truncate text-[10px] text-[var(--ui-text-muted)]">{{ m.email }}</p>
                             </AppTooltip>
                           </div>
                         </div>
@@ -218,19 +217,6 @@ watch(() => route.fullPath, () => {
               <AppTooltip :text="userStore.user?.email">
                 <p class="truncate text-xs text-[var(--ui-text-muted)]">{{ userStore.user?.email }}</p>
               </AppTooltip>
-      <div class="flex h-full flex-col min-w-0 min-h-0">
-        <header class="shrink-0 border-b border-[var(--ui-border)] bg-[var(--ui-bg)]/90 px-5 py-3 backdrop-blur-md sm:px-8 relative z-50">
-          <div class="flex items-center justify-between gap-8">
-            
-            <!-- Channel Header (Left side - larger flex) -->
-            <div class="min-w-0 flex-1">
-              <ChannelHeader />
-            </div>
-
-            <!-- User Info (Right side - fixed width) -->
-            <div class="text-right shrink-0 border-l border-[var(--ui-border)] pl-4">
-              <p class="text-sm font-semibold text-[var(--ui-text)] truncate max-w-[150px]">{{ userStore.user?.name }}</p>
-              <p class="text-xs text-[var(--ui-text-muted)] truncate max-w-[150px]">{{ userStore.user?.email }}</p>
             </div>
             <button
               type="button"
