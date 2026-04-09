@@ -34,7 +34,6 @@ const editingMessage = ref<Message | null>(null)
 const showEditModal = ref(false)
 const deletingMessageId = ref<string | null>(null)
 const showDeleteModal = ref(false)
-const storeReady = ref(false)
 const toast = useToast()
 
 const sortedMessages = computed(() => {
@@ -58,11 +57,6 @@ watch(
 
     console.log('[MessageList] Store ready with token:', token.slice(0, 20) + '...')
 
-    // Reset UI state when switching channels
-    editingId.value = null
-    editContent.value = ''
-    showDeleteConfirm.value = null
-
     console.log('[MessageList] Switching to channel:', trimmed)
     console.log('[MessageList] Clearing store and fetching messages')
 
@@ -75,8 +69,9 @@ watch(
         scrollToBottom()
       })
     })
-  }
-}, { immediate: true })
+  },
+  { immediate: true }
+)
 
 watch(() => sortedMessages.value.length, () => {
   nextTick(() => {

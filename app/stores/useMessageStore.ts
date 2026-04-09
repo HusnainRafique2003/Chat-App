@@ -3,7 +3,6 @@ import { addChannelMember } from '~/composables/useChannelsApi'
 import { canDeleteMessage, canEditMessage, createMessage, deleteMessage, markMessagesAsRead, reactToMessage, readMessages, searchMessages, updateMessage, type Message } from '~/composables/useMessagesApi'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
-import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
 interface MessageState {
   messages: Message[]
@@ -17,6 +16,19 @@ interface MessageState {
     total: number
     last_page: number
   }
+}
+
+interface StoreActionResult {
+  success: boolean
+  error?: string
+}
+
+interface MessageActionResult extends StoreActionResult {
+  message?: Message
+}
+
+interface SearchMessagesResult extends StoreActionResult {
+  messages?: Message[]
 }
 
 export const useMessageStore = defineStore('messages', {
@@ -97,7 +109,7 @@ export const useMessageStore = defineStore('messages', {
       return senderId || 'Unknown'
     },
 
-    async fetchMessages(channelId: string, page = 1, retryCount = 0) {
+    async fetchMessages(channelId: string, page = 1, retryCount = 0): Promise<StoreActionResult> {
       this.loading = true
       
       // Clear messages if switching to a different channel
@@ -191,9 +203,11 @@ export const useMessageStore = defineStore('messages', {
           }
           // Pattern 7: Try to find any array property (excluding pagination/meta)
           else if (typeof data.data === 'object' && data.data !== null) {
-            const arrayKeys = Object.keys(data.data).filter(key => Array.isArray(data.data[key]) && !['links', 'meta', 'pagination'].includes(key))
-            if (arrayKeys.length > 0) {
-              messagesArray = data.data[arrayKeys[0]]
+            const recordData = data.data as Record<string, unknown>
+            const arrayKeys = Object.keys(recordData).filter(key => Array.isArray(recordData[key]) && !['links', 'meta', 'pagination'].includes(key))
+            const firstArrayKey = arrayKeys[0]
+            if (firstArrayKey) {
+              messagesArray = recordData[firstArrayKey] as Message[]
               console.log(`[Message Store] ✓ Found messages at data.${arrayKeys[0]}:`, messagesArray.length)
             } else {
               console.log('[Message Store] ✗ No array found in data.data. Keys:', Object.keys(data.data))
@@ -277,13 +291,14 @@ export const useMessageStore = defineStore('messages', {
           })
 
         console.log('[Message Store] After filtering & mapping - final count:', this.messages.length)
-        if (this.messages.length > 0) {
-          console.log('[Message Store] First normalized message:', this.messages[0])
+        const firstMessage = this.messages[0]
+        if (firstMessage) {
+          console.log('[Message Store] First normalized message:', firstMessage)
           console.log('[Message Store] Message content check:', {
-            id: this.messages[0].id,
-            content: this.messages[0].content?.slice(0, 50),
-            sender: this.messages[0].sender?.name,
-            channel_id: this.messages[0].channel_id
+            id: firstMessage.id,
+            content: firstMessage.content?.slice(0, 50),
+            sender: firstMessage.sender?.name,
+            channel_id: firstMessage.channel_id
           })
         }
 
@@ -368,7 +383,7 @@ export const useMessageStore = defineStore('messages', {
       }
     },
 
-    async createMessage(channelId: string, content: string, file?: File, retryCount = 0) {
+    async createMessage(channelId: string, content: string, file?: File, retryCount = 0): Promise<MessageActionResult> {
       try {
         const userStore = useUserStore()
         
@@ -560,7 +575,7 @@ export const useMessageStore = defineStore('messages', {
       }
     },
 
-    async searchMessages(query: string, channelId?: string) {
+    async searchMessages(query: string, channelId?: string): Promise<SearchMessagesResult> {
       this.searching = true
       try {
         const response = await searchMessages(query, { channel_id: channelId })
