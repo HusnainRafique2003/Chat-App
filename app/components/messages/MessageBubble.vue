@@ -364,6 +364,15 @@ async function handleDownload() {
       </div>
     </div>
   </div>
+
+  <FileViewerModal
+    v-model:open="showFileModal"
+    :file-name="message.file_name"
+    :file-path="message.file_path"
+    :file-mime="message.file_mime"
+    :image-url="imageUrl"
+    @download="handleDownload"
+  />
 </template>
 
 <style scoped>
@@ -383,7 +392,7 @@ async function handleDownload() {
 .message-content :deep(em strong) {
   font-style: italic;
   font-weight: 800;
-  color: var(--ui-primary);
+  color: #15803d;
 }
 
 .message-content :deep(code) {
@@ -434,13 +443,3 @@ async function handleDownload() {
   text-transform: uppercase;
 }
 </style>
-
-  <FileViewerModal
-    v-model:open="showFileModal"
-    :file-name="message.file_name"
-    :file-path="message.file_path"
-    :file-mime="message.file_mime"
-    :image-url="imageUrl"
-    @download="handleDownload"
-  />
-</template>

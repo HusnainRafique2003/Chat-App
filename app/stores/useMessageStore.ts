@@ -61,9 +61,12 @@ export const useMessageStore = defineStore('messages', {
   }),
 
   getters: {
-    sortedMessages: (state) => [...state.messages, ...state.localScheduledMessages].sort((a, b) =>
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    ),
+    sortedMessages: (state) => {
+      const activeChannelId = state.currentChannelId
+      return [...state.messages, ...state.localScheduledMessages]
+        .filter(message => !activeChannelId || message.channel_id === activeChannelId)
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    },
     unreadCount: (state) => state.messages.filter(m => !m.is_read_by_me).length,
     
     /**
