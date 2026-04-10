@@ -31,7 +31,7 @@ export const useTeamStore = defineStore('team-data', {
     loading: false,
     currentTeamId: null
   }),
-
+  persist: { enabled: true, pick: ['currentTeamId'] },
   getters: {
     currentTeam: state => state.teams.find(t => t.id === state.currentTeamId)
   },
