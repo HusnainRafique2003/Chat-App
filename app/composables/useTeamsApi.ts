@@ -51,5 +51,81 @@ export async function getTeams(workspaceId: string): Promise<AxiosResponse> {
     throw error
   }
 }
+/**
+ * Create a team.
+ * POST /api/team/create
+ */
+export async function createTeam(data: {
+  workspace_id: string
+  name: string
+  description?: string
+  color?: string
+}): Promise<AxiosResponse> {
+  try {
+    return await teamsApiClient.post('/team/create', data)
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
+  }
+}
 
+/**
+ * Update a team.
+ * PUT /api/team
+ */
+export async function updateTeam(data: {
+  team_id: string
+  name?: string
+  description?: string
+  color?: string
+}): Promise<AxiosResponse> {
+  try {
+    return await teamsApiClient.put('/team', data)
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
+  }
+}
+
+/**
+ * Delete a team.
+ * DELETE /api/team/delete
+ */
+export async function deleteTeam(data: {
+  team_id: string
+}): Promise<AxiosResponse> {
+  try {
+    return await teamsApiClient.delete('/team/delete', { data })
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
+  }
+}
+export async function addTeamMember(data: { team_id: string; workspace_id: string; user_ids: string[] }) {
+  try {
+    return await teamsApiClient.post('/team/add-member', data)
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
+  }
+}
+
+export async function removeTeamMember(data: { team_id: string; workspace_id: string; user_ids: string[] }) {
+  try {
+    return await teamsApiClient.post('/team/remove-member', data)
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || error.message)
+    }
+    throw error
+  }
+}
 export { teamsApiClient }

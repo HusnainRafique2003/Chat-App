@@ -9,8 +9,13 @@ import { useToast } from '#ui/composables/useToast'
 import ChannelModal from './modals/ChannelModal.vue'
 import DmModal from './modals/DmModal.vue'
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal.vue'
+import WorkspaceModal from './modals/WorkspaceModal.vue'
+import TeamModal from './modals/TeamModal.vue'
+
 import type { ChannelPayload } from './modals/ChannelModal.vue'
 import type { DmMember } from './modals/DmModal.vue'
+import type { WorkspacePayload } from './modals/WorkspaceModal.vue'
+import type { TeamPayload } from './modals/TeamModal.vue'
 
 const workspaceStore = useWorkspaceStore()
 const teamStore = useTeamStore()
@@ -18,20 +23,31 @@ const channelStore = useChannelStore()
 const userStore = useUserStore()
 const toast = useToast()
 
-const showCreateChannelModal = ref(false)
 const isWorkspaceDropdownOpen = ref(false)
-const showDmModal = ref(false)
+const isTeamDropdownOpen = ref(false)
 
-// Edit & Delete state
+// Modals State
+const showCreateChannelModal = ref(false)
 const showEditChannelModal = ref(false)
 const showDeleteChannelModal = ref(false)
 const activeChannelForAction = ref<any>(null)
+
+const showDmModal = ref(false)
+
+const showWorkspaceModal = ref(false)
+const workspaceModalMode = ref<'create' | 'update'>('create')
+const activeWorkspaceForAction = ref<any>(null)
+const showDeleteWorkspaceModal = ref(false)
+
+const showTeamModal = ref(false)
+const teamModalMode = ref<'create' | 'update'>('create')
+const activeTeamForAction = ref<any>(null)
+const showDeleteTeamModal = ref(false)
 
 // Track DMs opened during this session (Persisted to LocalStorage)
 const activeDmIds = ref<string[]>([])
 
 onMounted(() => {
-  // Load saved DMs from the browser so they survive a refresh
   try {
     const saved = localStorage.getItem('chat-active-dms')
     if (saved) {
@@ -42,23 +58,57 @@ onMounted(() => {
   }
 })
 
-const workspaceItems = computed(() =>
-  workspaceStore.workspaces.map(w => ({
-    id: w.id,
-    name: w.name,
-    label: w.name.slice(0,2).toUpperCase(),
-    active: w.id === workspaceStore.currentWorkspaceId
-  }))
-)
+// === PERMISSION COMPUTEDS ===
+const workspaceItems = computed(() => {
+  const myId = userStore.user?.id || (userStore.user as any)?._id
+  return workspaceStore.workspaces.map(w => {
+    const isCreator = w.creator_id === myId || (w as any).created_id === myId || (w as any).created_by === myId || (w as any).owner_id === myId || (w as any).user_id === myId;
+    const isAdmin = w.members?.some((m: any) => (m.user_id === myId || m.id === myId || m._id === myId) && ['admin', 'owner', 'creator'].includes(m.role?.toLowerCase()));
+    
+    return {
+      id: w.id,
+      name: w.name,
+      label: w.name.slice(0, 2).toUpperCase(),
+      active: w.id === workspaceStore.currentWorkspaceId,
+      canManage: Boolean(myId && (isCreator || isAdmin))
+    }
+  })
+})
 
-const teamItems = computed(() =>
-  teamStore.teams.map(t => ({
-    id: t.id,
-    name: t.name,
-    label: t.name.slice(0,2).toUpperCase(),
-    active: t.id === teamStore.currentTeamId
-  }))
-)
+const teamItems = computed(() => {
+  const myId = userStore.user?.id || (userStore.user as any)?._id
+  return teamStore.teams.map(t => {
+    const isCreator = t.creator_id === myId || (t as any).created_id === myId || (t as any).created_by === myId || (t as any).owner_id === myId || (t as any).user_id === myId;
+    const isAdmin = t.members?.some((m: any) => (m.user_id === myId || m.id === myId || m._id === myId) && ['admin', 'owner', 'creator'].includes(m.role?.toLowerCase()));
+    
+    return {
+      id: t.id,
+      name: t.name,
+      label: t.name.slice(0, 2).toUpperCase(),
+      active: t.id === teamStore.currentTeamId,
+      canManage: Boolean(myId && (isCreator || isAdmin))
+    }
+  })
+})
+
+const channelItems = computed(() => {
+  const myId = userStore.user?.id || (userStore.user as any)?._id
+  return channelStore.channels
+    .filter(c => c.type !== 'direct' && c.team_id === teamStore.currentTeamId)
+    .map(c => {
+      const isCreator = c.created_id === myId || (c as any).creator_id === myId || (c as any).created_by === myId || (c as any).owner_id === myId || (c as any).user_id === myId;
+      const isAdmin = c.members?.some((m: any) => (m.user_id === myId || m.id === myId || m._id === myId) && ['admin', 'owner', 'creator'].includes(m.role?.toLowerCase()));
+      
+      return {
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        type: c.type,
+        active: c.id === channelStore.currentChannelId,
+        canManage: Boolean(myId && (isCreator || isAdmin))
+      }
+    })
+})
 
 const workspaceMemberNameMap = computed(() => {
   const map = new Map<string, string>()
@@ -104,24 +154,11 @@ function getDirectChannelName(channel: { name: string, members?: Array<{ user_id
   return fallbackName
 }
 
-const channelItems = computed(() =>
-  channelStore.channels
-    .filter(c => c.type !== 'direct' && c.team_id === teamStore.currentTeamId)
-    .map(c => ({
-      id: c.id,
-      name: c.name,
-      description: c.description,
-      type: c.type,
-      active: c.id === channelStore.currentChannelId
-    }))
-)
-
 const directMessages = computed(() =>
   channelStore.channels
-    .filter(c => 
-      c.type === 'direct' && 
-      c.team_id === teamStore.currentTeamId && 
-      // Changed to .includes()
+    .filter(c =>
+      c.type === 'direct' &&
+      c.team_id === teamStore.currentTeamId &&
       (activeDmIds.value.includes(c.id) || c.id === channelStore.currentChannelId)
     )
     .map(c => ({
@@ -135,9 +172,9 @@ const directMessages = computed(() =>
 const availableWorkspaceMembers = computed(() => {
   const workspace = workspaceStore.currentWorkspace
   if (!workspace || !workspace.members) return []
-  
+
   const myId = userStore.user?.id || (userStore.user as any)?._id
-  
+
   return workspace.members
     .filter(member => member && (member.id !== myId && (member as any)._id !== myId))
     .map(member => ({
@@ -147,17 +184,9 @@ const availableWorkspaceMembers = computed(() => {
     }))
 })
 
-function openDmModal() {
-  showDmModal.value = true 
-  if (workspaceStore.currentWorkspaceId) {
-    workspaceStore.refreshWorkspaceMembers(workspaceStore.currentWorkspaceId).catch(console.error)
-  }
-}
-
-// Actions
+// === Channel Actions ===
 async function handleCreateChannel(payload: ChannelPayload) {
   if (!teamStore.currentTeamId || !workspaceStore.currentWorkspaceId) return
-
   const result = await channelStore.createChannel({
     name: payload.name,
     description: payload.description,
@@ -166,7 +195,6 @@ async function handleCreateChannel(payload: ChannelPayload) {
     type: payload.type as any,
     isPrivate: payload.isPrivate
   } as any)
-
   if (result.success) showCreateChannelModal.value = false
 }
 
@@ -192,18 +220,23 @@ async function submitDeleteChannel() {
   }
 }
 
+// === Direct Messages ===
+function openDmModal() {
+  showDmModal.value = true
+  if (workspaceStore.currentWorkspaceId) {
+    workspaceStore.refreshWorkspaceMembers(workspaceStore.currentWorkspaceId).catch(console.error)
+  }
+}
+
 async function handleStartDm(member: DmMember) {
   if (!workspaceStore.currentWorkspaceId || !teamStore.currentTeamId) return
-  
   const result = await channelStore.createDirectChannel(
     workspaceStore.currentWorkspaceId,
     teamStore.currentTeamId,
     member.id,
     member.name
   )
-  
   if (result.success && result.channel) {
-    // Save the new DM to LocalStorage so it persists
     if (!activeDmIds.value.includes(result.channel.id)) {
       activeDmIds.value.push(result.channel.id)
       localStorage.setItem('chat-active-dms', JSON.stringify(activeDmIds.value))
@@ -212,7 +245,130 @@ async function handleStartDm(member: DmMember) {
   }
 }
 
-// Open modals for a specific channel
+// === Workspace Actions ===
+function openCreateWorkspace() {
+  workspaceModalMode.value = 'create'
+  activeWorkspaceForAction.value = null
+  showWorkspaceModal.value = true
+  isWorkspaceDropdownOpen.value = false
+}
+
+function openEditWorkspace(workspace: any) {
+  workspaceModalMode.value = 'update'
+  activeWorkspaceForAction.value = workspace
+  showWorkspaceModal.value = true
+  isWorkspaceDropdownOpen.value = false
+}
+
+function openDeleteWorkspace(workspace: any) {
+  activeWorkspaceForAction.value = workspace
+  showDeleteWorkspaceModal.value = true
+  isWorkspaceDropdownOpen.value = false
+}
+
+async function submitWorkspace(payload: WorkspacePayload) {
+  if (workspaceModalMode.value === 'create') {
+    const res = await workspaceStore.createWorkspace({ name: payload.name, description: payload.description })
+    if (res.success) {
+      showWorkspaceModal.value = false
+      toast.add({ title: 'Workspace created', color: 'success' })
+    } else {
+      toast.add({ title: res.error || 'Error', color: 'error' })
+    }
+  } else {
+    const res = await workspaceStore.updateWorkspace(activeWorkspaceForAction.value.id, { name: payload.name, description: payload.description })
+    if (res.success) {
+      showWorkspaceModal.value = false
+      toast.add({ title: 'Workspace updated', color: 'success' })
+    } else {
+      toast.add({ title: res.error || 'Error', color: 'error' })
+    }
+  }
+}
+
+async function submitDeleteWorkspace() {
+  if (!activeWorkspaceForAction.value) return
+  const res = await workspaceStore.deleteWorkspace(activeWorkspaceForAction.value.id)
+  if (res.success) {
+    showDeleteWorkspaceModal.value = false
+    toast.add({ title: 'Workspace deleted', color: 'success' })
+  } else {
+    toast.add({ title: res.error || 'Error', color: 'error' })
+  }
+}
+
+// === Team Actions ===
+function openCreateTeam() {
+  teamModalMode.value = 'create'
+  activeTeamForAction.value = null
+  showTeamModal.value = true
+  isTeamDropdownOpen.value = false
+}
+
+function openEditTeam(teamId: string) {
+  const fullTeam = teamStore.teams.find(t => t.id === teamId)
+  if (fullTeam) {
+    teamModalMode.value = 'update'
+    activeTeamForAction.value = fullTeam
+    showTeamModal.value = true
+    isTeamDropdownOpen.value = false
+  }
+}
+
+function openDeleteTeam(teamId: string) {
+  const fullTeam = teamStore.teams.find(t => t.id === teamId)
+  if (fullTeam) {
+    activeTeamForAction.value = fullTeam
+    showDeleteTeamModal.value = true
+    isTeamDropdownOpen.value = false
+  }
+}
+
+async function submitTeam(payload: TeamPayload) {
+  if (!workspaceStore.currentWorkspaceId) {
+    toast.add({ title: 'Select a workspace first', color: 'error' })
+    return
+  }
+
+  if (teamModalMode.value === 'create') {
+    const res = await teamStore.createTeam({
+      workspace_id: workspaceStore.currentWorkspaceId,
+      name: payload.name,
+      description: payload.description,
+      color: payload.color
+    })
+    if (res.success) {
+      showTeamModal.value = false
+      toast.add({ title: 'Team created', color: 'success' })
+    } else {
+      toast.add({ title: res.error || 'Error', color: 'error' })
+    }
+  } else {
+    const res = await teamStore.updateTeam(activeTeamForAction.value.id, {
+      name: payload.name,
+      description: payload.description,
+      color: payload.color
+    })
+    if (res.success) {
+      showTeamModal.value = false
+      toast.add({ title: 'Team updated', color: 'success' })
+    } else {
+      toast.add({ title: res.error || 'Error', color: 'error' })
+    }
+  }
+}
+
+async function submitDeleteTeam() {
+  if (!activeTeamForAction.value) return
+  const res = await teamStore.deleteTeam(activeTeamForAction.value.id)
+  if (res.success) {
+    showDeleteTeamModal.value = false
+    toast.add({ title: 'Team deleted', color: 'success' })
+  } else {
+    toast.add({ title: res.error || 'Error', color: 'error' })
+  }
+}
+
 function openEditModal(channel: any) {
   activeChannelForAction.value = channel
   showEditChannelModal.value = true
@@ -227,74 +383,156 @@ function openDeleteModal(channel: any) {
 <template>
   <div class="flex flex-1 min-h-0 h-full w-full text-[var(--ui-text)]">
     
-    <div class="flex w-16 flex-col items-center border-r border-[var(--ui-border)] px-2 py-5 overflow-y-auto shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+    <div class="relative z-50 flex w-16 flex-col items-center border-r border-[var(--ui-border)] bg-[var(--ui-bg)] px-2 py-5 shrink-0">
       
       <p class="mb-3 text-[7px] font-bold uppercase tracking-[0.2em] text-[var(--ui-text-dimmed)] shrink-0">
         Workspace
       </p>
       
-      <div class="flex flex-col items-center mb-6 shrink-0 w-full">
+      <div class="relative flex flex-col items-center mb-6 shrink-0 w-full gap-2">
         <button
           type="button"
-          @click="isWorkspaceDropdownOpen = !isWorkspaceDropdownOpen"
+          @click="isWorkspaceDropdownOpen = !isWorkspaceDropdownOpen; isTeamDropdownOpen = false"
           :title="workspaceStore.currentWorkspace?.name"
           class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition-all bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)] ring-2 ring-transparent hover:ring-[var(--ui-primary)]/50 relative z-[101]"
         >
           {{ workspaceStore.currentWorkspace?.name?.slice(0,2).toUpperCase() || 'WS' }}
         </button>
 
-        <div 
-          v-if="isWorkspaceDropdownOpen" 
-          class="fixed left-16 top-5 z-[100] ml-2 w-56 rounded-xl bg-[var(--ui-bg)] border border-[var(--ui-border)] shadow-xl overflow-hidden animate-in fade-in slide-in-from-left-2 duration-200"
+        <button
+          type="button"
+          @click="openCreateWorkspace"
+          class="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-[var(--ui-border)] text-[var(--ui-text-dimmed)] hover:text-[var(--ui-text)] hover:bg-[var(--ui-bg-elevated)] transition-colors"
+          title="Create Workspace"
         >
-          <div class="px-4 py-3 text-[10px] font-bold text-[var(--ui-text-dimmed)] uppercase tracking-wider border-b border-[var(--ui-border)] bg-[var(--ui-bg-muted)]/50">
-            Switch Workspace
-          </div>
-          
-          <div class="max-h-[400px] overflow-y-auto p-1.5 space-y-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <button
-              v-for="workspace in workspaceStore.workspaces"
-              :key="workspace.id"
-              @click="workspaceStore.setCurrentWorkspace(workspace.id); isWorkspaceDropdownOpen = false"
-              class="w-full flex items-center justify-between px-3 py-2.5 text-sm rounded-lg transition-colors text-left"
-              :class="workspace.id === workspaceStore.currentWorkspaceId 
-                ? 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] font-bold' 
-                : 'text-[var(--ui-text)] hover:bg-[var(--ui-bg-muted)]'"
-            >
-              <span class="truncate pr-2">{{ workspace.name }}</span>
-              <UIcon 
-                v-if="workspace.id === workspaceStore.currentWorkspaceId" 
-                name="i-lucide-check-circle-2" 
-                class="h-4 w-4 shrink-0" 
-              />
-            </button>
-          </div>
-        </div>
+          <UIcon name="i-lucide-plus" class="h-4 w-4" />
+        </button>
 
-        <div 
-          v-if="isWorkspaceDropdownOpen" 
-          @click="isWorkspaceDropdownOpen = false" 
-          class="fixed inset-0 z-[90]"
-        ></div>
+        <ClientOnly>
+          <Teleport to="body">
+            <div 
+              v-if="isWorkspaceDropdownOpen" 
+              class="fixed left-[76px] top-[114px] z-[100] w-64 rounded-xl bg-[var(--ui-bg)] border border-[var(--ui-border)] shadow-xl overflow-hidden animate-in fade-in slide-in-from-left-2 duration-200"
+            >
+              <div class="px-4 py-3 text-[10px] font-bold text-[var(--ui-text-dimmed)] uppercase tracking-wider border-b border-[var(--ui-border)] bg-[var(--ui-bg-muted)]/50">
+                Switch Workspace
+              </div>
+              
+              <div class="max-h-[60vh] overflow-y-auto p-1.5 space-y-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div
+                  v-for="workspace in workspaceItems"
+                  :key="workspace.id"
+                  class="group relative w-full flex items-center justify-between px-3 py-2.5 text-sm rounded-lg transition-colors text-left"
+                  :class="workspace.active 
+                    ? 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] font-bold' 
+                    : 'text-[var(--ui-text)] hover:bg-[var(--ui-bg-muted)]'"
+                >
+                  <button @click="workspaceStore.setCurrentWorkspace(workspace.id); isWorkspaceDropdownOpen = false" class="flex-1 truncate pr-2 text-left outline-none">
+                    {{ workspace.name }}
+                  </button>
+
+                  <div class="shrink-0 flex items-center min-h-[24px]">
+                    <UIcon 
+                      v-if="workspace.active" 
+                      name="i-lucide-check-circle-2" 
+                      class="h-4 w-4 shrink-0 transition-opacity group-hover:opacity-0 absolute right-3" 
+                    />
+                    
+                    <div v-if="workspace.canManage" class="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 bg-[var(--ui-bg)]/90 backdrop-blur-sm rounded-md relative z-10">
+                      <button @click.stop="openEditWorkspace(workspace)" class="flex h-6 w-6 items-center justify-center rounded-md hover:bg-[var(--ui-bg-elevated)] text-[var(--ui-text-muted)] hover:text-[var(--ui-text)] transition-colors" title="Edit Workspace">
+                        <UIcon name="i-mdi-pencil" class="h-3.5 w-3.5" />
+                      </button>
+                      <button @click.stop="openDeleteWorkspace(workspace)" class="flex h-6 w-6 items-center justify-center rounded-md hover:bg-red-500/10 text-[var(--ui-text-muted)] hover:text-red-500 transition-colors" title="Delete Workspace">
+                        <UIcon name="i-mdi-trash-can-outline" class="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div 
+              v-if="isWorkspaceDropdownOpen" 
+              @click="isWorkspaceDropdownOpen = false" 
+              class="fixed inset-0 z-[90]"
+            ></div>
+          </Teleport>
+        </ClientOnly>
       </div>
 
-      <p class="mb-3 text-[8px] font-bold uppercase tracking-[0.2em] text-[var(--ui-text-dimmed)] shrink-0">
+      <p class="mb-3 text-[7px] font-bold uppercase tracking-[0.2em] text-[var(--ui-text-dimmed)] shrink-0">
         Teams
       </p>
-      <div class="flex flex-col items-center gap-3 shrink-0">
+      
+      <div class="relative flex flex-col items-center mb-6 shrink-0 w-full gap-2">
         <button
-          v-for="team in teamItems"
-          :key="team.id"
           type="button"
-          :title="team.name"
-          @click="teamStore.setCurrentTeam(team.id)"
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition-all"
-          :class="team.active
-            ? 'bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)]'
-            : 'bg-[var(--ui-bg-muted)] text-[var(--ui-text)] hover:bg-[var(--ui-bg-elevated)]'"
+          @click="isTeamDropdownOpen = !isTeamDropdownOpen; isWorkspaceDropdownOpen = false"
+          :title="teamStore.currentTeam?.name"
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition-all bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)] ring-2 ring-transparent hover:ring-[var(--ui-primary)]/50 relative z-[101]"
         >
-          {{ team.label }}
+          {{ teamStore.currentTeam?.name?.slice(0,2).toUpperCase() || 'TM' }}
         </button>
+
+        <button
+          type="button"
+          @click="openCreateTeam"
+          class="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-[var(--ui-border)] text-[var(--ui-text-dimmed)] hover:text-[var(--ui-text)] hover:bg-[var(--ui-bg-elevated)] transition-colors"
+          title="Create Team"
+        >
+          <UIcon name="i-lucide-plus" class="h-4 w-4" />
+        </button>
+
+        <ClientOnly>
+          <Teleport to="body">
+            <div 
+              v-if="isTeamDropdownOpen" 
+              class="fixed left-[76px] top-[240px] z-[100] w-64 rounded-xl bg-[var(--ui-bg)] border border-[var(--ui-border)] shadow-xl overflow-hidden animate-in fade-in slide-in-from-left-2 duration-200"
+            >
+              <div class="px-4 py-3 text-[10px] font-bold text-[var(--ui-text-dimmed)] uppercase tracking-wider border-b border-[var(--ui-border)] bg-[var(--ui-bg-muted)]/50">
+                Switch Team
+              </div>
+              
+              <div class="max-h-[60vh] overflow-y-auto p-1.5 space-y-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div
+                  v-for="team in teamItems"
+                  :key="team.id"
+                  class="group relative w-full flex items-center justify-between px-3 py-2.5 text-sm rounded-lg transition-colors text-left"
+                  :class="team.active 
+                    ? 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] font-bold' 
+                    : 'text-[var(--ui-text)] hover:bg-[var(--ui-bg-muted)]'"
+                >
+                  <button @click="teamStore.setCurrentTeam(team.id); isTeamDropdownOpen = false" class="flex-1 truncate pr-2 text-left outline-none">
+                    {{ team.name }}
+                  </button>
+
+                  <div class="shrink-0 flex items-center min-h-[24px]">
+                    <UIcon 
+                      v-if="team.active" 
+                      name="i-lucide-check-circle-2" 
+                      class="h-4 w-4 shrink-0 transition-opacity group-hover:opacity-0 absolute right-3" 
+                    />
+                    
+                    <div v-if="team.canManage" class="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 bg-[var(--ui-bg)]/90 backdrop-blur-sm rounded-md relative z-10">
+                      <button @click.stop="openEditTeam(team.id)" class="flex h-6 w-6 items-center justify-center rounded-md hover:bg-[var(--ui-bg-elevated)] text-[var(--ui-text-muted)] hover:text-[var(--ui-text)] transition-colors" title="Edit Team">
+                        <UIcon name="i-mdi-pencil" class="h-3.5 w-3.5" />
+                      </button>
+                      <button @click.stop="openDeleteTeam(team.id)" class="flex h-6 w-6 items-center justify-center rounded-md hover:bg-red-500/10 text-[var(--ui-text-muted)] hover:text-red-500 transition-colors" title="Delete Team">
+                        <UIcon name="i-mdi-trash-can-outline" class="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div 
+              v-if="isTeamDropdownOpen" 
+              @click="isTeamDropdownOpen = false" 
+              class="fixed inset-0 z-[90]"
+            ></div>
+          </Teleport>
+        </ClientOnly>
       </div>
     </div>
 
@@ -334,11 +572,15 @@ function openDeleteModal(channel: any) {
               @click="channelStore.setCurrentChannel(channel.id)"
               class="flex flex-1 items-center gap-2 truncate text-left px-1 py-1"
             >
-              <span class="opacity-50 shrink-0">#</span>
+              <span class="opacity-50 shrink-0 flex items-center justify-center w-3 h-3">
+                <UIcon v-if="channel.type === 'private'" name="i-lucide-lock" class="h-3 w-3" />
+                <span v-else>#</span>
+              </span>
               <span class="truncate">{{ channel.name }}</span>
             </button>
 
             <div 
+              v-if="channel.canManage"
               class="shrink-0 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
               :class="{ 'opacity-100': channel.active }"
             >
@@ -413,16 +655,19 @@ function openDeleteModal(channel: any) {
     @submit="handleCreateChannel"
     @cancel="showCreateChannelModal = false"
   />
-
   <ChannelModal
     v-model:open="showEditChannelModal"
     mode="update"
-    :initial="{ name: activeChannelForAction?.name || '', description: activeChannelForAction?.description || '', type: activeChannelForAction?.type as any }"
+    :initial="{ 
+      name: activeChannelForAction?.name || '', 
+      description: activeChannelForAction?.description || '', 
+      type: activeChannelForAction?.type as any,
+      isPrivate: activeChannelForAction?.type === 'private'
+    }"
     :loading="channelStore.loading"
     @submit="submitUpdateChannel"
     @cancel="showEditChannelModal = false"
   />
-
   <ConfirmDeleteModal
     v-model:open="showDeleteChannelModal"
     entity-type="channel"
@@ -438,5 +683,40 @@ function openDeleteModal(channel: any) {
     :loading="channelStore.loading"
     @select="handleStartDm"
     @cancel="showDmModal = false"
+  />
+
+  <WorkspaceModal
+    v-model:open="showWorkspaceModal"
+    :mode="workspaceModalMode"
+    :initial="{ name: activeWorkspaceForAction?.name || '', description: activeWorkspaceForAction?.description || '' }"
+    :loading="workspaceStore.loading"
+    @submit="submitWorkspace"
+    @cancel="showWorkspaceModal = false"
+  />
+  <ConfirmDeleteModal
+    v-model:open="showDeleteWorkspaceModal"
+    entity-type="workspace"
+    :entity-name="activeWorkspaceForAction?.name || ''"
+    :loading="workspaceStore.loading"
+    @confirm="submitDeleteWorkspace"
+    @cancel="showDeleteWorkspaceModal = false"
+  />
+
+  <TeamModal
+    v-model:open="showTeamModal"
+    :mode="teamModalMode"
+    :workspace-name="workspaceStore.currentWorkspace?.name"
+    :initial="{ name: activeTeamForAction?.name || '', description: activeTeamForAction?.description || '', color: activeTeamForAction?.color || 'bg-indigo-500' }"
+    :loading="teamStore.loading"
+    @submit="submitTeam"
+    @cancel="showTeamModal = false"
+  />
+  <ConfirmDeleteModal
+    v-model:open="showDeleteTeamModal"
+    entity-type="team"
+    :entity-name="activeTeamForAction?.name || ''"
+    :loading="teamStore.loading"
+    @confirm="submitDeleteTeam"
+    @cancel="showDeleteTeamModal = false"
   />
 </template>
