@@ -25,7 +25,10 @@ export const useWorkspaceStore = defineStore('workspace-data', {
     loading: false,
     currentWorkspaceId: null
   }),
-
+  persist: {
+    enabled: true,
+    pick: ['currentWorkspaceId'] // Only persist the ID, not the whole list
+  },
   getters: {
     currentWorkspace: state => state.workspaces.find(w => w.id === state.currentWorkspaceId)
   },
