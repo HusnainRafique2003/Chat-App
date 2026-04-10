@@ -75,16 +75,13 @@ function sanitizeMessageHtml(html: string): string {
   return Array.from(doc.body.childNodes).map(walk).join('').trim()
 }
 
-const renderedContent = computed(() => sanitizeMessageHtml(props.message.content))
+const renderedContent = computed(() => sanitizeMessageHtml(props.message.content || props.message.message || ''))
 const isAudioAttachment = computed(() => {
   if (props.message.file_mime?.startsWith('audio/')) return true
   return /\.(wav|mp3|m4a|ogg|webm)$/i.test(props.message.file_name || '')
 })
 const audioSource = computed(() => props.message.file_download_url || '')
-/**
- * FIXED COMPUTED PROPERTY
- * Handles both standard ID and MongoDB-style _id for comparison 
- */
+
 const isOwn = computed(() => {
   const currentUserId = userStore.user?.id || (userStore.user as any)?._id;
   const messageSenderId = props.message.sender_id || props.message.sender?.id || (props.message.sender as any)?._id;
@@ -130,31 +127,20 @@ const isImage = computed(() => {
 const imageUrl = ref<string | null>(null)
 const isLoadingImage = ref(false)
 
-/**
- * Image fetcher logic
- * Uses Blob URLs for secure local rendering of server-stored images [cite: 809, 810]
- */
- watch(() => props.message, async (newMsg) => {
-  // If it's an image and we don't have a local blob yet
+watch(() => props.message, async (newMsg) => {
   if (isImage.value && !imageUrl.value) {
     isLoadingImage.value = true
     try {
       const workspaceId = newMsg.workspace_id
       const filename = newMsg.file_name
-      // Generate the path exactly as the API expects it
       const path = newMsg.file_path || (workspaceId && filename ? `workspaces/${workspaceId}/messages/${filename}` : '')
 
       if (path) {
-        // This call uses your axios interceptor to provide the required TOKEN
         const response = await downloadMessageFile(path) 
-        
-        // Convert the raw data into a local Blob URL the browser can render without headers
         const blob = new Blob([response.data], {
           type: response.headers['content-type'] || newMsg.file_mime || 'image/png'
         })
         imageUrl.value = URL.createObjectURL(blob) 
-        
-        console.log('[MessageBubble] Successfully created local Blob URL:', imageUrl.value)
       }
     } catch (e) {
       console.error('[MessageBubble] Failed to fetch image data for blob:', e)
@@ -163,20 +149,13 @@ const isLoadingImage = ref(false)
     }
   }
 }, { immediate: true })
-/**
- * Memory Management
- * Ensures Blob URLs are not revoked while the FileViewerModal is still using them
- */
+
 onUnmounted(() => {
   if (imageUrl.value && !props.message.file_download_url && !showFileModal.value) {
      URL.revokeObjectURL(imageUrl.value)
   }
 })
 
-/**
- * Robust preview trigger
- * Allows opening the modal for non-image files to provide download options
- */
 function openPreview() {
   if (imageUrl.value || !isImage.value) {
     showFileModal.value = true
@@ -257,7 +236,21 @@ async function handleDownload() {
           ? 'rounded-br-md bg-[linear-gradient(180deg,rgba(55,27,23,0.96),rgba(55,27,23,0.88))] text-white'
           : 'rounded-bl-md border border-[var(--ui-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,255,255,0.78))] text-[var(--ui-text)] dark:bg-[linear-gradient(180deg,rgba(24,24,27,0.94),rgba(24,24,27,0.86))]'
       ]">
-        <div class="message-content text-sm leading-6" v-html="renderedContent" />
+        <div v-if="renderedContent" class="message-content text-sm leading-6 mb-2" v-html="renderedContent" />
+
+        <div v-if="isImage" class="relative mt-2 mb-2 inline-block overflow-hidden rounded-xl bg-black/10 dark:bg-white/10 max-w-[280px] sm:max-w-sm">
+          <div v-if="isLoadingImage" class="flex h-32 w-48 items-center justify-center">
+            <UIcon name="i-lucide-loader" class="h-6 w-6 animate-spin opacity-50" />
+          </div>
+          <img
+            v-else-if="imageUrl"
+            :src="imageUrl"
+            :alt="message.file_name"
+            class="max-h-[320px] w-auto rounded-lg object-contain cursor-pointer transition-transform duration-300 hover:scale-[1.02] block"
+            @click="openPreview" 
+            :title="`Click to preview ${message.file_name}`"
+          />
+        </div>
 
         <div
           v-if="message.status === 'scheduled' && message.schedule_time"
@@ -272,8 +265,7 @@ async function handleDownload() {
           Scheduled for {{ formatScheduledTime(message.schedule_time) }}
         </div>
 
-        <!-- File Attachment -->
-        <div v-if="message.file_name" class="mt-3 border-t border-current border-opacity-15 pt-3">
+        <div v-if="message.file_name && !isImage" class="mt-3 border-t border-current border-opacity-15 pt-3">
           <div
             v-if="isAudioAttachment && audioSource"
             class="rounded-2xl bg-black/5 p-3 dark:bg-white/5"
@@ -304,7 +296,6 @@ async function handleDownload() {
             type="button"
             @click="openPreview"
             class="flex w-fit items-center gap-3 rounded-xl border border-current border-opacity-20 bg-black/5 px-4 py-3 text-left transition-colors hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"
-            :class="{ 'border-t border-current border-opacity-15 pt-3': cleanContent }"
           >
             <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-current bg-opacity-10">
               <UIcon name="i-mdi-file-document-outline" class="h-5 w-5" />
@@ -364,76 +355,6 @@ async function handleDownload() {
       </div>
     </div>
   </div>
-</template>
-
-<style scoped>
-.message-content :deep(p) {
-  margin: 0;
-}
-
-.message-content :deep(p + p) {
-  margin-top: 0.65rem;
-}
-
-.message-content :deep(a) {
-  font-weight: 600;
-}
-
-.message-content :deep(strong em),
-.message-content :deep(em strong) {
-  font-style: italic;
-  font-weight: 800;
-  color: var(--ui-primary);
-}
-
-.message-content :deep(code) {
-  border: 1px solid color-mix(in srgb, var(--ui-border) 75%, transparent);
-  background: color-mix(in srgb, var(--ui-bg-elevated) 88%, transparent);
-  border-radius: 0.55rem;
-  padding: 0.15rem 0.4rem;
-  font-family: "JetBrains Mono", "Fira Code", monospace;
-  font-size: 0.82em;
-}
-
-.message-content :deep(pre) {
-  position: relative;
-  overflow-x: auto;
-  border: 1px solid color-mix(in srgb, var(--ui-border) 80%, transparent);
-  background: #101827;
-  color: #e5eefc;
-  border-radius: 1rem;
-  margin-top: 0.85rem;
-  padding: 1rem;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.message-content :deep(pre code) {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  padding: 0;
-  border-radius: 0;
-  font-size: 0.85rem;
-  line-height: 1.6;
-  white-space: pre;
-  display: block;
-}
-
-.message-content :deep(pre)::before {
-  content: "Code";
-  display: inline-flex;
-  align-items: center;
-  margin-bottom: 0.75rem;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.16);
-  color: #cbd5e1;
-  padding: 0.18rem 0.5rem;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-</style>
 
   <FileViewerModal
     v-model:open="showFileModal"
