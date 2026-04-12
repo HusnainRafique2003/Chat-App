@@ -143,8 +143,13 @@ export const useMessageStore = defineStore('messages', {
       return senderId || 'Unknown'
     },
 
-    async fetchMessages(channelId: string, page = 1, retryCount = 0): Promise<StoreActionResult> {
-      this.loading = true
+    // 👇 Notice the 'silent = false' parameter added here 👇
+    async fetchMessages(channelId: string, page = 1, retryCount = 0, silent = false): Promise<StoreActionResult> {
+      
+      // 👇 Only trigger the full-screen loader if this is NOT a silent poll 👇
+      if (!silent) {
+        this.loading = true
+      }
       
       // Clear messages if switching to a different channel
       if (this.currentChannelId && this.currentChannelId !== channelId) {
@@ -164,7 +169,7 @@ export const useMessageStore = defineStore('messages', {
       this.buildUserNameCache()
       
       try {
-        console.log('[Message Store] Fetching messages for channel:', { channelId, page, retryCount })
+        if (!silent) console.log('[Message Store] Fetching messages for channel:', { channelId, page, retryCount })
         
         const response = await readMessages({
           channel_id: channelId,
@@ -173,103 +178,28 @@ export const useMessageStore = defineStore('messages', {
         })
         const data = response.data
 
-        console.log('[Message Store] Raw API response:', {
-          hasSuccess: 'success' in data,
-          success: data.success,
-          hasData: 'data' in data,
-          dataType: Array.isArray(data) ? 'array' : Array.isArray(data.data) ? 'data-is-array' : typeof data.data,
-          dataKeys: data.data ? (Array.isArray(data.data) ? `[array-${data.data.length}]` : Object.keys(data.data)) : 'no-data',
-          fullResponse: JSON.stringify(data).slice(0, 500)
-        })
-        console.log('[Message Store] Full data.data object:', data.data)
-        console.log('[Message Store] Complete response for debugging:', data)
-
         // Extract messages from various possible response shapes
         let messagesArray: Message[] = []
-
-        // Comprehensive extraction with detailed logging
-        console.log('[Message Store] Starting message extraction...')
         
         if (data.success || data.data) {
-          // Debug: Check data.data.messages specifically
-          console.log('[Message Store] DEBUG - data.data type:', typeof data.data)
-          console.log('[Message Store] DEBUG - data.data.messages exists?:', 'messages' in (data.data || {}))
-          console.log('[Message Store] DEBUG - data.data.messages type:', typeof data.data?.messages)
-          console.log('[Message Store] DEBUG - data.data.messages isArray?:', Array.isArray(data.data?.messages))
-          console.log('[Message Store] DEBUG - data.data.messages value:', data.data?.messages)
-          
-          // Try all possible locations where messages might be
-          
-          // Pattern 1: data.messages (direct in data)
-          if (data.data?.messages && Array.isArray(data.data.messages)) {
-            messagesArray = data.data.messages
-            console.log('[Message Store] ✓ Found messages at data.messages:', messagesArray.length)
-          }
-          // Pattern 1b: Laravel Paginator - data.messages.data (pagination wrapper)
-          else if (data.data?.messages?.data && Array.isArray(data.data.messages.data)) {
-            messagesArray = data.data.messages.data
-            console.log('[Message Store] ✓ Found messages at data.messages.data (Laravel Paginator):', messagesArray.length)
-          }
-          // Pattern 2: data.data.data (nested)
-          else if (data.data?.data && Array.isArray(data.data.data)) {
-            messagesArray = data.data.data
-            console.log('[Message Store] ✓ Found messages at data.data.data:', messagesArray.length)
-          }
-          // Pattern 3: data.data is array
-          else if (Array.isArray(data.data)) {
-            messagesArray = data.data
-            console.log('[Message Store] ✓ Found messages as data array:', messagesArray.length)
-          }
-          // Pattern 4: data.result
-          else if (data.data?.result && Array.isArray(data.data.result)) {
-            messagesArray = data.data.result
-            console.log('[Message Store] ✓ Found messages at data.result:', messagesArray.length)
-          }
-          // Pattern 5: data.items
-          else if (data.data?.items && Array.isArray(data.data.items)) {
-            messagesArray = data.data.items
-            console.log('[Message Store] ✓ Found messages at data.items:', messagesArray.length)
-          }
-          // Pattern 6: data._data (Illuminate)
-          else if (data.data?._data && Array.isArray(data.data._data)) {
-            messagesArray = data.data._data
-            console.log('[Message Store] ✓ Found messages at data._data:', messagesArray.length)
-          }
-          // Pattern 7: Try to find any array property (excluding pagination/meta)
+          if (data.data?.messages && Array.isArray(data.data.messages)) messagesArray = data.data.messages
+          else if (data.data?.messages?.data && Array.isArray(data.data.messages.data)) messagesArray = data.data.messages.data
+          else if (data.data?.data && Array.isArray(data.data.data)) messagesArray = data.data.data
+          else if (Array.isArray(data.data)) messagesArray = data.data
+          else if (data.data?.result && Array.isArray(data.data.result)) messagesArray = data.data.result
+          else if (data.data?.items && Array.isArray(data.data.items)) messagesArray = data.data.items
+          else if (data.data?._data && Array.isArray(data.data._data)) messagesArray = data.data._data
           else if (typeof data.data === 'object' && data.data !== null) {
             const recordData = data.data as Record<string, unknown>
             const arrayKeys = Object.keys(recordData).filter(key => Array.isArray(recordData[key]) && !['links', 'meta', 'pagination'].includes(key))
-            const firstArrayKey = arrayKeys[0]
-            if (firstArrayKey) {
-              messagesArray = recordData[firstArrayKey] as Message[]
-              console.log(`[Message Store] ✓ Found messages at data.${arrayKeys[0]}:`, messagesArray.length)
-            } else {
-              console.log('[Message Store] ✗ No array found in data.data. Keys:', Object.keys(data.data))
-            }
+            if (arrayKeys[0]) messagesArray = recordData[arrayKeys[0]] as Message[]
           }
-          
-          // Fallback: Check if messages is at top level
-          if (messagesArray.length === 0 && data.messages && Array.isArray(data.messages)) {
-            messagesArray = data.messages
-            console.log('[Message Store] ✓ Found messages at top level data.messages:', messagesArray.length)
-          }
-          
-          // Fallback: Check response wrapper
-          if (messagesArray.length === 0 && data.response && Array.isArray(data.response)) {
-            messagesArray = data.response
-            console.log('[Message Store] ✓ Found messages at data.response:', messagesArray.length)
-          }
+          if (messagesArray.length === 0 && data.messages && Array.isArray(data.messages)) messagesArray = data.messages
+          if (messagesArray.length === 0 && data.response && Array.isArray(data.response)) messagesArray = data.response
         } else if (Array.isArray(data)) {
           messagesArray = data
-          console.log('[Message Store] ✓ Response is raw array:', messagesArray.length)
         }
 
-        // Normalize id field (some backends return _id only)
-        // IMPORTANT: Filter messages to only include those from the current channel
-        console.log('[Message Store] Before filtering - messagesArray length:', messagesArray.length)
-        console.log('[Message Store] First message RAW sample:', messagesArray[0])
-        console.log('[Message Store] First message keys:', messagesArray[0] ? Object.keys(messagesArray[0]) : 'no messages')
-        
         const userStore = useUserStore()
         const workspaceStore = useWorkspaceStore()
         const currentUserId = userStore.user?.id
@@ -280,15 +210,13 @@ export const useMessageStore = defineStore('messages', {
         workspaceMembers.forEach((member: any) => {
           const ids = [member?.id, member?._id, member?.user_id].filter(Boolean)
           const name = member?.name || member?.user?.name
-
-          if (name) {
-            ids.forEach((id: string) => userNameMap.set(id, name))
-          }
+          if (name) ids.forEach((id: string) => userNameMap.set(id, name))
         })
 
         const looksLikeUserId = (value?: string | null) => Boolean(value && /^[a-f0-9]{24}$/i.test(value))
         
-        this.messages = messagesArray
+        // Map the fresh incoming data
+        const mappedIncomingMessages = messagesArray
           .filter((m: any) => !m.channel_id || m.channel_id === channelId)
           .map((m: any) => {
             const senderId = m.sender?.id || m.sender?._id || m.sender_id || ''
@@ -301,11 +229,9 @@ export const useMessageStore = defineStore('messages', {
               senderName = userNameMap.get(senderId) || senderName
             }
 
-            if (!senderName) {
-              senderName = 'Unknown'
-            }
+            if (!senderName) senderName = 'Unknown'
              
-            const normalized = {
+            return {
               ...m,
               id: m.id || m._id,
               channel_id: m.channel_id || channelId,
@@ -323,32 +249,38 @@ export const useMessageStore = defineStore('messages', {
               read_by_count: m.read_by_count ?? 0,
               content: m.content || m.message || m.text || m.body || '',
             }
-            return normalized
           })
 
-        console.log('[Message Store] After filtering & mapping - final count:', this.messages.length)
-        const firstMessage = this.messages[0]
-        if (firstMessage) {
-          console.log('[Message Store] First normalized message:', firstMessage)
-          console.log('[Message Store] Message content check:', {
-            id: firstMessage.id,
-            content: firstMessage.content?.slice(0, 50),
-            sender: firstMessage.sender?.name,
-            channel_id: firstMessage.channel_id
+        // ========================================================================
+        // 👇 SMART MERGING LOGIC: Prevents screen jump during polling 👇
+        // ========================================================================
+        if (silent && this.messages.length > 0) {
+          // If silent polling, we append only NEW messages
+          const existingIds = new Set(this.messages.map(m => m.id))
+          const newMessages = mappedIncomingMessages.filter(m => !existingIds.has(m.id))
+          
+          if (newMessages.length > 0) {
+            this.messages = [...this.messages, ...newMessages]
+          }
+
+          // Update reactions and edits on existing messages without replacing the array
+          mappedIncomingMessages.forEach(incoming => {
+            const index = this.messages.findIndex(m => m.id === incoming.id)
+            if (index !== -1) {
+              this.messages[index] = incoming
+            }
           })
+        } else {
+          // Normal load (when you first click a channel)
+          this.messages = mappedIncomingMessages
         }
-
-        console.log('[Message Store] Messages loaded:', this.messages.length, 'messages')
 
         // Mark unread messages as read when opening a channel.
         const unreadIds = this.messages.filter(m => !m.is_read_by_me).map(m => m.id)
-        if (unreadIds.length) {
-          console.log('[Message Store] Marking', unreadIds.length, 'messages as read')
+        if (unreadIds.length && !silent) {
           this.markAsRead(channelId, unreadIds).catch(() => {})
         }
 
-        // Extract pagination info per API documentation
-        // Pagination can be at: data.data.messages (Laravel Paginator) or data.data directly
         const paginationSource = data.data?.messages || data.data
         this.pagination = {
           current_page: paginationSource?.current_page ?? page,
@@ -357,65 +289,42 @@ export const useMessageStore = defineStore('messages', {
           last_page: paginationSource?.last_page ?? 1
         }
 
-        console.log('[Message Store] Pagination info:', this.pagination)
-
         return { success: true }
       } catch (error) {
-        // Check if error is "not a member of this channel"
         const errorMessage = error instanceof Error ? error.message : ''
-        const is403NotMember = errorMessage.includes('You are not a member of this channel') || 
-                                errorMessage.includes('not a member')
+        const is403NotMember = errorMessage.includes('You are not a member of this channel') || errorMessage.includes('not a member')
         const isDirectChannel = errorMessage.includes('Cannot add members to a direct channel')
         const isInactiveDirectChannel = errorMessage.includes('no longer a member of this direct channel')
         
         if (is403NotMember && retryCount === 0 && !isDirectChannel && !isInactiveDirectChannel) {
           try {
             const userStore = useUserStore()
-            if (!userStore.user?.id) {
-              console.error('[Message Store] Cannot auto-add member: No user ID found')
-              return { success: false, error: 'User not authenticated' }
-            }
-
-            console.log('[Message Store] Auto-adding user to channel:', { channelId, userId: userStore.user.id })
+            if (!userStore.user?.id) return { success: false, error: 'User not authenticated' }
             
-            // Automatically add the user to the channel
-            await addChannelMember({
-              channel_id: channelId,
-              user_id: userStore.user.id
-            })
+            await addChannelMember({ channel_id: channelId, user_id: userStore.user.id })
             
-            console.log('[Message Store] User successfully added to channel, retrying message fetch')
-            
-            // Retry fetching messages (with retryCount = 1 to prevent infinite retries)
-            return this.fetchMessages(channelId, page, retryCount + 1)
+            // Pass the silent parameter to the retry as well!
+            return this.fetchMessages(channelId, page, retryCount + 1, silent)
           } catch (memberError) {
             const memberErrorMessage = memberError instanceof Error ? memberError.message : 'Unknown error'
-            
-            // If already a member, try fetching messages anyway
             if (memberErrorMessage.includes('already a member')) {
-              console.log('[Message Store] User already a member, retrying message fetch')
-              return this.fetchMessages(channelId, page, retryCount + 1)
+              return this.fetchMessages(channelId, page, retryCount + 1, silent)
             }
-            
-            console.error('[Message Store] Failed to add user to channel:', { 
-              error: memberErrorMessage, 
-              channelId 
-            })
             return { success: false, error: `Failed to add member to channel: ${memberErrorMessage}` }
           }
         }
         
-        // For direct channels or if already a member, just show the error
         if (isDirectChannel || isInactiveDirectChannel || errorMessage.includes('already a member')) {
-          console.warn('[Message Store] Direct channel or already member, cannot auto-add:', { channelId, errorMessage })
           return { success: false, error: errorMessage }
         }
         
         const message = errorMessage || 'Failed to fetch messages'
-        console.error('[Message Store] Error fetching messages:', { error: message, channelId })
         return { success: false, error: message }
       } finally {
-        this.loading = false
+        // 👇 Only turn off the loader if this is NOT a silent poll 👇
+        if (!silent) {
+          this.loading = false
+        }
       }
     },
 

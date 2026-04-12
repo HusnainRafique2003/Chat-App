@@ -41,7 +41,7 @@ function startPolling(channelId: string) {
     try {
       // Assuming your messageStore has a fetchMessages function.
       // If it takes a 'silent' boolean to prevent loading spinners, pass true!
-      await messageStore.fetchMessages(channelId, true) 
+      await messageStore.fetchMessages(channelId, 1, 0, true)
     } catch (e) {
       console.error('Polling failed to fetch messages', e)
     }
