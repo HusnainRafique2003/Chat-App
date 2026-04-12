@@ -1,13 +1,13 @@
 <script setup lang="ts">
+import { useToast } from '#ui/composables/useToast'
 import { computed, nextTick, ref, watch } from 'vue'
 import type { Message } from '~/composables/useMessagesApi'
 import { useMessageStore } from '~/stores/useMessageStore'
 import { useUserStore } from '~/stores/useUserStore'
-import { useToast } from '#ui/composables/useToast'
-import MessageBubble from './MessageBubble.vue'
-import RichMessageComposer from './RichMessageComposer.vue'
 import EditMessageModal from '../modals/EditMessageModal.vue'
 import MessageDeleteModal from '../modals/MessageDeleteModal.vue'
+import MessageBubble from './MessageBubble.vue'
+import RichMessageComposer from './RichMessageComposer.vue'
 
 interface Props {
  channelId: string
@@ -26,7 +26,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<Emits>()
-
+const toast = useToast()
 const messageStore = useMessageStore()
 const userStore = useUserStore()
 const messagesContainer = ref<HTMLElement>()
@@ -34,7 +34,6 @@ const editingMessage = ref<Message | null>(null)
 const showEditModal = ref(false)
 const deletingMessageId = ref<string | null>(null)
 const showDeleteModal = ref(false)
-const toast = useToast()
 const scrollThreshold = ref(100) // pixels from top to trigger loading more
 const shouldAutoScroll = ref(true) // Flag to control auto-scrolling to bottom
 const previousMessageCount = ref(0) // Track message count to detect new messages
@@ -235,14 +234,49 @@ async function handleReaction(messageId: string, emoji: string) {
   emit('reaction-added', { messageId, emoji })
 }
 
-async function handleMessageSent(data: { content: string; file?: File }) {
-  // Emit the message-sent event to parent component
-  emit('message-sent', data)
-  
-  // Re-enable auto-scroll so the watcher will scroll when the message appears
+async function handleMessageSent(data: { content: string; file?: File; scheduledAt?: Date }) {
+  console.log('[MessageList DEBUG] handleMessageSent:', {
+    channelId: props.channelId,
+    content: data.content.slice(0, 50),
+    hasFile: !!data.file,
+    fileType: data.file?.type,
+    fileName: data.file?.name,
+    scheduled: !!data.scheduledAt
+  })
+
+  if (!props.channelId?.trim()) {
+    toast.add({ title: 'No channel selected', color: 'warning' })
+    return
+  }
+
+  if (!userStore.token) {
+    toast.add({ title: 'Not authenticated - missing token', color: 'error' })
+    return
+  }
+
+  try {
+    const result = await messageStore.createMessage(
+      props.channelId,
+      data.content,
+      data.file,
+      data.scheduledAt
+    )
+
+    if (result.success) {
+      console.log('[MessageList] Message sent OK:', result.message?.id)
+      toast.add({ title: 'Message sent!', color: 'success' })
+    } else {
+      console.error('[MessageList] Send failed:', result.error)
+      toast.add({ title: result.error || 'Failed to send message', color: 'error' })
+    }
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[MessageList] Send error:', errMsg)
+    toast.add({ title: `Send error: ${errMsg}`, color: 'error' })
+  }
+
+  // Re-enable auto-scroll
   shouldAutoScroll.value = true
-  
-  console.log('[MessageList] Message sent, auto-scroll enabled. Watcher will handle scrolling when message is added to store.')
 }
 </script>
 
@@ -280,7 +314,7 @@ async function handleMessageSent(data: { content: string; file?: File }) {
 
       <!-- Messages -->
       <template v-else>
-        <div v-for="message in sortedMessages" :key="message.id" :data-message-id="message.id">
+        <div v-for="(message, index) in sortedMessages" :key="message.id" :data-message-id="message.id">
           <MessageBubble
             :message="message"
             @edit="startEdit(message)"

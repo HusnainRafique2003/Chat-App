@@ -146,7 +146,7 @@ export async function createMessage(data: {
     if (data.file) {
       const formData = new FormData()
       formData.append('channel_id', data.channel_id)
-      formData.append('message', data.message)
+      formData.append('message', data.message.trim())
       formData.append('file', data.file)
       if (data.schedule_time) {
         formData.append('schedule_time', data.schedule_time)
@@ -162,8 +162,8 @@ export async function createMessage(data: {
 
     // Text-only message
     const response = await apiClient.post('/create', {
-      channel_id: data.channel_id,
-      message: data.message,
+channel_id: data.channel_id,
+      message: data.message.trim(),
       schedule_time: data.schedule_time,
     })
 
@@ -277,7 +277,7 @@ export async function updateMessage(data: {
       const formData = new FormData()
       formData.append('channel_id', data.channel_id)
       formData.append('message_id', data.message_id)
-      formData.append('message', data.message)
+      formData.append('message', data.message.trim())
       formData.append('file', data.file)
 
       const response = await apiClient.patch('/update', formData, {
@@ -289,10 +289,10 @@ export async function updateMessage(data: {
     }
 
     // Text-only update
-    const response = await apiClient.patch('/update', {
-      channel_id: data.channel_id,
-      message_id: data.message_id,
-      message: data.message,
+      const response = await apiClient.patch('/update', {
+        channel_id: data.channel_id,
+        message_id: data.message_id,
+        message: data.message.trim(),
     })
 
     console.log('[Messages API] Text message updated successfully')

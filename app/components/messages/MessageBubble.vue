@@ -237,3 +237,72 @@ async function handleDownload() {
     @download="handleDownload"
   />
 </template>
+
+<style scoped>
+.message-content :deep(p) {
+  margin: 0;
+}
+
+.message-content :deep(p + p) {
+  margin-top: 0.65rem;
+}
+
+.message-content :deep(a) {
+  font-weight: 600;
+}
+
+.message-content :deep(strong em),
+.message-content :deep(em strong) {
+  font-style: italic;
+  font-weight: 800;
+  color: #15803d;
+}
+
+.message-content :deep(code) {
+  border: 1px solid color-mix(in srgb, var(--ui-border) 75%, transparent);
+  background: color-mix(in srgb, var(--ui-bg-elevated) 88%, transparent);
+  border-radius: 0.55rem;
+  padding: 0.15rem 0.4rem;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.82em;
+}
+
+.message-content :deep(pre) {
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid color-mix(in srgb, var(--ui-border) 80%, transparent);
+  background: #101827;
+  color: #e5eefc;
+  border-radius: 1rem;
+  margin-top: 0.85rem;
+  padding: 1rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.message-content :deep(pre code) {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  white-space: pre;
+  display: block;
+}
+
+.message-content :deep(pre)::before {
+  content: "Code";
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+</style>

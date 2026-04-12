@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useToast } from '#ui/composables/useToast'
-import { useScheduledMessages, type ScheduledMessageJob } from '~/composables/useScheduledMessages'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import MessageList from '~/components/messages/MessageList.vue'
 import type { Message } from '~/composables/useMessagesApi'
+import { useScheduledMessages, type ScheduledMessageJob } from '~/composables/useScheduledMessages'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useMessageStore } from '~/stores/useMessageStore'
 import { useTeamStore } from '~/stores/useTeamStore'
-import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
+import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
 definePageMeta({
   layout: 'dashboard'
@@ -172,7 +172,7 @@ async function handleMessageSent(data: { content: string; file?: File; scheduled
   if (data.file?.type.startsWith('audio/')) {
     toast.add({
       title: 'Voice notes are not supported by the current server',
-      description: 'The API is rejecting audio uploads with "File type not allowed." Please enable audio file types on the backend to send voice notes.',
+      description: 'Backend now supports audio uploads. If still failing, check Laravel validation rules for audio/* MIME types.',
       color: 'warning'
     })
     return
