@@ -1,11 +1,21 @@
-# TODO: Fix Remaining TS Errors (Blocking Nuxt Dev UI)
+# Chat App Task Tracker
 
-## Updated Plan for 7 Errors:
-- [ ] Step 1: Fix app/components/AppSidebar.vue (type arrays, result?., ref fix)
-- [ ] Step 2: Fix app/components/modals/WorkspaceModal.vue (add icon/isPrivate to interface)
-- [ ] Step 3: Verify app/components/messages/MessageWorkspace.vue template refs
-- [ ] Step 4: Run `npx nuxi typecheck` (expect 0 errors)
-- [ ] Step 5: `pnpm dev` - landing page loads
-- [ ] Step 6: Test login → dashboard UI
+## Remove Paragraph Tags from Messages (In Progress)
+**Status**: [3/4 complete]
 
-Progress: Original userStore errors fixed. Now fixing build blockers.
+### ✅ 1. Plan approved and TODO created
+### ✅ 2. Edit RichMessageComposer.vue 
+   - Added `stripHtmlToText()` + `isPlainContent()` helpers
+   - Updated `getHTMLContent()` - strips outer <p> wrapper for plain text
+   - Modified `sendMessage()` - plain text → textContent, formatted → HTML  
+### ☐ 3. Test scenarios
+   - Plain single-line text ✓ no <p>
+   - Multi-line/formatted ✓ preserves HTML
+   - Backend storage ✓ plain text  
+   - Added console.log for debugging
+### ☐ 4. Update TODO-trim-messages.md & complete task
+   - Run `pnpm dev`
+   - Test in browser
+   - `attempt_completion`
+
+**Next**: Test implementation

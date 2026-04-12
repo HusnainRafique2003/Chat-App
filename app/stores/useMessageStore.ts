@@ -324,7 +324,7 @@ export const useMessageStore = defineStore('messages', {
               reactions_summary: m.reactions_summary || [],
               is_read_by_me: m.is_read_by_me ?? false,
               read_by_count: m.read_by_count ?? 0,
-              content: m.content || m.message || m.text || m.body || '',
+              content: (m.content || m.message || m.text || m.body || '').trim(),
             }
             return normalized
           })
@@ -495,7 +495,7 @@ export const useMessageStore = defineStore('messages', {
               reactions_summary: newMessage.reactions_summary || [],
               is_read_by_me: true,
               read_by_count: newMessage.read_by_count ?? 0,
-              content: newMessage.content || newMessage.message || content,
+              content: (newMessage.content || newMessage.message || content).trim(),
             }
             // Only add message if we're currently viewing this channel
             if (this.currentChannelId === channelId) {
@@ -571,7 +571,20 @@ export const useMessageStore = defineStore('messages', {
           return { success: false, error: errorMessage }
         }
         
-        const message = errorMessage || 'Failed to create message'
+        // Parse Laravel validation errors specifically
+        let message = errorMessage || 'Failed to create message'
+        if (axios.isAxiosError(error) && error.response?.data) {
+          const apiErrors = error.response.data.errors
+          if (apiErrors?.file && Array.isArray(apiErrors.file) && apiErrors.file[0]) {
+            message = `File type not allowed: ${apiErrors.file[0]}. Try JPG/PNG/PDF/ZIP/MP4.`
+            console.error('[Message Store] File upload rejected:', {
+              fileType: file?.type,
+              fileName: file?.name,
+              fileSize: file?.size,
+              serverErrors: apiErrors
+            })
+          }
+        }
         return { success: false, error: message }
       }
     },
@@ -615,7 +628,7 @@ export const useMessageStore = defineStore('messages', {
                 ...updatedMessage,
                 id: updatedMessage.id || updatedMessage._id || messageId,
                 channel_id: channelId,
-                content: updatedMessage.content || updatedMessage.message || content,
+                content: (updatedMessage.content || updatedMessage.message || content).trim(),
               }
               console.log('[Message Store] Message updated successfully')
             }
@@ -951,7 +964,7 @@ export const useMessageStore = defineStore('messages', {
               reactions_summary: m.reactions_summary || [],
               is_read_by_me: m.is_read_by_me ?? false,
               read_by_count: m.read_by_count ?? 0,
-              content: m.content || m.message || m.text || m.body || '',
+              content: (m.content || m.message || m.text || m.body || '').trim(),
             }
           })
 

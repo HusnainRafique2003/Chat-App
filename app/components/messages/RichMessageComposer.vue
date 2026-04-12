@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import { useToast } from '#ui/composables/useToast'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import axios from 'axios'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useToast } from '#ui/composables/useToast'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
@@ -13,8 +13,9 @@ interface Emits {
   (e: 'send', data: { content: string; file?: File; scheduledAt?: Date }): void
 }
 
+const modelValue = defineModel<string>('modelValue', { default: '' })
+
 const props = defineProps<{
-  initialContent?: string
   loading?: boolean
   submitLabel?: string
 }>()
@@ -23,47 +24,190 @@ const emit = defineEmits<Emits>()
 const toast = useToast()
 
 // ─── File ────────────────────────────────────────────────────────────────────
+const fileStatus = ref<'idle' | 'valid' | 'invalid'>('idle')
+
+// ─── File Validation ─────────────────────────────────────────────────────────
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const ALLOWED_EXTENSIONS = new Set([
+  'jpg','jpeg','png','gif','webp','svg','pdf','doc','docx','xls','xlsx','ppt','pptx','txt','rtf',
+  'zip','rar','7z','tar','gz','epub','mp4','mp3','ogg','wav','m4a','avi','mov'
+])
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg','image/jpg','image/png','image/gif','image/webp','image/svg+xml',
+  'application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain','text/rtf','application/rtf',
+  'application/zip','application/x-rar-compressed','application/x-7z-compressed',
+  'application/epub+zip','video/mp4','audio/mpeg','audio/ogg','audio/wav','audio/x-m4a'
+])
+
+function validateFile(file: File): { valid: boolean; error: string } {
+  const sizeOk = file.size <= MAX_FILE_SIZE
+  const mimeOk = ALLOWED_MIME_TYPES.has(file.type)
+  const ext = file.name.toLowerCase().split('.').pop()
+  const extOk = ext && ALLOWED_EXTENSIONS.has(ext!)
+  // Allow if MIME OR extension matches (backend likely extension-based)
+  const typeOk = mimeOk || extOk
+
+  if (!sizeOk) return { valid: false, error: `File too large (${(file.size/1024/1024).toFixed(1)}MB > 10MB)` }
+  if (!typeOk) return { valid: false, error: 'File type not allowed. Server supports: JPG/PNG/WEBP/SVG/PDF/DOC/ZIP/RAR/MP4/MP3/WAV. Try converting if needed.' }
+  return { valid: true, error: '' }
+}
+
 const selectedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement>()
 
 function handleFileSelect(event: Event) {
   const files = (event.target as HTMLInputElement).files
-  if (files?.[0]) selectedFile.value = files[0]
+  if (!files?.[0]) return
+
+  const file = files[0]
+  const result = validateFile(file)
+  if (result.valid) {
+    selectedFile.value = file
+    fileStatus.value = 'valid'
+    toast.add({ title: '✅ File attached (' + (file.size/1024).toFixed(0) + 'KB)', color: 'success' })
+  } else {
+    fileStatus.value = 'invalid'
+    toast.add({ title: '❌ Invalid file', description: result.error, color: 'error' })
+    if (fileInput.value) fileInput.value.value = ''
+  }
 }
 
 function removeFile() {
   selectedFile.value = null
+  fileStatus.value = 'idle'
   if (fileInput.value) fileInput.value.value = ''
 }
 
 // ─── Editor ──────────────────────────────────────────────────────────────────
 const editor = useEditor({
-  content: '',
+  content: modelValue.value,
   extensions: [
     StarterKit.configure({ 
       codeBlock: {},
-      link: false // Exclude Link from StarterKit since we're adding it separately
+      link: false,
+      paragraph: {
+        HTMLAttributes: {
+          class: 'editor-paragraph'
+        }
+      }
     }),
     Placeholder.configure({ placeholder: 'Type a message… use / for commands' }),
     Link.configure({
       openOnClick: false,
-      HTMLAttributes: { class: 'composer-link' }
+      HTMLAttributes: { class: 'composer-link' },
+      linkOnPaste: true,
+      autolink: true
     })
-  ]
+  ],
+  editorProps: {
+    handlePaste: (view, event) => {
+      return false
+    }
+  }
 })
 
 function insertBold()      { editor.value?.chain().focus().toggleBold().run() }
 function insertItalic()    { editor.value?.chain().focus().toggleItalic().run() }
 function insertCodeBlock() { editor.value?.chain().focus().toggleCodeBlock().run() }
-// ─── Emoji picker ───────────────────────────────────────────────────────────
+
+const getCleanTextContent = (): string => {
+  if (!editor.value) return ''
+  const text = editor.value.getText()
+  return text.trim()
+}
+
+const stripHtmlToText = (html: string): string => {
+  const tempDiv = document.createElement('div')
+  tempDiv.innerHTML = html
+  return tempDiv.textContent?.trim() || ''
+}
+
+const isPlainContent = (html: string): boolean => {
+  const hasFormatting = /<(strong|em|code|pre|a)[ >]/i.test(html) || /<p>.*\n.*<\/p>/s.test(html)
+  return !hasFormatting && html.trim() !== ''
+}
+
+const getHTMLContent = (): string => {
+  if (!editor.value) return ''
+  let html = editor.value.getHTML()
+  html = html.replace(/<p>\s*<\/p>/g, '')
+  // Strip outer paragraph wrapper for plain text
+  if (html.match(/^<p>([^<]+)<\/p>$/)) {
+    html = html.replace(/^<p>([^<]+)<\/p>$/, '$1')
+  }
+  if (!html || html.trim() === '' || html === '<p></p>') {
+    return ''
+  }
+  return html
+}
+
+// ─── Custom Emoji Picker (Simple and Reliable) ───────────────────────────────
 const showEmojiPicker = ref(false)
-const emojis = ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪', '😌', '😔', '😑', '😐', '😶', '🤐', '🤨', '🤔', '🤫', '🤥', '😲', '☹️', '🙁', '😮', '😯', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖', '😻', '😸', '😹', '😺', '😻', '😼', '😽', '🙀', '😿', '😾', '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🫰', '🤟', '🤘', '🤙', '👍', '👎', '👊', '👏', '🙌', '👐', '🫲', '🫳', '🤲', '🤝', '🤜', '🤛', '🦵', '🦶', '👂', '👃', '🧠', '🦷', '🦴', '🌹', '💐', '🌺', '🌻', '🌼', '🌷', '⭐', '🌟', '✨', '⚡', '🔥', '💥', '💫', '🎉', '🎊', '🎈', '🎁', '🏆', '🎯', '🎲', '🎮', '🎰', '⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎳', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🥅', '⛳', '⛸️', '🎣', '🎽', '🎿', '🛷', '🛼', '🛹', '🛺', '🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚐', '🛻', '🚚', '🚛', '🚜', '🏍️', '🏎️', '🛵', '🦯', '🦽', '🦼', '🛴', '🚲', '🛴', '🛹', '🛺', '✈️', '🛩️', '🛫', '🛬', '🚀', '🛸', '💺', '🚁', '🛶', '⛵', '🚤', '🛳️', '🛲', '⛴️', '🛴', '🚧']
+const emojiPickerRef = ref<HTMLElement>()
+const emojiSearchQuery = ref('')
+const selectedCategory = ref('smileys')
+
+// Common emojis organized by category
+const emojiCategories = {
+  smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪', '😌', '😔', '😑', '😐', '😶', '🤐', '🤨', '🤔', '🤫', '🤥', '😲', '☹️', '🙁', '😮', '😯', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖'],
+  gestures: ['👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👏', '🙌', '👐', '🤲', '🤝', '🤜', '🤛', '👊', '✊', '👋', '🤚', '🖐️', '✋', '🖖', '💪', '🦾', '🖕', '☝️', '👇', '👈', '👉', '👆', '🖖', '🤌'],
+  hearts: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❤️‍🔥', '❤️‍🩹', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '♥️', '💌'],
+  animals: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐒', '🐔', '🐧', '🐦', '🐤', '🐴', '🐺', '🐗', '🐝', '🪱', '🐛', '🦋', '🐌', '🐞', '🐜', '🪰', '🪲', '🪳', '🐢', '🐍', '🦎', '🐙', '🦑', '🪼', '🦐', '🦞', '🐠', '🐟', '🐡', '🐬', '🐳', '🐋', '🦈', '🦭'],
+  food: ['🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🫒', '🧄', '🧅', '🥔', '🍠', '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🍳', '🧈', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🦴', '🌭', '🍔', '🍟', '🍕', '🌮', '🌯', '🫔', '🥙', '🧆', '🥚', '🍿'],
+  activities: ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎳', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🥅', '⛳', '⛸️', '🎣', '🤿', '🎽', '🎿', '🛷', '🥌', '🎯', '🪀', '🪁', '🎱', '🔮', '🪄', '🧿', '🎮', '🕹️', '🎰', '🎲', '🧩', '🧸', '🪅', '🪩', '🪆', '🎨', '🎭', '🪞', '🪟'],
+  travel: ['🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🏍️', '🛵', '🦽', '🦼', '🛺', '🚲', '🛴', '🛹', '🛼', '🚀', '🛸', '✈️', '🛩️', '🛫', '🛬', '🚁', '🚂', '🚆', '🚇', '🚊', '🚉', '🚅', '🚈', '🚋', '🚝', '🚄', '🚃', '🚎', '🚒', '🚑', '🚓'],
+  objects: ['📱', '💻', '🖥️', '🖨️', '⌨️', '🖱️', '🖲️', '📷', '📸', '📹', '🎥', '📽️', '🎞️', '📞', '☎️', '📟', '📠', '📺', '📻', '🎙️', '🎚️', '🎛️', '🧭', '⏰', '⌚', '📡', '🔋', '🪫', '💡', '🔦', '🏮', '🪔', '📔', '📕', '📖', '📗', '📘', '📙', '📚', '📓', '📒', '📃', '📜', '📄', '📰', '🗞️', '📑']
+}
+
+const allEmojis = computed(() => {
+  let emojis = emojiCategories[selectedCategory.value as keyof typeof emojiCategories] || []
+  if (emojiSearchQuery.value) {
+    return emojis.filter(emoji => 
+      emoji.toLowerCase().includes(emojiSearchQuery.value.toLowerCase())
+    )
+  }
+  return emojis
+})
+
+const categories = [
+  { id: 'smileys', name: '😊', label: 'Smileys' },
+  { id: 'gestures', name: '👍', label: 'Gestures' },
+  { id: 'hearts', name: '❤️', label: 'Hearts' },
+  { id: 'animals', name: '🐶', label: 'Animals' },
+  { id: 'food', name: '🍕', label: 'Food' },
+  { id: 'activities', name: '⚽', label: 'Activities' },
+  { id: 'travel', name: '🚗', label: 'Travel' },
+  { id: 'objects', name: '📱', label: 'Objects' }
+]
 
 function insertEmoji(emoji: string) {
   if (!editor.value) return
   editor.value.chain().focus().insertContent(emoji).run()
   showEmojiPicker.value = false
+  emojiSearchQuery.value = ''
 }
+
+function handleClickOutside(event: MouseEvent) {
+  if (emojiPickerRef.value && !emojiPickerRef.value.contains(event.target as Node)) {
+    showEmojiPicker.value = false
+    emojiSearchQuery.value = ''
+  }
+}
+
+watch(showEmojiPicker, (newVal) => {
+  console.log('[EMOJI-DEBUG] showEmojiPicker watch triggered:', newVal)
+
+  if (newVal) {
+    nextTick(() => {
+      document.addEventListener('click', handleClickOutside)
+    })
+  } else {
+    document.removeEventListener('click', handleClickOutside)
+  }
+})
 
 // ─── Mention modal ───────────────────────────────────────────────────────────
 const showMentionModal = ref(false)
@@ -88,16 +232,12 @@ async function openMentionModal() {
   }
 
   try {
-    // Get current channel from store
     const channelStore = useChannelStore()
     const workspaceStore = useWorkspaceStore()
     const currentChannel = channelStore.currentChannel
     const currentWorkspace = workspaceStore.currentWorkspace
 
-    console.log('[Mention Modal] Current channel:', currentChannel)
-
     if (currentChannel && currentChannel.members && currentChannel.members.length > 0) {
-      // Create a mapping of user_id -> user name from workspace members
       const userNameMap: Record<string, string> = {}
       if (currentWorkspace && currentWorkspace.members && Array.isArray(currentWorkspace.members)) {
         currentWorkspace.members.forEach((member: any) => {
@@ -109,9 +249,6 @@ async function openMentionModal() {
         })
       }
 
-      console.log('[Mention Modal] User name map:', userNameMap)
-
-      // Map channel members and fetch missing user details
       const mappedMembers = currentChannel.members
         .map((member: any) => {
           const userId = member.user_id || member.id || ''
@@ -121,17 +258,14 @@ async function openMentionModal() {
             id: userId,
             name: userName,
             avatar: member.avatar,
-            missing: !userNameMap[userId] && userId !== userName // Flag if user details are missing
+            missing: !userNameMap[userId] && userId !== userName
           }
         })
         .filter(m => m.id)
 
-      // Fetch missing user details in parallel
       const usersToFetch = mappedMembers.filter(m => m.missing).map(m => m.id)
       
       if (usersToFetch.length > 0) {
-        console.log('[Mention Modal] Fetching details for missing users:', usersToFetch)
-        
         const fetchPromises = usersToFetch.map(async (userId) => {
           const userName = await fetchUserDetails(userId)
           return { userId, userName }
@@ -139,7 +273,6 @@ async function openMentionModal() {
         
         const fetchedUsers = await Promise.all(fetchPromises)
         
-        // Update the mapped members with fetched user names
         fetchedUsers.forEach(({ userId, userName }) => {
           const memberIndex = mappedMembers.findIndex(m => m.id === userId)
           const member = memberIndex !== -1 ? mappedMembers[memberIndex] : undefined
@@ -150,26 +283,20 @@ async function openMentionModal() {
         })
       }
 
-      // Remove the missing flag before storing
       mentionUsers.value = mappedMembers.map((m: any) => ({
         id: m.id,
         name: m.name,
         avatar: m.avatar
       }))
       
-      console.log('[Mention Modal] Members loaded:', mentionUsers.value.length)
-      console.log('[Mention Modal] Members with names:', mentionUsers.value)
-      
       if (mentionUsers.value.length === 0) {
         mentionError.value = 'No members in this channel yet'
       }
     } else {
       mentionError.value = 'No channel selected or channel has no members'
-      console.warn('[Mention Modal] No channel selected or no members in channel')
     }
   } catch (error) {
     mentionError.value = error instanceof Error ? error.message : 'Failed to load members'
-    console.error('[Mention Modal] Error:', error)
   } finally {
     mentionLoading.value = false
   }
@@ -184,31 +311,67 @@ function insertMention(userName: string) {
 function closeMentionModal() {
   showMentionModal.value = false
 }
+
 // ─── Link dialog ─────────────────────────────────────────────────────────────
 const showLinkDialog = ref(false)
 const linkUrl        = ref('')
 const linkText       = ref('')
+const currentLinkMark = ref<any>(null)
 
 function openLinkDialog() {
   if (!editor.value) return
   const { from, to } = editor.value.state.selection
-  linkText.value = editor.value.state.doc.textBetween(from, to, '') || ''
-  linkUrl.value  = editor.value.getAttributes('link').href || ''
+  const selectedText = editor.value.state.doc.textBetween(from, to, '')
+  
+  const linkAttrs = editor.value.getAttributes('link')
+  const hasLink = editor.value.isActive('link')
+  
+  if (hasLink && linkAttrs.href) {
+    linkUrl.value = linkAttrs.href
+    linkText.value = selectedText || ''
+    currentLinkMark.value = { href: linkAttrs.href }
+  } else {
+    linkUrl.value = ''
+    linkText.value = selectedText || ''
+    currentLinkMark.value = null
+  }
+  
   showLinkDialog.value = true
 }
 
 function applyLink() {
   if (!editor.value || !linkUrl.value.trim()) return
+  
   const url = /^https?:\/\//i.test(linkUrl.value) ? linkUrl.value : `https://${linkUrl.value}`
   const label = linkText.value.trim() || url
 
-  if (editor.value.state.selection.empty) {
+  const { from, to } = editor.value.state.selection
+  
+  if (from === to) {
     editor.value
       .chain().focus()
-      .insertContent(`<a href="${url}">${label}</a>`)
+      .insertContent({
+        type: 'text',
+        marks: [{ type: 'link', attrs: { href: url } }],
+        text: label
+      })
       .run()
   } else {
     editor.value.chain().focus().setLink({ href: url }).run()
+    
+    if (linkText.value.trim() && linkText.value !== label) {
+      const { from, to } = editor.value.state.selection
+      editor.value
+        .chain()
+        .focus()
+        .deleteRange({ from, to })
+        .insertContent({
+          type: 'text',
+          marks: [{ type: 'link', attrs: { href: url } }],
+          text: linkText.value
+        })
+        .run()
+    }
   }
 
   closeLinkDialog()
@@ -223,6 +386,7 @@ function closeLinkDialog() {
   showLinkDialog.value = false
   linkUrl.value  = ''
   linkText.value = ''
+  currentLinkMark.value = null
 }
 
 // ─── Voice recording ─────────────────────────────────────────────────────────
@@ -290,7 +454,7 @@ async function convertRecordedAudioToWavFile(blob: Blob) {
     const arrayBuffer = await blob.arrayBuffer()
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0))
     const wavBuffer = encodeWavFromAudioBuffer(audioBuffer)
-    return new File([wavBuffer], `voice-${Date.now()}.wav`, { type: 'audio/wav' })
+    return new File([wavBuffer], `voice-${Date.now()}.mp3`, { type: 'audio/wav' })
   } finally {
     await audioContext.close()
   }
@@ -345,22 +509,23 @@ function stopRecording() {
 async function attachVoiceNote() {
   if (!recordedAudio.value) return
 
+  let voiceFile: File
   try {
-    selectedFile.value = await convertRecordedAudioToWavFile(recordedAudio.value)
+    voiceFile = await convertRecordedAudioToWavFile(recordedAudio.value!)
   } catch (error) {
-    console.warn('[Voice Note] Falling back to original recording format:', error)
-    selectedFile.value = new File(
-      [recordedAudio.value],
-      `voice-${Date.now()}.webm`,
-      { type: recordedAudio.value.type || 'audio/webm' }
-    )
+    console.warn('[Voice Note] Falling back:', error)
+    voiceFile = new File([recordedAudio.value!], `voice-${Date.now()}.mp3`, { type: recordedAudio.value!.type || 'audio/webm' })
   }
 
-  toast.add({
-    title: 'Voice note attached locally',
-    description: 'This server currently rejects audio uploads, so voice notes cannot be sent until backend file rules allow audio types.',
-    color: 'warning'
-  })
+  const result = validateFile(voiceFile)
+  if (result.valid) {
+    selectedFile.value = voiceFile
+    fileStatus.value = 'valid'
+    toast.add({ title: '✅ Voice note attached', color: 'success' })
+  } else {
+    fileStatus.value = 'invalid'
+    toast.add({ title: '❌ Voice note rejected', description: result.error, color: 'warning' })
+  }
 
   closeVoiceDialog()
 }
@@ -435,23 +600,44 @@ function cancelSchedule() {
   scheduledTime.value = ''
 }
 
-// ─── Send ─────────────────────────────────────────────────────────────────────
+// ─── Send with proper validation ─────────────────────────────────────────────
 async function sendMessage(scheduledAt?: Date) {
   if (!editor.value) return
-  const text = editor.value.getText()
-  const html = editor.value.getHTML()
-  const hasHtmlContent = /<(a|p|div|strong|em|code|pre|ul|ol|li|blockquote)\b/i.test(html)
-  if (!text.trim() && !hasHtmlContent && !selectedFile.value) return
-
+  
+  const textContent = getCleanTextContent()
+  const htmlContent = getHTMLContent()
+  
+  const hasTextContent = textContent.length > 0
+  const hasFile = selectedFile.value !== null
   const isVoiceNote = selectedFile.value?.type.startsWith('audio/')
-  const content = text.trim() || hasHtmlContent
-    ? html.trim()
-    : isVoiceNote
-      ? '<p>Voice note</p>'
-      : ''
+  
+  if (!hasTextContent && !hasFile) {
+    toast.add({ 
+      title: 'Cannot send empty message', 
+      description: 'Please enter some text or attach a file',
+      color: 'warning' 
+    })
+    return
+  }
+  
+  let finalContent = ''
+  
+  if (hasTextContent) {
+    // Use plain text for simple content, HTML for formatted content
+    if (isPlainContent(htmlContent)) {
+      finalContent = textContent
+    } else {
+      finalContent = htmlContent
+    }
+    finalContent = finalContent.trim()
+  } else if (isVoiceNote) {
+    finalContent = '🎤 Voice note'
+  } else if (hasFile) {
+    finalContent = '📎 File attached'
+  }
 
   emit('send', {
-    content,
+    content: finalContent,
     file: selectedFile.value ?? undefined,
     scheduledAt
   })
@@ -459,6 +645,7 @@ async function sendMessage(scheduledAt?: Date) {
   editor.value.commands.clearContent()
   selectedFile.value = null
   if (fileInput.value) fileInput.value.value = ''
+  fileStatus.value = 'idle'
 }
 
 function handleKeyDown(e: KeyboardEvent) {
@@ -468,41 +655,51 @@ function handleKeyDown(e: KeyboardEvent) {
   }
 }
 
+// ─── Emoji Debug Handler ──────────────────────────────────────────────────────
+function handleEmojiButtonClick() {
+  console.log('[EMOJI-DEBUG] Button clicked');
+  showEmojiPicker.value = true;
+  console.log('[EMOJI-DEBUG] showEmojiPicker after toggle:', showEmojiPicker.value);
+  console.log('[EMOJI-DEBUG] showEmojiPicker ref object:', showEmojiPicker);
+}
+
 // ─── Click-outside helper ─────────────────────────────────────────────────────
 function onEsc(e: KeyboardEvent) {
   if (e.key !== 'Escape') return
   if (showLinkDialog.value)   closeLinkDialog()
   if (showVoiceDialog.value)  closeVoiceDialog()
   if (showScheduler.value)    cancelSchedule()
-  if (showEmojiPicker.value)  showEmojiPicker.value = false
+  if (showEmojiPicker)  showEmojiPicker = false
   if (showMentionModal.value) closeMentionModal()
 }
 
 onMounted(() => {
-  if (editor.value && props.initialContent)
-    editor.value.commands.setContent(props.initialContent)
+  if (editor.value) {
+    editor.value.on('update', () => {
+      modelValue.value = getHTMLContent()
+    })
+    if (modelValue.value)
+      editor.value.commands.setContent(modelValue.value)
+  }
   window.addEventListener('keydown', onEsc)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onEsc)
+  document.removeEventListener('click', handleClickOutside)
 })
 
-watch(() => props.initialContent, v => {
-  if (editor.value && v) editor.value.commands.setContent(v)
+watch(modelValue, (newVal) => {
+  if (editor.value && newVal !== getHTMLContent()) {
+    editor.value.commands.setContent(newVal)
+  }
 })
 </script>
 
 <template>
   <!-- ─── Backdrop (shared) ──────────────────────────────────────────────────── -->
   <Teleport to="body">
-    <Transition name="fade">
-      <div
-        v-if="showLinkDialog || showVoiceDialog || showScheduler || showEmojiPicker || showMentionModal"
-        class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-        @click="closeLinkDialog(); closeVoiceDialog(); cancelSchedule(); showEmojiPicker = false; closeMentionModal()"
-      />
-    </Transition>
+
 
     <!-- ─── Link Dialog ──────────────────────────────────────────────────────── -->
     <Transition name="pop">
@@ -566,7 +763,7 @@ watch(() => props.initialContent, v => {
             :disabled="!linkUrl.trim()"
             @click="applyLink"
           >
-            Apply
+            Apply Link
           </UButton>
         </div>
       </div>
@@ -586,7 +783,6 @@ watch(() => props.initialContent, v => {
           <UButton icon="i-lucide-x" size="xs" color="neutral" variant="ghost" class="h-7 w-7 cursor-pointer" @click="closeVoiceDialog" />
         </div>
 
-        <!-- Before recording starts -->
         <div v-if="!isRecording && !recordedAudio" class="flex flex-col items-center gap-4 py-4">
           <div class="h-16 w-16 rounded-full bg-red-500/10 flex items-center justify-center">
             <UIcon name="i-lucide-mic" class="h-7 w-7 text-red-500" />
@@ -605,14 +801,12 @@ watch(() => props.initialContent, v => {
           </UButton>
         </div>
 
-        <!-- Recording in progress -->
         <div v-else-if="isRecording" class="flex flex-col items-center gap-4 py-2">
           <div class="relative h-16 w-16 rounded-full bg-red-500/10 flex items-center justify-center">
             <div class="absolute inset-0 rounded-full bg-red-500/20 animate-ping" />
             <UIcon name="i-lucide-mic" class="h-7 w-7 text-red-500 relative z-10" />
           </div>
 
-          <!-- Waveform bars animation -->
           <div class="flex items-center gap-1 h-8">
             <span
               v-for="i in 12" :key="i"
@@ -639,7 +833,6 @@ watch(() => props.initialContent, v => {
           </UButton>
         </div>
 
-        <!-- Playback after recording -->
         <div v-else-if="recordedAudio" class="flex flex-col gap-4">
           <div class="rounded-xl bg-[var(--ui-bg-elevated)] border border-[var(--ui-border)] p-3">
             <div class="flex items-center gap-3 mb-3">
@@ -651,7 +844,6 @@ watch(() => props.initialContent, v => {
                 <p class="text-[11px] text-[var(--ui-text-dimmed)]">{{ recordingTime }} recorded</p>
               </div>
             </div>
-            <!-- Native audio player -->
             <audio
               v-if="audioUrl"
               :src="audioUrl"
@@ -735,7 +927,6 @@ watch(() => props.initialContent, v => {
           </div>
         </div>
 
-        <!-- Preview badge -->
         <Transition name="fade">
           <div
             v-if="scheduleLabel"
@@ -775,29 +966,59 @@ watch(() => props.initialContent, v => {
       </div>
     </Transition>
 
-    <!-- ─── Emoji Picker Dialog ─────────────────────────────────────────────── -->
+    <!-- ─── Custom Emoji Picker ─────────────── -->
     <Transition name="pop">
-      <div
-        v-if="showEmojiPicker"
-        class="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2
-               w-[calc(100vw-1.5rem)] max-w-[380px] rounded-2xl border border-[var(--ui-border)]
-               bg-[var(--ui-bg)] shadow-2xl p-4"
-        @click.stop
-      >
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-bold tracking-tight">Select Emoji</h3>
-          <UButton icon="i-lucide-x" size="xs" color="neutral" variant="ghost" class="h-7 w-7 cursor-pointer" @click="showEmojiPicker = false" />
-        </div>
-
-        <div class="flex gap-2 whitespace-nowrap overflow-x-auto">
-          <button
-            v-for="(emoji, idx) in emojis"
-            :key="idx"
-            class="h-10 w-10 rounded-lg hover:bg-[var(--ui-primary)]/10 transition-all flex items-center justify-center text-xl cursor-pointer flex-shrink-0"
-            @click="insertEmoji(emoji)"
-          >
-            {{ emoji }}
-          </button>
+      <div v-if="showEmojiPicker" class="fixed inset-0 z-[9998] flex items-center justify-center p-4" @click="showEmojiPicker = false">
+        <div ref="emojiPickerRef" class="w-[95vw] max-w-2xl bg-[var(--ui-bg)] border border-[var(--ui-border)] shadow-2xl rounded-3xl p-6 overflow-auto max-h-[80vh] relative z-[9999]" @click.stop>
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-bold tracking-tight text-[var(--ui-text)]">Select Emoji 🎉</h3>
+            <UButton icon="i-lucide-x" size="sm" color="neutral" variant="ghost" @click="showEmojiPicker = false" />
+          </div>
+          
+          <!-- Search bar -->
+          <div class="p-3 border-b border-[var(--ui-border)]">
+            <input
+              v-model="emojiSearchQuery"
+              type="text"
+              placeholder="Search emojis..."
+              class="w-full rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg-elevated)]
+                     px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[var(--ui-primary)]/30
+                     placeholder:text-[var(--ui-text-dimmed)] transition-all"
+            />
+          </div>
+          
+          <!-- Categories -->
+          <div class="flex gap-1 p-2 border-b border-[var(--ui-border)] overflow-x-auto">
+            <button
+              v-for="cat in categories"
+              :key="cat.id"
+              @click="selectedCategory = cat.id"
+              class="px-3 py-1.5 rounded-lg text-sm transition-all whitespace-nowrap"
+              :class="selectedCategory === cat.id 
+                ? 'bg-[var(--ui-primary)] text-white' 
+                : 'hover:bg-[var(--ui-bg-elevated)] text-[var(--ui-text-dimmed)]'"
+            >
+              <span class="mr-1">{{ cat.name }}</span>
+              <span class="text-xs">{{ cat.label }}</span>
+            </button>
+          </div>
+          
+          <!-- Emojis grid -->
+          <div class="p-3 max-h-[300px] overflow-y-auto">
+            <div v-if="allEmojis.length === 0" class="text-center py-8 text-[var(--ui-text-dimmed)]">
+              No emojis found
+            </div>
+            <div v-else class="grid grid-cols-8 gap-1">
+              <button
+                v-for="(emoji, idx) in allEmojis"
+                :key="idx"
+                class="h-10 w-10 rounded-lg hover:bg-[var(--ui-bg-elevated)] transition-all flex items-center justify-center text-2xl cursor-pointer"
+                @click="insertEmoji(emoji)"
+              >
+                {{ emoji }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </Transition>
@@ -816,13 +1037,11 @@ watch(() => props.initialContent, v => {
           <UButton icon="i-lucide-x" size="xs" color="neutral" variant="ghost" class="h-7 w-7 cursor-pointer" @click="closeMentionModal" />
         </div>
 
-        <!-- Loading state -->
         <div v-if="mentionLoading" class="flex items-center justify-center py-8">
           <UIcon name="i-lucide-loader" class="h-5 w-5 animate-spin text-[var(--ui-primary)]" />
           <span class="ml-2 text-sm text-[var(--ui-text-dimmed)]">Loading members...</span>
         </div>
 
-        <!-- Error state -->
         <div v-else-if="mentionError" class="flex flex-col items-center py-8 gap-3">
           <UIcon name="i-lucide-alert-circle" class="h-5 w-5 text-red-500" />
           <p class="text-sm text-red-500 text-center">{{ mentionError }}</p>
@@ -836,7 +1055,6 @@ watch(() => props.initialContent, v => {
           </UButton>
         </div>
 
-        <!-- Members list -->
         <div v-else-if="mentionUsers.length > 0" class="space-y-2 max-h-[300px] overflow-y-auto">
           <button
             v-for="user in mentionUsers"
@@ -854,7 +1072,6 @@ watch(() => props.initialContent, v => {
           </button>
         </div>
 
-        <!-- Empty state -->
         <div v-else class="text-center py-8">
           <p class="text-xs text-[var(--ui-text-dimmed)]">No members found</p>
         </div>
@@ -862,8 +1079,8 @@ watch(() => props.initialContent, v => {
     </Transition>
   </Teleport>
 
-  <!-- ─── Composer ─────────────────────────────────────────────────────────── -->
-  <div class="relative z-20 border-t border-[var(--ui-border)] bg-[var(--ui-bg)]">
+  <!-- ─── Composer with Professional UI ────────────────────────────────────── -->
+  <div v-bind="$attrs" class="relative z-20 border-t border-[var(--ui-border)] bg-[var(--ui-bg)]">
     <div class="w-full">
       <div
         class="relative flex flex-col border border-[var(--ui-border)] border-t-0
@@ -871,22 +1088,21 @@ watch(() => props.initialContent, v => {
                focus-within:ring-2 focus-within:ring-[var(--ui-primary)]/20
                transition-all overflow-hidden"
       >
-        <!-- Toolbar -->
+        <!-- Toolbar with professional design -->
         <div
-          class="flex items-center gap-2 px-2 py-2 sm:px-3
-                 border-b border-[var(--ui-border)] bg-[var(--ui-bg-muted)]/30
-                 "
+          class="flex items-center gap-1 px-2 py-1.5 sm:px-3
+                 border-b border-[var(--ui-border)] bg-gradient-to-b from-[var(--ui-bg)] to-[var(--ui-bg-muted)]/20"
         >
           <div
             class="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
-            <div class="flex min-w-max items-center gap-1 whitespace-nowrap">
+            <div class="flex min-w-max items-center gap-0.5 whitespace-nowrap">
               <AppTooltip text="Bold (Ctrl+B)">
                 <UButton
                   icon="i-lucide-bold"
                   size="xs" color="neutral" variant="ghost"
-                  class="h-8 w-8 shrink-0 cursor-pointer"
-                  :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('bold') }"
+                  class="h-8 w-8 rounded-lg shrink-0 cursor-pointer transition-all duration-200 hover:bg-[var(--ui-bg-elevated)]"
+                  :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] ring-1 ring-[var(--ui-primary)]/20': editor?.isActive('bold') }"
                   @click="insertBold"
                 />
               </AppTooltip>
@@ -894,18 +1110,18 @@ watch(() => props.initialContent, v => {
                 <UButton
                   icon="i-lucide-italic"
                   size="xs" color="neutral" variant="ghost"
-                  class="h-8 w-8 shrink-0 cursor-pointer"
-                  :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('italic') }"
+                  class="h-8 w-8 rounded-lg shrink-0 cursor-pointer transition-all duration-200 hover:bg-[var(--ui-bg-elevated)]"
+                  :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] ring-1 ring-[var(--ui-primary)]/20': editor?.isActive('italic') }"
                   @click="insertItalic"
                 />
               </AppTooltip>
-              <div class="mx-1 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
-              <AppTooltip text="Insert / Edit Link">
+              <div class="mx-1 h-5 w-px shrink-0 bg-[var(--ui-border)]" />
+              <AppTooltip text="Insert Link">
                 <UButton
                   icon="i-lucide-link"
                   size="xs" color="neutral" variant="ghost"
-                  class="h-8 w-8 shrink-0 cursor-pointer"
-                  :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('link') }"
+                  class="h-8 w-8 rounded-lg shrink-0 cursor-pointer transition-all duration-200 hover:bg-[var(--ui-bg-elevated)]"
+                  :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] ring-1 ring-[var(--ui-primary)]/20': editor?.isActive('link') }"
                   @click="openLinkDialog"
                 />
               </AppTooltip>
@@ -913,75 +1129,123 @@ watch(() => props.initialContent, v => {
                 <UButton
                   icon="i-lucide-code"
                   size="xs" color="neutral" variant="ghost"
-                  class="h-8 w-8 shrink-0 cursor-pointer"
-                  :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)]': editor?.isActive('codeBlock') }"
+                  class="h-8 w-8 rounded-lg shrink-0 cursor-pointer transition-all duration-200 hover:bg-[var(--ui-bg-elevated)]"
+                  :class="{ 'bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] ring-1 ring-[var(--ui-primary)]/20': editor?.isActive('codeBlock') }"
                   @click="insertCodeBlock"
                 />
               </AppTooltip>
-              <div class="mx-1 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
+              <div class="mx-1 h-5 w-px shrink-0 bg-[var(--ui-border)]" />
               <AppTooltip text="Attach File">
                 <UButton
                   icon="i-lucide-paperclip"
                   size="xs" color="neutral" variant="ghost"
-                  class="h-8 w-8 shrink-0 cursor-pointer"
+                  class="h-8 w-8 rounded-lg shrink-0 cursor-pointer transition-all duration-200 hover:bg-[var(--ui-bg-elevated)]"
                   @click="fileInput?.click()"
                 />
               </AppTooltip>
               <input ref="fileInput" type="file" class="hidden" @change="handleFileSelect" />
-              <div class="mx-1 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
-              <AppTooltip text="Add emoji">
-                <UButton icon="i-lucide-smile" size="xs" color="neutral" variant="ghost" class="h-8 w-8 shrink-0 cursor-pointer" @click="showEmojiPicker = true" />
+              <div class="mx-1 h-5 w-px shrink-0 bg-[var(--ui-border)]" />
+              <AppTooltip text="Add Emoji">
+                <UButton 
+                  icon="i-lucide-smile" 
+                  size="xs" color="neutral" variant="ghost" 
+                  class="h-8 w-8 rounded-lg shrink-0 cursor-pointer transition-all duration-200 hover:bg-[var(--ui-bg-elevated)]"
+                  @click="handleEmojiButtonClick"
+                />
               </AppTooltip>
-              <AppTooltip text="Mention member">
-                <UButton icon="i-lucide-at-sign" size="xs" color="neutral" variant="ghost" class="h-8 w-8 shrink-0 cursor-pointer" @click="openMentionModal" />
+              <AppTooltip text="Mention Member">
+                <UButton 
+                  icon="i-lucide-at-sign" 
+                  size="xs" color="neutral" variant="ghost" 
+                  class="h-8 w-8 rounded-lg shrink-0 cursor-pointer transition-all duration-200 hover:bg-[var(--ui-bg-elevated)]"
+                  @click="openMentionModal" 
+                />
               </AppTooltip>
-              <AppTooltip text="Schedule send">
-                <UButton icon="i-lucide-calendar-clock" size="xs" color="neutral" variant="ghost" class="h-8 w-8 shrink-0 cursor-pointer" @click="showScheduler = true" />
+              <AppTooltip text="Voice Recording">
+                <UButton 
+                  icon="i-lucide-mic" 
+                  size="xs" color="neutral" variant="ghost" 
+                  class="h-8 w-8 rounded-lg shrink-0 cursor-pointer transition-all duration-200 hover:bg-[var(--ui-bg-elevated)]"
+                  @click="openVoiceDialog" 
+                />
+              </AppTooltip>
+              <AppTooltip text="Schedule Send">
+                <UButton 
+                  icon="i-lucide-calendar-clock" 
+                  size="xs" color="neutral" variant="ghost" 
+                  class="h-8 w-8 rounded-lg shrink-0 cursor-pointer transition-all duration-200 hover:bg-[var(--ui-bg-elevated)]"
+                  @click="showScheduler = true" 
+                />
               </AppTooltip>
             </div>
           </div>
-          <AppTooltip text="Send message">
-            <UButton icon="i-lucide-send" color="primary" size="xs" class="h-9 w-9 shrink-0 cursor-pointer rounded-full shadow-lg shadow-[var(--ui-primary)]/20" :loading="loading" @click="sendMessage()" />
+          
+          <!-- Professional Send Button -->
+          <AppTooltip text="Send message (Enter)">
+            <UButton 
+              :icon="loading ? 'i-lucide-loader-circle' : 'i-lucide-send'" 
+              color="primary" 
+              size="sm"
+              class="h-9 px-4 shrink-0 cursor-pointer rounded-lg shadow-md shadow-[var(--ui-primary)]/20
+                     font-semibold transition-all duration-200 hover:shadow-lg hover:scale-105
+                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              :loading="loading"
+              :disabled="(!getCleanTextContent() && !selectedFile) || loading"
+              @click="sendMessage()"
+            >
+              <span class="hidden sm:inline ml-1">Send</span>
+            </UButton>
           </AppTooltip>
         </div>
 
         <!-- Rich-text editor area -->
-        <div class="relative flex min-h-[56px] max-h-[160px] flex-col overflow-y-auto sm:max-h-[120px]">
+        <div class="relative flex min-h-[60px] max-h-[160px] flex-col overflow-y-auto sm:max-h-[140px]">
           <editor-content
             :editor="editor"
-            class="flex-1 px-3 py-3 text-sm focus:outline-none sm:px-4 sm:py-2
+            class="flex-1 px-3 py-2 text-sm focus:outline-none sm:px-4 sm:py-2.5
                    prose prose-sm max-w-none dark:prose-invert
-                   font-medium leading-relaxed custom-editor"
+                   leading-relaxed custom-editor"
             @keydown="handleKeyDown"
           />
 
-          <!-- Attached file preview -->
+          <!-- Attached file preview with professional design -->
           <Transition name="slide-up">
             <div
               v-if="selectedFile"
-              class="mx-4 mb-3 p-2 rounded-xl bg-[var(--ui-primary)]/5
-                     border border-[var(--ui-primary)]/10
-                     flex items-center gap-3"
+              class="mx-3 mb-2 p-2 rounded-xl flex items-center gap-3 backdrop-blur-sm
+                     border shadow-sm transition-all duration-200"
+              :class="{
+                'bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400': fileStatus === 'valid',
+                'bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-400': fileStatus === 'invalid',
+                'bg-[var(--ui-primary)]/5 border-[var(--ui-primary)]/20': fileStatus === 'idle'
+              }"
             >
-              <div class="h-8 w-8 rounded-lg bg-[var(--ui-primary)]/10 flex items-center justify-center text-[var(--ui-primary)]">
+              <div class="h-8 w-8 rounded-lg bg-[var(--ui-primary)]/10 flex items-center justify-center">
                 <UIcon
                   :name="selectedFile.type.startsWith('audio') ? 'i-lucide-mic' : 'i-lucide-file'"
-                  class="h-4 w-4"
+                  class="h-4 w-4 text-[var(--ui-primary)]"
                 />
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-xs font-black truncate tracking-tight">{{ selectedFile.name }}</p>
-                <p class="text-[9px] font-black uppercase opacity-50">
+                <p class="text-xs font-semibold truncate">{{ selectedFile.name }}</p>
+                <p class="text-[10px] font-medium opacity-60">
                   {{ (selectedFile.size / 1024).toFixed(1) }} KB
                 </p>
               </div>
-              <UButton icon="i-lucide-x" size="xs" color="error" variant="ghost" class="h-6 w-6 cursor-pointer" @click="removeFile" />
+              <UButton 
+                icon="i-lucide-x" 
+                size="xs" 
+                color="error" 
+                variant="ghost" 
+                class="h-6 w-6 rounded-lg cursor-pointer hover:bg-red-500/10 transition-all" 
+                @click="removeFile" 
+              />
             </div>
           </Transition>
         </div>
-        </div>
       </div>
     </div>
+  </div>
 </template>
 
 <style scoped>
@@ -989,6 +1253,7 @@ watch(() => props.initialContent, v => {
 .custom-editor :deep(.ProseMirror) {
   outline: none;
   cursor: text;
+  min-height: 40px;
 }
 
 .custom-editor :deep(.ProseMirror p.is-editor-empty:first-child::before) {
@@ -999,18 +1264,31 @@ watch(() => props.initialContent, v => {
   height: 0;
 }
 
-/* Preserve bold / italic visually inside the editor */
-.custom-editor :deep(strong) { font-weight: 700; }
-.custom-editor :deep(em)     { font-style: italic; }
-
-/* Styled links inside the editor */
-.custom-editor :deep(.composer-link) {
-  color: var(--ui-primary);
-  text-decoration: underline;
-  cursor: pointer;
+.custom-editor :deep(strong) { 
+  font-weight: 700; 
+  color: inherit;
 }
 
-/* Code blocks */
+.custom-editor :deep(em) { 
+  font-style: italic; 
+}
+
+.custom-editor :deep(.composer-link),
+.custom-editor :deep(a) {
+  color: var(--ui-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.custom-editor :deep(.composer-link:hover),
+.custom-editor :deep(a:hover) {
+  color: color-mix(in srgb, var(--ui-primary) 80%, black);
+  text-decoration-thickness: 2px;
+}
+
 .custom-editor :deep(pre) {
   background: var(--ui-bg-muted);
   border: 1px solid var(--ui-border);
@@ -1018,6 +1296,25 @@ watch(() => props.initialContent, v => {
   padding: 0.75rem 1rem;
   font-size: 12px;
   cursor: text;
+  margin: 0.5rem 0;
+  overflow-x: auto;
+}
+
+.custom-editor :deep(code) {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  background: var(--ui-bg-muted);
+  padding: 0.2rem 0.3rem;
+  border-radius: 4px;
+}
+
+.custom-editor :deep(.editor-paragraph),
+.custom-editor :deep(p) {
+  margin: 0 0 0.25rem 0;
+}
+
+.custom-editor :deep(p:last-child) {
+  margin-bottom: 0;
 }
 
 /* ── Recording waveform ───────────────────────────────────────────────────── */
