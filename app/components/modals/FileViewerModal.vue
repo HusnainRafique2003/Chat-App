@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import BaseModal from '~/components/base/BaseModal.vue'
 
 interface Props {
@@ -18,14 +18,30 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { default: false })
 
-/**
- * Detect if the file is an image based on MIME type or common extensions[cite: 807].
- */
+// --- Improved Zoom Logic ---
+const scale = ref(1)
+function zoomIn() { if (scale.value < 4) scale.value += 0.25 }
+function zoomOut() { if (scale.value > 0.5) scale.value -= 0.25 }
+function resetZoom() { scale.value = 1 }
+
+// Reset zoom whenever the modal closes or a new file is loaded
+watch(open, (val) => { if (!val) resetZoom() })
+
+// --- File Type Logic  ---
+const extension = computed(() => props.fileName?.split('.').pop()?.toLowerCase() || '')
+
 const isImage = computed(() => {
-  if (props.fileMime?.startsWith('image/')) return true
-  const ext = props.fileName?.split('.').pop()?.toLowerCase() || ''
-  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)
+  return props.fileMime?.startsWith('image/') || 
+         ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'jif'].includes(extension.value)
 })
+
+const isPDF = computed(() => props.fileMime === 'application/pdf' || extension.value === 'pdf')
+
+const isVideo = computed(() => props.fileMime?.startsWith('video/') || extension.value === 'mp4')
+
+const isAudio = computed(() => props.fileMime?.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'webm'].includes(extension.value))
+
+const isDoc = computed(() => ['doc', 'docx'].includes(extension.value))
 </script>
 
 <template>
@@ -34,50 +50,87 @@ const isImage = computed(() => {
     :title="fileName || 'File Preview'"
     size="xl" 
     icon="i-mdi-file-eye-outline"
-    icon-color="primary"
-    confirm-label="Download File"
+    confirm-label="Download"
     :loading="loading"
     @confirm="emit('download')"
     @cancel="open = false"
   >
-    <div class="flex flex-col items-center justify-center min-h-[400px] bg-[var(--ui-bg-muted)] rounded-2xl overflow-hidden p-2 sm:p-4">
+    <div class="flex flex-col items-center justify-center min-h-[500px] max-h-[75vh] bg-[var(--ui-bg-muted)] rounded-2xl overflow-hidden relative">
       
-      <template v-if="isImage">
-        <div v-if="imageUrl" class="relative group w-full flex justify-center items-center">
+      <template v-if="isImage && imageUrl">
+        <div class="absolute top-4 right-4 z-20 flex gap-2 bg-[var(--ui-bg)]/80 backdrop-blur-md p-1.5 rounded-xl border border-[var(--ui-border)] shadow-sm">
+          <UButton icon="i-mdi-plus" size="xs" color="neutral" variant="ghost" @click="zoomIn" title="Zoom In" />
+          <div class="w-px h-4 bg-[var(--ui-border)] self-center" />
+          <UButton icon="i-mdi-refresh" size="xs" color="neutral" variant="ghost" @click="resetZoom" title="Reset" />
+          <div class="w-px h-4 bg-[var(--ui-border)] self-center" />
+          <UButton icon="i-mdi-minus" size="xs" color="neutral" variant="ghost" @click="zoomOut" title="Zoom Out" />
+          <span class="px-2 text-[10px] font-bold self-center min-w-[35px] text-center">{{ Math.round(scale * 100) }}%</span>
+        </div>
+
+        <div class="w-full h-full overflow-auto flex items-center justify-center p-6 custom-scrollbar">
           <img 
             :src="imageUrl" 
-            :alt="fileName || 'Image preview'" 
-            class="max-h-[65vh] w-auto object-contain rounded-lg shadow-xl transition-all duration-500 animate-in fade-in zoom-in-95"
-            @error="(e) => console.error('Modal Image Error: URL might be revoked or invalid.', { fileName, imageUrl })"
+            class="max-w-full h-auto transition-transform duration-200 ease-out shadow-lg rounded-sm origin-center"
+            :style="{ transform: `scale(${scale})` }"
           />
-          
-          <div class="absolute bottom-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <div class="bg-black/70 backdrop-blur-md px-4 py-2 rounded-full text-white text-[11px] font-bold uppercase tracking-wider">
-              {{ fileName }}
-            </div>
-          </div>
         </div>
-        
-        <div v-else class="flex flex-col items-center gap-3">
-           <UIcon name="i-lucide-loader" class="h-8 w-8 animate-spin text-[var(--ui-primary)]" />
-           <p class="text-xs text-[var(--ui-text-muted)]">Loading preview...</p>
+      </template>
+
+      <template v-else-if="isPDF && imageUrl">
+        <iframe :src="imageUrl" class="w-full h-[70vh] border-none rounded-lg" />
+      </template>
+
+      <template v-else-if="isVideo && imageUrl">
+        <video controls class="max-h-[65vh] w-full bg-black rounded-lg">
+          <source :src="imageUrl" :type="fileMime || 'video/mp4'">
+          Your browser does not support the video tag.
+        </video>
+      </template>
+
+      <template v-else-if="isAudio && imageUrl">
+        <div class="flex flex-col items-center gap-6 p-12 w-full">
+          <div class="h-24 w-24 rounded-3xl bg-[var(--ui-primary)]/10 flex items-center justify-center text-[var(--ui-primary)] animate-pulse">
+            <UIcon name="i-mdi-volume-high" class="h-12 w-12" />
+          </div>
+          <audio controls class="w-full max-w-md">
+            <source :src="imageUrl" :type="fileMime || 'audio/mpeg'">
+          </audio>
+          <p class="text-sm font-medium text-[var(--ui-text-muted)]">{{ fileName }}</p>
         </div>
       </template>
 
       <template v-else>
-        <div class="flex flex-col items-center gap-6 text-center py-16">
+        <div class="flex flex-col items-center gap-6 text-center py-20">
           <div class="h-24 w-24 rounded-[2rem] bg-[var(--ui-primary)]/10 flex items-center justify-center text-[var(--ui-primary)] shadow-inner">
-            <UIcon name="i-mdi-file-document-outline" class="h-12 w-12" />
+            <UIcon :name="isDoc ? 'i-mdi-file-word' : 'i-mdi-file-document-outline'" class="h-12 w-12" />
           </div>
           <div class="max-w-xs px-4">
             <p class="text-lg font-black text-[var(--ui-text-highlighted)] truncate">{{ fileName }}</p>
             <p class="text-xs text-[var(--ui-text-muted)] mt-2 leading-relaxed">
-              Preview is not supported for this file type. Use the button below to download and view the file locally.
+              {{ isDoc ? 'Word documents cannot be previewed in the browser.' : 'Preview is not available for this file type.' }}
+              Please download the file to view it.
             </p>
           </div>
         </div>
       </template>
-      
+
     </div>
   </BaseModal>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(var(--ui-primary-rgb), 0.2);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--ui-primary-rgb), 0.4);
+}
+</style>
