@@ -143,6 +143,9 @@ function formatScheduledTime(date: string) {
   return new Date(date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+// Read status indicator
+const hasBeenRead = computed(() => props.message.read_by_count > 0)
+
 // --- Authorized Fetching Logic for All Preview Types ---
 const imageUrl = ref<string | null>(null)
 const isLoadingFile = ref(false)
@@ -275,6 +278,29 @@ async function handleDownload() {
 
         <span class="text-[var(--ui-text-dimmed)]">{{ formatTime(message.created_at) }}</span>
 
+        <!-- Read status indicator for own messages - WhatsApp style -->
+        <div v-if="isOwn" :title="hasBeenRead ? 'Seen by other users' : 'Not yet seen'" class="flex items-center -space-x-1.5">
+          <UIcon 
+            name="i-mdi-check" 
+            :class="[
+              'h-4 w-4 transition-colors duration-300',
+              hasBeenRead ? 'text-blue-500' : 'text-gray-400'
+            ]" 
+          />
+          <UIcon 
+            name="i-mdi-check" 
+            :class="[
+              'h-4 w-4 transition-colors duration-300',
+              hasBeenRead ? 'text-blue-500' : 'text-gray-400'
+            ]" 
+          />
+        </div>
+
+        <!-- Unread indicator for messages from others -->
+        <div v-else-if="!hasBeenRead" :title="'Unread message'" class="flex items-center">
+          <span class="h-2 w-2 rounded-full bg-[var(--ui-primary)]" />
+        </div>
+
       </div>
 
 
@@ -282,7 +308,11 @@ async function handleDownload() {
       <div :class="[
 
         'max-w-[min(82vw,40rem)] rounded-[1.35rem] px-4 py-3 break-words shadow-[var(--shadow-sm)] transition-all duration-300',
-        isOwn ? 'rounded-br-md bg-[linear-gradient(180deg,rgba(55,27,23,0.96),rgba(55,27,23,0.88))] text-white' : 'rounded-bl-md border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-text)]'
+        isOwn 
+          ? 'rounded-br-md bg-[linear-gradient(180deg,rgba(55,27,23,0.96),rgba(55,27,23,0.88))] text-white' 
+          : hasBeenRead 
+            ? 'rounded-bl-md border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-text)]'
+            : 'rounded-bl-md border-2 border-[var(--ui-primary)] bg-[var(--ui-bg-elevated)] text-[var(--ui-text)] shadow-[0_0_12px_rgba(var(--color-primary-500),0.15)]'
       ]">
 
         <div v-if="renderedContent" class="message-content text-sm leading-6 mb-2" v-html="renderedContent" />
