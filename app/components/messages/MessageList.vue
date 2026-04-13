@@ -1,13 +1,13 @@
 <script setup lang="ts">
+import { useToast } from '#ui/composables/useToast'
 import { computed, nextTick, ref, watch } from 'vue'
 import type { Message } from '~/composables/useMessagesApi'
 import { useMessageStore } from '~/stores/useMessageStore'
 import { useUserStore } from '~/stores/useUserStore'
-import { useToast } from '#ui/composables/useToast'
-import MessageBubble from './MessageBubble.vue'
-import RichMessageComposer from './RichMessageComposer.vue'
 import EditMessageModal from '../modals/EditMessageModal.vue'
 import MessageDeleteModal from '../modals/MessageDeleteModal.vue'
+import MessageBubble from './MessageBubble.vue'
+import RichMessageComposer from './RichMessageComposer.vue'
 
 interface Props {
  channelId: string
@@ -15,7 +15,6 @@ interface Props {
 }
 
 interface Emits {
-  (e: 'message-sent', data: { content: string; file?: File }): void
   (e: 'message-deleted', messageId: string): void
   (e: 'message-edited', data: { messageId: string; content: string; file?: File }): void
   (e: 'reaction-added', data: { messageId: string; emoji: string }): void
@@ -206,13 +205,31 @@ async function handleReaction(messageId: string, emoji: string) {
 }
 
 async function handleMessageSent(data: { content: string; file?: File }) {
-  // Emit the message-sent event to parent component
-  emit('message-sent', data)
+  console.log('[MessageList] handleMessageSent:', {
+    channelId: props.channelId,
+    content: data.content,
+    hasFile: !!data.file,
+    fileType: data.file?.type,
+    fileName: data.file?.name
+  })
+
+  const result = await messageStore.createMessage(props.channelId, data.content, data.file)
   
-  // Re-enable auto-scroll and scroll to bottom when user sends a message
+  if (result.success) {
+    toast.add({
+      title: 'Message sent!',
+      color: 'success'
+    })
+  } else {
+    toast.add({
+      title: 'Failed to send message',
+      description: result.error || 'Unknown error',
+      color: 'error'
+    })
+  }
+  
+  // Always scroll to bottom and re-enable auto-scroll
   shouldAutoScroll.value = true
-  
-  // Wait for the message to be added to the store and DOM to update
   await nextTick()
   requestAnimationFrame(() => {
     scrollToBottom()

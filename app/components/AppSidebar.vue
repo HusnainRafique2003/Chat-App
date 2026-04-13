@@ -1,27 +1,24 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
-
-const emit = defineEmits(['navigate'])
+import { useToast } from '#ui/composables/useToast'
+import { computed, onMounted, ref } from 'vue'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useTeamStore } from '~/stores/useTeamStore'
-import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
-import { useToast } from '#ui/composables/useToast'
+import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
+
+const emit = defineEmits(['navigate'])
 
 import ChannelModal from './modals/ChannelModal.vue'
-import DmModal from './modals/DmModal.vue'
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal.vue'
-import WorkspaceModal from './modals/WorkspaceModal.vue'
+import DmModal from './modals/DmModal.vue'
 import TeamModal from './modals/TeamModal.vue'
+import WorkspaceModal from './modals/WorkspaceModal.vue'
 
 import type { ChannelPayload } from './modals/ChannelModal.vue'
 import type { DmMember } from './modals/DmModal.vue'
-import type { WorkspacePayload } from './modals/WorkspaceModal.vue'
 import type { TeamPayload } from './modals/TeamModal.vue'
+import type { WorkspacePayload } from './modals/WorkspaceModal.vue'
 
-defineEmits<{
-  navigate: []
-}>()
 
 const workspaceStore = useWorkspaceStore()
 const teamStore = useTeamStore()
