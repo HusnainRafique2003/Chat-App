@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { getTeams } from '~/composables/useTeamsApi'
+import { getTeams, createTeam, updateTeam, deleteTeam } from '~/composables/useTeamsApi'
 
 export interface TeamMember {
   user_id: string
@@ -31,7 +31,7 @@ export const useTeamStore = defineStore('team-data', {
     loading: false,
     currentTeamId: null
   }),
-
+  persist: { enabled: true, pick: ['currentTeamId'] },
   getters: {
     currentTeam: state => state.teams.find(t => t.id === state.currentTeamId)
   },
@@ -88,6 +88,85 @@ export const useTeamStore = defineStore('team-data', {
         this.loading = false
       }
     },
+
+    // --- NEW ACTIONS: Create, Update, Delete ---
+
+    async createTeam(data: { workspace_id: string; name: string; description?: string; color?: string }) {
+      this.loading = true
+      try {
+        const response = await createTeam(data)
+        const responseData = response.data
+
+        if (responseData.success) {
+          const newTeam = responseData.data?.team || responseData.data || responseData.team
+          if (newTeam) {
+            newTeam.id = newTeam.id || newTeam._id
+            newTeam.members = newTeam.members || []
+            this.teams.push(newTeam)
+            
+            // Switch to the newly created team
+            this.setCurrentTeam(newTeam.id)
+            return { success: true, team: newTeam }
+          }
+        }
+        return { success: false, error: responseData.message || 'Failed to create team' }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to create team' }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async updateTeam(teamId: string, data: { name?: string; description?: string; color?: string }) {
+      this.loading = true
+      try {
+        const response = await updateTeam({ team_id: teamId, ...data })
+        const responseData = response.data
+
+        if (responseData.success) {
+          const updatedTeam = responseData.data?.team || responseData.data
+          if (updatedTeam) {
+            const index = this.teams.findIndex(t => t.id === teamId || t._id === teamId)
+            if (index > -1) {
+              // Merge the updated data into the existing state
+              this.teams[index] = { ...this.teams[index], ...updatedTeam }
+            }
+            return { success: true }
+          }
+        }
+        return { success: false, error: responseData.message || 'Failed to update team' }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to update team' }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async deleteTeam(teamId: string) {
+      this.loading = true
+      try {
+        const response = await deleteTeam({ team_id: teamId })
+        const responseData = response.data
+
+        if (responseData.success) {
+          // Remove from local state
+          this.teams = this.teams.filter(t => t.id !== teamId && t._id !== teamId)
+          
+          // If they deleted their active team, fallback to the first available one
+          if (this.currentTeamId === teamId) {
+            this.currentTeamId = this.teams.length > 0 ? (this.teams[0].id || this.teams[0]._id as string) : null
+          }
+          return { success: true }
+        }
+        return { success: false, error: responseData.message || 'Failed to delete team' }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to delete team' }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    // --- State Management ---
 
     setCurrentTeam(id: string) {
       this.currentTeamId = id

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { getWorkspaces, getWorkspace } from '~/composables/useWorkspacesApi'
+import { getWorkspaces, getWorkspace, createWorkspace, updateWorkspace, deleteWorkspace } from '~/composables/useWorkspacesApi'
 import type { ApiUser } from '~/stores/useUserStore'
 
 export interface Workspace {
@@ -25,7 +25,10 @@ export const useWorkspaceStore = defineStore('workspace-data', {
     loading: false,
     currentWorkspaceId: null
   }),
-
+  persist: {
+    enabled: true,
+    pick: ['currentWorkspaceId'] // Only persist the ID, not the whole list
+  },
   getters: {
     currentWorkspace: state => state.workspaces.find(w => w.id === state.currentWorkspaceId)
   },
@@ -108,6 +111,86 @@ export const useWorkspaceStore = defineStore('workspace-data', {
         console.error('Failed to refresh workspace members:', error)
       }
     },
+
+    // --- NEW ACTIONS: Create, Update, Delete ---
+
+    async createWorkspace(data: { name: string; description?: string }) {
+      this.loading = true
+      try {
+        const response = await createWorkspace(data)
+        const responseData = response.data
+
+        if (responseData.success) {
+          const newWorkspace = responseData.data?.workspace || responseData.data || responseData.workspace
+          if (newWorkspace) {
+            newWorkspace.id = newWorkspace.id || newWorkspace._id
+            newWorkspace.members = newWorkspace.members || []
+            this.workspaces.push(newWorkspace)
+            
+            // Switch to the newly created workspace
+            this.setCurrentWorkspace(newWorkspace.id)
+            return { success: true, workspace: newWorkspace }
+          }
+        }
+        return { success: false, error: responseData.message || 'Failed to create workspace' }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to create workspace' }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async updateWorkspace(workspaceId: string, data: { name?: string; description?: string }) {
+      this.loading = true
+      try {
+        const response = await updateWorkspace({ workspace_id: workspaceId, ...data })
+        const responseData = response.data
+
+        if (responseData.success) {
+          const updatedWorkspace = responseData.data?.workspace || responseData.data
+          if (updatedWorkspace) {
+            const index = this.workspaces.findIndex(w => w.id === workspaceId || w._id === workspaceId)
+            if (index > -1) {
+              // Merge the updated data into the existing state
+              this.workspaces[index] = { ...this.workspaces[index], ...updatedWorkspace }
+            }
+            return { success: true }
+          }
+        }
+        return { success: false, error: responseData.message || 'Failed to update workspace' }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to update workspace' }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async deleteWorkspace(workspaceId: string) {
+      this.loading = true
+      try {
+        const response = await deleteWorkspace({ workspace_id: workspaceId })
+        const responseData = response.data
+
+        if (responseData.success) {
+          // Remove from local state
+          this.workspaces = this.workspaces.filter(w => w.id !== workspaceId && w._id !== workspaceId)
+          
+          // If they deleted their active workspace, fallback to the first available one
+          if (this.currentWorkspaceId === workspaceId) {
+            this.currentWorkspaceId = this.workspaces.length > 0 ? (this.workspaces[0].id || this.workspaces[0]._id as string) : null
+          }
+          return { success: true }
+        }
+        return { success: false, error: responseData.message || 'Failed to delete workspace' }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to delete workspace' }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    // --- State Management ---
+
     setCurrentWorkspace(id: string) {
       this.currentWorkspaceId = id
     },

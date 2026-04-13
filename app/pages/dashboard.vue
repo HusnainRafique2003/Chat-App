@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useToast } from '#ui/composables/useToast'
-import { useScheduledMessages, type ScheduledMessageJob } from '~/composables/useScheduledMessages'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import MessageList from '~/components/messages/MessageList.vue'
 import type { Message } from '~/composables/useMessagesApi'
+import { useScheduledMessages, type ScheduledMessageJob } from '~/composables/useScheduledMessages'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useMessageStore } from '~/stores/useMessageStore'
 import { useTeamStore } from '~/stores/useTeamStore'
-import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
+import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
 definePageMeta({
   layout: 'dashboard'
@@ -25,12 +25,46 @@ const { enqueueScheduledMessage, getScheduledMessages, processDueScheduledMessag
 const showMessaging = ref(false)
 let scheduledMessageInterval: ReturnType<typeof setInterval> | null = null
 
-// Auto-open the chat area when channels finish loading and a current channel becomes available.
+// === NEW: Polling State ===
+let messagePollingInterval: ReturnType<typeof setInterval> | null = null
+
+function startPolling(channelId: string) {
+  // Clear any existing poll before starting a new one
+  stopPolling()
+  
+  // Fetch messages every 3 seconds (3000ms)
+  messagePollingInterval = setInterval(async () => {
+    // NOTE FOR LATER: 
+    // When your teammate finishes Socket.io, delete this setInterval!
+    // Instead, you will just do: socket.on('new_message', (msg) => messageStore.messages.push(msg))
+    
+    try {
+      // Assuming your messageStore has a fetchMessages function.
+      // If it takes a 'silent' boolean to prevent loading spinners, pass true!
+      await messageStore.fetchMessages(channelId, 1, 0, true)
+    } catch (e) {
+      console.error('Polling failed to fetch messages', e)
+    }
+  }, 5000)
+}
+
+function stopPolling() {
+  if (messagePollingInterval) {
+    clearInterval(messagePollingInterval)
+    messagePollingInterval = null
+  }
+}
+
+// Auto-open the chat area and START POLLING when a channel is selected
 watch(
   () => channelStore.currentChannelId,
   (channelId) => {
     if (channelId) {
       showMessaging.value = true
+      startPolling(channelId)
+    } else {
+      stopPolling()
+      showMessaging.value = false
     }
   }
 )
@@ -138,7 +172,7 @@ async function handleMessageSent(data: { content: string; file?: File; scheduled
   if (data.file?.type.startsWith('audio/')) {
     toast.add({
       title: 'Voice notes are not supported by the current server',
-      description: 'The API is rejecting audio uploads with "File type not allowed." Please enable audio file types on the backend to send voice notes.',
+      description: 'Backend now supports audio uploads. If still failing, check Laravel validation rules for audio/* MIME types.',
       color: 'warning'
     })
     return
@@ -220,9 +254,15 @@ onMounted(() => {
   scheduledMessageInterval = setInterval(() => {
     processDueScheduledMessages(sendScheduledJob)
   }, 1000)
+  
+  // If a channel is already selected on mount, start polling immediately
+  if (channelStore.currentChannelId) {
+    startPolling(channelStore.currentChannelId)
+  }
 })
 
 onUnmounted(() => {
+  stopPolling() // Clean up polling when leaving the page
   if (scheduledMessageInterval) {
     clearInterval(scheduledMessageInterval)
     scheduledMessageInterval = null

@@ -34,21 +34,41 @@ const userStore = useUserStore()
 const toast = useToast()
 
 const searchQuery = ref('')
-const isAddingMember = ref(false)
-const isRemovingMember = ref(false)
+const addingMemberId = ref<string | null>(null)
+const removingMemberId = ref<string | null>(null)
+
 const isSearching = ref(false)
 const searchResults = ref<Array<{ id: string; name: string; email: string; avatar?: string }>>([])
+
+// Get the current user's ID
+const currentUserId = computed(() => userStore.user?.id || (userStore.user as any)?._id || '')
+
+// Helper to reliably identify the channel creator from any ID
+function isCreator(userId: string) {
+  const c = channelStore.currentChannel
+  if (!c) return false
+  return c.created_id === userId ||
+         (c as any).creator_id === userId ||
+         (c as any).created_by === userId ||
+         (c as any).owner_id === userId ||
+         (c as any).user_id === userId
+}
+
+// Check if the currently logged-in user is the creator
+const isCurrentUserCreator = computed(() => {
+  if (!currentUserId.value) return false
+  return isCreator(currentUserId.value)
+})
 
 // Get all workspace members not in the channel (fallback)
 const allAvailableMembers = computed(() => {
   const workspaceMembers = workspaceStore.currentWorkspace?.members || []
   const currentMemberIds = new Set(props.members.map(m => m.user_id))
-  const currentUserId = userStore.user?.id || (userStore.user as any)?._id
 
   return workspaceMembers
     .filter((member: any) => {
       const memberId = member.id || member._id || member.user_id
-      return !currentMemberIds.has(memberId) && memberId !== currentUserId
+      return !currentMemberIds.has(memberId) && memberId !== currentUserId.value
     })
     .map((member: any) => ({
       id: member.id || member._id || member.user_id,
@@ -119,11 +139,10 @@ async function performSearch(query: string) {
       
       // Filter out current members
       const currentMemberIds = new Set(props.members.map(m => m.user_id))
-      const currentUserId = userStore.user?.id || (userStore.user as any)?._id
       
       results = results.filter((member: any) => {
         const memberId = member.id || member._id || member.user_id
-        return !currentMemberIds.has(memberId) && memberId !== currentUserId
+        return !currentMemberIds.has(memberId) && memberId !== currentUserId.value
       })
       
       // Normalize the results
@@ -159,7 +178,7 @@ async function addMember(userId: string) {
     return
   }
 
-  isAddingMember.value = true
+  addingMemberId.value = userId
   try {
     const response = await addChannelMember({
       channel_id: props.channelId,
@@ -195,7 +214,7 @@ async function addMember(userId: string) {
     })
     console.error('Error adding member:', error)
   } finally {
-    isAddingMember.value = false
+    addingMemberId.value = null
   }
 }
 
@@ -209,7 +228,7 @@ async function removeMember(userId: string) {
     return
   }
 
-  isRemovingMember.value = true
+  removingMemberId.value = userId
   try {
     const response = await removeChannelMember({
       channel_id: props.channelId,
@@ -243,7 +262,56 @@ async function removeMember(userId: string) {
     })
     console.error('Error removing member:', error)
   } finally {
-    isRemovingMember.value = false
+    removingMemberId.value = null
+  }
+}
+
+// === NEW: Leave Channel Function ===
+async function leaveChannel(userId: string) {
+  if (!props.channelId) return
+
+  removingMemberId.value = userId
+  try {
+    const response = await removeChannelMember({
+      channel_id: props.channelId,
+      user_id: userId
+    })
+
+    if (response.data?.success || response.status === 200) {
+      toast.add({
+        title: 'Left channel',
+        description: 'You have successfully left the channel.',
+        color: 'success'
+      })
+      
+      open.value = false // Close the modal immediately
+      
+      // If they left the channel they are currently viewing, clear it from the UI
+      if (channelStore.currentChannelId === props.channelId) {
+        channelStore.clearCurrentChannel()
+      }
+      
+      // Refresh the channel list so it disappears from their sidebar
+      const channel = channelStore.channels.find(c => c.id === props.channelId)
+      if (channel) {
+        await channelStore.fetchChannels(channel.team_id, channel.workspace_id)
+      }
+    } else {
+      toast.add({
+        title: 'Error',
+        description: response.data?.message || 'Failed to leave channel',
+        color: 'error'
+      })
+    }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Failed to leave channel'
+    toast.add({
+      title: 'Error',
+      description: errorMsg,
+      color: 'error'
+    })
+  } finally {
+    removingMemberId.value = null
   }
 }
 
@@ -267,14 +335,15 @@ watch(open, (newVal) => {
 <template>
   <BaseModal
     v-model:open="open"
-    :title="`Manage Members - ${channelName}`"
+    :title="isCurrentUserCreator ? `Manage Members - ${channelName}` : `View Members - ${channelName}`"
     icon="i-mdi-account-multiple"
     icon-color="primary"
+    :hide-footer="true"
     @cancel="open = false"
   >
-    <div class="flex flex-col gap-4 max-h-[600px] overflow-hidden">
-      <!-- Search Bar -->
-      <div>
+    <div class="flex flex-col gap-4">
+      
+      <div v-if="isCurrentUserCreator" class="shrink-0">
         <label class="block text-sm font-medium text-[var(--ui-text)]">Search Members</label>
         <div class="relative mt-2">
           <UInput
@@ -292,14 +361,14 @@ watch(open, (newVal) => {
         </div>
       </div>
 
-      <div class="flex flex-col gap-6 min-h-0 overflow-hidden">
-        <!-- Add Members Section -->
-        <div class="flex flex-col gap-3 overflow-y-auto min-h-0">
+      <div class="flex flex-col gap-6">
+        
+        <div v-if="isCurrentUserCreator" class="flex flex-col gap-3">
           <div v-if="searchQuery || filteredMembers.length > 0">
-            <h3 class="text-sm font-semibold text-[var(--ui-text)] mb-3 sticky top-0 bg-[var(--ui-bg)] py-1">
+            <h3 class="text-sm font-semibold text-[var(--ui-text)] mb-3">
               {{ searchQuery ? `Search Results (${filteredMembers.length})` : `Available Members (${filteredMembers.length})` }}
             </h3>
-            <div class="space-y-2">
+            <div class="space-y-2 max-h-[28vh] overflow-y-auto pr-2 pb-1 [scrollbar-width:thin]">
               <div
                 v-for="(member, index) in filteredMembers"
                 :key="member.id"
@@ -320,10 +389,10 @@ watch(open, (newVal) => {
                 <button
                   type="button"
                   @click="addMember(member.id)"
-                  :disabled="isAddingMember"
+                  :disabled="addingMemberId !== null"
                   class="shrink-0 px-3 py-1.5 rounded-lg bg-[var(--ui-primary)] text-white text-xs font-medium hover:bg-[var(--ui-primary)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span v-if="!isAddingMember">Add</span>
+                  <span v-if="addingMemberId !== member.id">Add</span>
                   <UIcon v-else name="i-lucide-loader" class="h-3 w-3 animate-spin" />
                 </button>
               </div>
@@ -337,12 +406,12 @@ watch(open, (newVal) => {
           </div>
         </div>
 
-        <!-- Current Members Section -->
-        <div class="flex flex-col gap-3 border-t border-[var(--ui-border)] pt-4">
-          <h3 class="text-sm font-semibold text-[var(--ui-text)]">
+        <div class="flex flex-col gap-3" :class="{ 'border-t border-[var(--ui-border)] pt-4': isCurrentUserCreator }">
+          <h3 class="text-sm font-semibold text-[var(--ui-text)] shrink-0">
             Channel Members ({{ currentMembers.length }})
           </h3>
-          <div class="space-y-2 max-h-56 overflow-y-auto">
+          
+          <div class="space-y-2 overflow-y-auto pr-2 pb-1 [scrollbar-width:thin]" :class="isCurrentUserCreator ? 'max-h-[35vh]' : 'max-h-[50vh]'">
             <div
               v-for="(member, index) in currentMembers"
               :key="member.user_id"
@@ -356,22 +425,40 @@ watch(open, (newVal) => {
                   {{ getInitials(member.name) }}
                 </div>
                 <div class="min-w-0">
-                  <p class="text-sm font-medium text-[var(--ui-text)] truncate">{{ member.name }}</p>
+                  <div class="flex items-center gap-2">
+                    <p class="text-sm font-medium text-[var(--ui-text)] truncate">{{ member.name }}</p>
+                    <span v-if="isCreator(member.user_id)" class="shrink-0 rounded-full bg-[var(--ui-primary)]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--ui-primary)]">Creator</span>
+                  </div>
                   <p class="text-xs text-[var(--ui-text-muted)] truncate">{{ member.email }}</p>
                 </div>
               </div>
+              
               <button
+                v-if="isCurrentUserCreator && !isCreator(member.user_id)"
                 type="button"
                 @click="removeMember(member.user_id)"
-                :disabled="isRemovingMember"
+                :disabled="removingMemberId !== null"
                 class="shrink-0 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 text-xs font-medium hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span v-if="!isRemovingMember">Remove</span>
+                <span v-if="removingMemberId !== member.user_id">Remove</span>
                 <UIcon v-else name="i-lucide-loader" class="h-3 w-3 animate-spin" />
               </button>
             </div>
           </div>
         </div>
+
+        <div v-if="!isCurrentUserCreator" class="pt-4 border-t border-[var(--ui-border)] flex justify-end">
+          <UButton
+            color="error"
+            variant="soft"
+            icon="i-lucide-log-out"
+            label="Leave Channel"
+            :loading="removingMemberId === currentUserId"
+            class="transition-transform duration-300 hover:-translate-y-0.5 cursor-pointer"
+            @click="leaveChannel(currentUserId)"
+          />
+        </div>
+
       </div>
     </div>
   </BaseModal>

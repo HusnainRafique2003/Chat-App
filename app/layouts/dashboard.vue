@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { navigateTo, useRoute } from '#app'
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+
+// 1. Explicitly importing the modals to bypass any Nuxt auto-prefixing issues
 import AppSidebar from '~/components/AppSidebar.vue'
+import WorkspaceMemberModal from '~/components/modals/WorkspaceMemberModal.vue'
+import TeamMemberModal from '~/components/modals/TeamMemberModal.vue'
+
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useTeamStore } from '~/stores/useTeamStore'
 import { useUserStore } from '~/stores/useUserStore'
@@ -16,6 +21,10 @@ const route = useRoute()
 // --- State for Workspace Member Dropdown & Mobile ---
 const isWorkspaceMenuOpen = ref(false)
 const isMobileSidebarOpen = ref(false)
+
+// --- State for Add Member Modals ---
+const showWorkspaceMemberModal = ref(false)
+const showTeamMemberModal = ref(false)
 
 // --- Computed Member List ---
 const workspaceMembers = computed(() => workspaceStore.currentWorkspace?.members || [])
@@ -38,10 +47,18 @@ function closeMobilePanels() {
   isWorkspaceMenuOpen.value = false
 }
 
-onMounted(async () => {
-  // Wait for store to hydrate from localStorage before checking auth
-  await nextTick()
-  
+// Added a quick diagnostic function to ensure the click is registering!
+function triggerWorkspaceModal() {
+  console.log('Opening Workspace Modal...')
+  showWorkspaceMemberModal.value = true
+}
+
+function triggerTeamModal() {
+  console.log('Opening Team Modal...')
+  showTeamMemberModal.value = true
+}
+
+onMounted(() => {
   if (userStore.token && userStore.user) {
     workspaceStore.fetchWorkspaces()
   } else {
@@ -88,17 +105,41 @@ watch(() => route.fullPath, () => {
     <div class="grid h-full w-full lg:grid-cols-[275px_minmax(0,1fr)]">
       
       <aside class="flex h-full flex-col border-r border-[var(--ui-border)] bg-[var(--ui-bg)] min-h-0">
-        <div class="shrink-0 flex items-center border-b border-[var(--ui-border)] px-5 h-[72px]">
-          <NuxtLink to="/dashboard" class="flex items-center w-full">
-            <div class="min-w-0 flex-1">
+        
+        <div class="shrink-0 flex flex-col justify-center border-b border-[var(--ui-border)] px-5 h-[72px]">
+          
+          <div class="group flex items-center justify-between min-w-0 w-full mb-0.5">
+            <NuxtLink to="/dashboard" class="min-w-0 truncate pr-2 hover:opacity-80 transition-opacity relative z-10">
               <p class="font-black text-[var(--ui-text-highlighted)] truncate" :title="workspaceStore.currentWorkspace?.name">
                 {{ workspaceStore.currentWorkspace?.name || 'No Workspace' }}
               </p>
+            </NuxtLink>
+            <button
+              v-if="workspaceStore.currentWorkspaceId"
+              @click.stop.prevent="triggerWorkspaceModal"
+              class="opacity-0 group-hover:opacity-100 flex h-6 w-6 shrink-0 items-center justify-center rounded-md hover:bg-[var(--ui-bg-elevated)] text-[var(--ui-text-muted)] hover:text-[var(--ui-text)] transition-all cursor-pointer relative z-50"
+              title="Add member to workspace"
+            >
+              <UIcon name="i-lucide-user-plus" class="h-4 w-4" />
+            </button>
+          </div>
+
+          <div class="group flex items-center justify-between min-w-0 w-full">
+            <NuxtLink to="/dashboard" class="min-w-0 truncate pr-2 hover:opacity-80 transition-opacity relative z-10">
               <p class="text-xs text-[var(--ui-text-muted)] truncate" :title="teamStore.currentTeam?.name">
                 {{ teamStore.currentTeam?.name || 'No Team' }}
               </p>
-            </div>
-          </NuxtLink>
+            </NuxtLink>
+            <button
+              v-if="teamStore.currentTeamId"
+              @click.stop.prevent="triggerTeamModal"
+              class="opacity-0 group-hover:opacity-100 flex h-5 w-5 shrink-0 items-center justify-center rounded-md hover:bg-[var(--ui-bg-elevated)] text-[var(--ui-text-muted)] hover:text-[var(--ui-text)] transition-all cursor-pointer relative z-50"
+              title="Add member to team"
+            >
+              <UIcon name="i-lucide-user-plus" class="h-3.5 w-3.5" />
+            </button>
+          </div>
+
         </div>
 
         <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
@@ -157,5 +198,20 @@ watch(() => route.fullPath, () => {
       </div>
 
     </div>
+
+    <WorkspaceMemberModal
+      v-if="workspaceStore.currentWorkspaceId"
+      v-model:open="showWorkspaceMemberModal"
+      :workspace-id="workspaceStore.currentWorkspaceId"
+      :workspace-name="workspaceStore.currentWorkspace?.name || ''"
+    />
+
+    <TeamMemberModal
+      v-if="teamStore.currentTeamId"
+      v-model:open="showTeamMemberModal"
+      :team-id="teamStore.currentTeamId"
+      :team-name="teamStore.currentTeam?.name || ''"
+    />
+
   </div>
 </template>

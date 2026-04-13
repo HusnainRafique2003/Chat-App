@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 export interface ChannelPayload {
   name: string
@@ -30,28 +30,42 @@ const form = ref<ChannelPayload>({
   type: 'public', 
   isPrivate: false,
 })
-const errors = ref({ name: '' })
+// 1. Dynamic Error State
+const nameError = computed(() => {
+  // If the input is completely empty, don't show the red error text yet
+  if (!form.value.name || form.value.name === '') {
+    return undefined
+  }
+  
+  const trimmedName = form.value.name.trim()
+  
+  // If they have typed something, but it's less than 3 characters (excluding trailing spaces)
+  if (form.value.name.length > 0 && trimmedName.length < 3) {
+    return 'Channel name must be at least 3 characters.'
+  }
+  
+  return undefined
+})
+
+// 2. Dynamic Submit Button State
+const isSubmitDisabled = computed(() => {
+  // Disable if the name is empty, under 3 characters, OR if there is an active error
+  return !form.value.name || form.value.name.trim().length < 3 || nameError.value !== undefined
+})
 
 watch(open, (val) => {
-  if (val && props.initial) form.value = { ...form.value, ...props.initial }
-  if (!val) {
-    errors.value = { name: '' }
-    if (props.mode === 'create')
-      form.value = { name: '', description: '', type: 'public', isPrivate: false }
+  if (val && props.initial) {
+    form.value = { ...form.value, ...props.initial }
+  }
+  if (!val && props.mode === 'create') {
+    form.value = { name: '', description: '', type: 'public', isPrivate: false }
   }
 })
 
-function validate() {
-  errors.value.name = ''
-  if (!form.value.name.trim()) { errors.value.name = 'Channel name is required.'; return false }
-  if (/\s/.test(form.value.name)) { errors.value.name = 'Channel name cannot contain spaces.'; return false }
-  return true
-}
-
 function handleSubmit() {
-  if (!validate()) return
+  // Safety check just in case they bypass the disabled button
+  if (isSubmitDisabled.value) return
   
-  // Automatically set the type based on the toggle before emitting
   const finalPayload: ChannelPayload = {
     ...form.value,
     type: form.value.isPrivate ? 'private' : 'public'
@@ -66,21 +80,22 @@ function handleSubmit() {
     v-model:open="open"
     :title="mode === 'create' ? 'Create Channel' : 'Update Channel'"
     :description="teamName ? `In team: ${teamName}` : undefined"
-    :icon="mode === 'create' ? 'i-mdi-pound' : 'i-mdi-pencil'"
+    :icon="mode === 'create' ? 'i-lucide-hash' : 'i-lucide-pencil'"
     :icon-color="mode === 'create' ? 'primary' : 'warning'"
     :confirm-label="mode === 'create' ? 'Create Channel' : 'Save Changes'"
     :confirm-color="mode === 'create' ? 'primary' : 'warning'"
     :loading="loading"
+    :confirm-disabled="isSubmitDisabled" 
     @confirm="handleSubmit"
     @cancel="emit('cancel')"
   >
     <div class="flex flex-col gap-4">
 
-      <UFormField label="Channel Name" :error="errors.name" required>
+      <UFormField label="Channel Name" :error="nameError" required>
         <UInput
           v-model="form.name"
           placeholder="e.g. general"
-          :color="errors.name ? 'error' : undefined"
+          :color="nameError ? 'error' : undefined"
           class="w-full"
         >
           <template #leading>
