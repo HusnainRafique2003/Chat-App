@@ -22,7 +22,7 @@ const ALLOWED_EXTENSIONS = new Set([
     'application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'text/plain',
     'application/zip',
-    'video/mp4','audio/mpeg','audio/webm','audio/webm;codecs=opus','audio/ogg','audio/ogg;codecs=opus','audio/wav'
+'video/mp4','audio/mpeg','audio/webm','audio/webm;codecs=opus','audio/ogg','audio/ogg;codecs=opus','audio/wav','audio/webm;codecs=vorbis'
   ])
   
   const sizeOk = file.size <= MAX_FILE_SIZE

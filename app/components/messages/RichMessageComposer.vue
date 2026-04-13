@@ -38,7 +38,7 @@ const ALLOWED_MIME_TYPES = new Set([
   'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   'text/plain',
   'application/zip',
-  'video/mp4', 'audio/mpeg', 'audio/webm', 'audio/webm;codecs=opus', 'audio/ogg', 'audio/ogg;codecs=opus', 'audio/wav'
+'video/mp4', 'audio/mpeg', 'audio/webm', 'audio/webm;codecs=opus', 'audio/ogg', 'audio/ogg;codecs=opus', 'audio/wav', 'audio/webm;codecs=vorbis'
 ])
 
 function validateFile(file: File): { valid: boolean; error: string } {
@@ -446,9 +446,9 @@ function encodeWavFromAudioBuffer(audioBuffer: AudioBuffer): ArrayBuffer {
 }
 
 
-async function convertRecordedAudioToMp3(blob: Blob) {
-  const { convertToMp3 } = await import('~/composables/useVoiceMp3.ts')
-  return await convertToMp3(blob)
+async function convertRecordedAudio(blob: Blob) {
+  const { normalizeVoiceBlob } = await import('~/composables/useVoiceMp3.ts')
+  return await normalizeVoiceBlob(blob)
 }
 
 async function openVoiceDialog() {
@@ -502,22 +502,14 @@ function stopRecording() {
 async function attachVoiceNote() {
   if (!recordedAudio.value) return
 
-  let voiceFile: File
-  try {
-    console.log('[Voice] Converting to MP3...', recordedAudio.value.type, recordedAudio.value.size)
-    voiceFile = await convertRecordedAudioToMp3(recordedAudio.value!)
-    console.log('[Voice] MP3 ready:', voiceFile.name, voiceFile.type, voiceFile.size)
-  } catch (error) {
-    console.error('[Voice] MP3 failed, fallback webm:', error)
-    voiceFile = new File([recordedAudio.value!], `voice-${Date.now()}.mp3`, { type: 'audio/mpeg' })
-  }
-
+  const voiceFile = await convertRecordedAudio(recordedAudio.value!)
+  
   const result = validateFile(voiceFile)
   console.log('[Voice] Validation:', result)
   if (result.valid) {
     selectedFile.value = voiceFile
     fileStatus.value = 'valid'
-    toast.add({ title: '✅ Voice MP3 attached (' + (voiceFile.size / 1024).toFixed(0) + 'KB)', color: 'success' })
+    toast.add({ title: `✅ Voice note attached (${(voiceFile.size / 1024).toFixed(0)}KB)`, color: 'success' })
   } else {
     fileStatus.value = 'invalid'
     toast.add({ title: '❌ Attach failed', description: result.error, color: 'error' })
@@ -603,13 +595,20 @@ async function sendMessage(scheduledAt?: Date) {
   const textContent = getCleanTextContent()
   const htmlContent = getHTMLContent()
 
-  console.log('[TRIM-DEBUG] RichComposer - Raw:', { textContent, htmlContent })
+  console.log('[RichComposer] sendMessage:', { 
+    textContent: textContent?.slice(0, 50), 
+    hasFile: !!selectedFile.value,
+    fileType: selectedFile.value?.type,
+    isVoice: selectedFile.value?.type?.startsWith('audio/'),
+    scheduled: !!scheduledAt
+  })
 
   const hasTextContent = textContent.length > 0
   const hasFile = selectedFile.value !== null
   const isVoiceNote = selectedFile.value?.type.startsWith('audio/')
 
-  if (!hasTextContent && !hasFile) {
+  const sendFile = selectedFile.value || undefined
+  if (!hasTextContent && !sendFile) {
     toast.add({
       title: 'Cannot send empty message',
       description: 'Please enter some text or attach a file',
@@ -628,7 +627,6 @@ async function sendMessage(scheduledAt?: Date) {
       finalContent = htmlContent
     }
     finalContent = simpleTrimStartEnd(finalContent)
-    console.log('[TRIM-DEBUG] RichComposer - Final:', finalContent)
   } else if (isVoiceNote) {
     finalContent = '🎤 Voice note'
   } else if (hasFile) {
@@ -637,10 +635,10 @@ async function sendMessage(scheduledAt?: Date) {
 
   emit('send', {
     content: finalContent,
-    file: selectedFile.value ?? undefined,
+    file: sendFile,
     scheduledAt
   })
-  console.log('[TRIM-DEBUG] RichComposer - Emitted:', finalContent)
+  console.log('[RichComposer] Emitted send:', { content: finalContent, fileName: sendFile?.name, fileType: sendFile?.type })
 
   editor.value.commands.clearContent()
   selectedFile.value = null
