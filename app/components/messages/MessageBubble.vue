@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
-import { downloadMessageFile } from '~/composables/useMessagesApi'
-import type { Message } from '~/composables/useMessagesApi'
-import { useUserStore } from '~/stores/useUserStore'
 import { useToast } from '#ui/composables/useToast'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import FileViewerModal from '~/components/modals/FileViewerModal.vue'
+import type { Message } from '~/composables/useMessagesApi'
+import { downloadMessageFile } from '~/composables/useMessagesApi'
+import { useUserStore } from '~/stores/useUserStore'
 
 interface Props {
   message: Message
@@ -33,8 +33,11 @@ function sanitizeMessageHtml(html: string): string {
     return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
   }
 
-  function walk(node: Node): string {
-    if (node.nodeType === Node.TEXT_NODE) return escapeHtml(node.textContent || '')
+function walk(node: Node): string {
+    if (node.nodeType === Node.TEXT_NODE) {
+      // FIXED: Preserve ALL original whitespace/spaces/tabs (user requirement)
+      return escapeHtml(node.textContent || '')
+    }
     if (!(node instanceof HTMLElement)) return ''
     const tagName = node.tagName.toUpperCase()
     const children = Array.from(node.childNodes).map(walk).join('')
@@ -48,10 +51,16 @@ function sanitizeMessageHtml(html: string): string {
     const safeTag = tagName.toLowerCase()
     return `<${safeTag}>${children}</${safeTag}>`
   }
-  return Array.from(doc.body.childNodes).map(walk).join('').trim()
+  // Preserve ALL internal whitespace (spaces/tabs preserved)
+  const preservedContent = Array.from(doc.body.childNodes).map(walk).join('')
+  return simpleTrimStartEnd(preservedContent)
 }
 
-const renderedContent = computed(() => sanitizeMessageHtml(props.message.content || props.message.message || ''))
+const renderedContent = computed(() => {
+  const result = sanitizeMessageHtml(props.message.content || props.message.message || '')
+  console.log('[TRIM-DEBUG] MessageBubble - Raw:', props.message.content, '→ Rendered:', result)
+  return result
+})
 
 // --- Expanded File Detection ---
 const extension = computed(() => props.message.file_name?.split('.').pop()?.toLowerCase() || '')
@@ -239,6 +248,10 @@ async function handleDownload() {
 </template>
 
 <style scoped>
+.message-content {
+  white-space: pre-wrap; /* FIXED: Preserve ALL spaces/newlines */
+}
+
 .message-content :deep(p) {
   margin: 0;
 }

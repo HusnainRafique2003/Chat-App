@@ -1,6 +1,6 @@
+import { useRuntimeConfig } from '#app'
 import type { AxiosResponse } from 'axios'
 import axios from 'axios'
-import { useRuntimeConfig } from '#app'
 import { useUserStore } from '~/stores/useUserStore'
 
 const API_BASE = 'http://178.104.58.236/api/messages'
@@ -129,16 +129,20 @@ export interface Message {
  * @param data - Message data with channel_id, message content, and optional file
  * @returns Created message response
  */
+import { simpleTrimStartEnd } from './useMessageUtils'
+
 export async function createMessage(data: {
   channel_id: string
   message: string
   file?: File
   schedule_time?: string
 }): Promise<AxiosResponse> {
+  const trimmedMessage = simpleTrimStartEnd(data.message)
   try {
     console.log('[Messages API] Creating message:', {
       channel_id: data.channel_id,
       hasFile: !!data.file,
+      messageLength: trimmedMessage.length,
       schedule_time: data.schedule_time || null
     })
 
@@ -146,7 +150,7 @@ export async function createMessage(data: {
     if (data.file) {
       const formData = new FormData()
       formData.append('channel_id', data.channel_id)
-      formData.append('message', data.message.trim())
+      formData.append('message', trimmedMessage)
       formData.append('file', data.file)
       if (data.schedule_time) {
         formData.append('schedule_time', data.schedule_time)
@@ -162,8 +166,8 @@ export async function createMessage(data: {
 
     // Text-only message
     const response = await apiClient.post('/create', {
-channel_id: data.channel_id,
-      message: data.message.trim(),
+      channel_id: data.channel_id,
+      message: trimmedMessage,
       schedule_time: data.schedule_time,
     })
 
@@ -265,6 +269,7 @@ export async function updateMessage(data: {
   message: string
   file?: File
 }): Promise<AxiosResponse> {
+  const trimmedMessage = simpleTrimStartEnd(data.message)
   try {
     console.log('[Messages API] Updating message:', {
       channel_id: data.channel_id,
@@ -277,7 +282,7 @@ export async function updateMessage(data: {
       const formData = new FormData()
       formData.append('channel_id', data.channel_id)
       formData.append('message_id', data.message_id)
-      formData.append('message', data.message.trim())
+      formData.append('message', trimmedMessage)
       formData.append('file', data.file)
 
       const response = await apiClient.patch('/update', formData, {
@@ -292,7 +297,7 @@ export async function updateMessage(data: {
       const response = await apiClient.patch('/update', {
         channel_id: data.channel_id,
         message_id: data.message_id,
-        message: data.message.trim(),
+        message: trimmedMessage,
     })
 
     console.log('[Messages API] Text message updated successfully')

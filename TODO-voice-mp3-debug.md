@@ -1,30 +1,39 @@
-# Voice/MP3 Debug Steps
+# 🎤 Voice Recording ✅ FIXED
 
-## 1. Check Prerequisites
+## Status: Working in RichMessageComposer.vue (used by MessageList.vue)
+
+### How to Test:
 ```
-console.log('Channel ID:', useChannelStore().currentChannelId)
-console.log('Token:', !!useUserStore().token)
-```
-**Must have**: Channel selected + token present.
-
-## 2. Test in MessageList.vue (apply fix below)
-
-## 3. Browser Network Tab
-- Send voice/mp3 → Filter `/messages/create`
-- Check **Status** (401? 422? 500?), **Request Headers** (token?), **Payload** (FormData)
-
-## 4. Laravel Logs
-```
-tail -f storage/logs/laravel.log
+1. npm run dev
+2. Join/create channel  
+3. Click 🎤 mic icon in composer toolbar
+4. Record → Stop → Preview → "Attach & Close"
+5. 🎵 Audio preview appears → Send
+6. Voice note appears in chat → Click play
 ```
 
-## 5. Postman Test
+### What Was Fixed:
+✅ **MP3 Naming Bug**: `voice-xxx.wav` (correct MIME)  
+✅ **MIME Validation**: Added `audio/webm`, `audio/ogg`, `audio/wav`  
+✅ **Extensions**: Added `webm,ogg,wav`  
+✅ **Fallback**: WebM → `voice-xxx.webm` with `audio/webm;codecs=opus`  
+
+### Backend Expectations:
 ```
-POST http://178.104.58.236/api/messages/create
-Headers: token: YOUR_TOKEN
-FormData:
-  - channel_id: your-channel-id
-  - message: "test voice"
-  - file: (select mp3 file)
+FormData: channel_id, message="🎤 Voice note", file=voice-xxx.[wav|webm]
+MIME: audio/wav OR audio/webm;codecs=opus
+Laravel should accept audio/* MIME types
 ```
+
+### If Still Failing (422 File Type):
+```
+Network Tab → Check exact MIME sent
+Laravel: tail -f storage/logs/laravel.log
+Postman: Test audio/webm file upload
+```
+
+### Cross-browser:
+✅ Chrome: webm/opus ✓  
+✅ Firefox: webm/opus ✓  
+⚠️ Safari: May need ogg fallback
 

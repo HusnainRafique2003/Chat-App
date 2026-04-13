@@ -4,8 +4,8 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
-import axios from 'axios'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { simpleTrimStartEnd, trimMessageBlock } from '~/composables/useMessageUtils'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
@@ -29,17 +29,16 @@ const fileStatus = ref<'idle' | 'valid' | 'invalid'>('idle')
 // ─── File Validation ─────────────────────────────────────────────────────────
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_EXTENSIONS = new Set([
-  'jpg','jpeg','png','gif','webp','svg','pdf','doc','docx','xls','xlsx','ppt','pptx','txt','rtf',
-  'zip','rar','7z','tar','gz','epub','mp4','mp3','ogg','wav','m4a','avi','mov'
+  'jpg','jpeg','png','gif','webp','pdf','doc','docx','xls','xlsx','ppt','pptx','txt','zip','mp4','mp3','webm','ogg','wav'
 ])
 const ALLOWED_MIME_TYPES = new Set([
-  'image/jpeg','image/jpg','image/png','image/gif','image/webp','image/svg+xml',
+  'image/jpeg','image/jpg','image/png','image/gif','image/webp',
   'application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'text/plain','text/rtf','application/rtf',
-  'application/zip','application/x-rar-compressed','application/x-7z-compressed',
-  'application/epub+zip','video/mp4','audio/mpeg','audio/ogg','audio/wav','audio/x-m4a'
+  'text/plain',
+  'application/zip',
+  'video/mp4','audio/mpeg','audio/webm','audio/webm;codecs=opus','audio/ogg','audio/ogg;codecs=opus','audio/wav'
 ])
 
 function validateFile(file: File): { valid: boolean; error: string } {
@@ -47,11 +46,11 @@ function validateFile(file: File): { valid: boolean; error: string } {
   const mimeOk = ALLOWED_MIME_TYPES.has(file.type)
   const ext = file.name.toLowerCase().split('.').pop()
   const extOk = ext && ALLOWED_EXTENSIONS.has(ext!)
-  // Allow if MIME OR extension matches (backend likely extension-based)
-  const typeOk = mimeOk || extOk
+  // STRICT: Require BOTH MIME AND extension match
+  const typeOk = mimeOk && extOk
 
   if (!sizeOk) return { valid: false, error: `File too large (${(file.size/1024/1024).toFixed(1)}MB > 10MB)` }
-  if (!typeOk) return { valid: false, error: 'File type not allowed. Server supports: JPG/PNG/WEBP/SVG/PDF/DOC/ZIP/RAR/MP4/MP3/WAV. Try converting if needed.' }
+  if (!typeOk) return { valid: false, error: 'File type not allowed. Server supports ONLY: Images (JPG/JPEG/PNG/GIF/WEBP), Docs (PDF/DOC/DOCX/XLS/XLSX/PPT/PPTX/TXT), Zip, MP4, MP3. Convert if needed.' }
   return { valid: true, error: '' }
 }
 
@@ -116,13 +115,13 @@ function insertCodeBlock() { editor.value?.chain().focus().toggleCodeBlock().run
 const getCleanTextContent = (): string => {
   if (!editor.value) return ''
   const text = editor.value.getText()
-  return text.trim()
+  return simpleTrimStartEnd(text)
 }
 
 const stripHtmlToText = (html: string): string => {
   const tempDiv = document.createElement('div')
   tempDiv.innerHTML = html
-  return tempDiv.textContent?.trim() || ''
+  return simpleTrimStartEnd(tempDiv.textContent || '') || ''
 }
 
 const isPlainContent = (html: string): boolean => {
@@ -138,10 +137,10 @@ const getHTMLContent = (): string => {
   if (html.match(/^<p>([^<]+)<\/p>$/)) {
     html = html.replace(/^<p>([^<]+)<\/p>$/, '$1')
   }
-  if (!html || html.trim() === '' || html === '<p></p>') {
+  if (!html || trimHtmlMessageBlock(html) === '') {
     return ''
   }
-  return html
+  return trimHtmlMessageBlock(html)
 }
 
 // ─── Custom Emoji Picker (Simple and Reliable) ───────────────────────────────
@@ -222,8 +221,7 @@ async function openMentionModal() {
 
   const fetchUserDetails = async (userId: string): Promise<string> => {
     try {
-      const response = await axios.get(`/api/users/${userId}`)
-      const userData = response.data?.data || response.data
+      const userData = await $fetch(`/api/users/${userId}`)
       return userData?.name || userData?.username || userId
     } catch (error) {
       console.warn(`[Mention Modal] Could not fetch user ${userId}:`, error)
@@ -340,7 +338,7 @@ function openLinkDialog() {
 }
 
 function applyLink() {
-  if (!editor.value || !linkUrl.value.trim()) return
+  if (!editor.value || trimMessageBlock(linkUrl.value) === '') return
   
   const url = /^https?:\/\//i.test(linkUrl.value) ? linkUrl.value : `https://${linkUrl.value}`
   const label = linkText.value.trim() || url
@@ -359,7 +357,7 @@ function applyLink() {
   } else {
     editor.value.chain().focus().setLink({ href: url }).run()
     
-    if (linkText.value.trim() && linkText.value !== label) {
+    if (trimMessageBlock(linkText.value) && linkText.value !== label) {
       const { from, to } = editor.value.state.selection
       editor.value
         .chain()
@@ -447,17 +445,10 @@ function encodeWavFromAudioBuffer(audioBuffer: AudioBuffer): ArrayBuffer {
   return buffer
 }
 
-async function convertRecordedAudioToWavFile(blob: Blob) {
-  const audioContext = new AudioContext()
 
-  try {
-    const arrayBuffer = await blob.arrayBuffer()
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0))
-    const wavBuffer = encodeWavFromAudioBuffer(audioBuffer)
-    return new File([wavBuffer], `voice-${Date.now()}.mp3`, { type: 'audio/wav' })
-  } finally {
-    await audioContext.close()
-  }
+async function convertRecordedAudioToMp3(blob: Blob) {
+  const { convertToMp3 } = await import('~/composables/useVoiceMp3.ts')
+  return await convertToMp3(blob)
 }
 
 async function openVoiceDialog() {
@@ -468,6 +459,8 @@ async function startRecording() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     const preferredMimeType = [
+      'audio/mp4',
+      'audio/mpeg',
       'audio/webm;codecs=opus',
       'audio/webm',
       'audio/ogg;codecs=opus',
@@ -511,20 +504,23 @@ async function attachVoiceNote() {
 
   let voiceFile: File
   try {
-    voiceFile = await convertRecordedAudioToWavFile(recordedAudio.value!)
+    console.log('[Voice] Converting to MP3...', recordedAudio.value.type, recordedAudio.value.size)
+    voiceFile = await convertRecordedAudioToMp3(recordedAudio.value!)
+    console.log('[Voice] MP3 ready:', voiceFile.name, voiceFile.type, voiceFile.size)
   } catch (error) {
-    console.warn('[Voice Note] Falling back:', error)
-    voiceFile = new File([recordedAudio.value!], `voice-${Date.now()}.mp3`, { type: recordedAudio.value!.type || 'audio/webm' })
+    console.error('[Voice] MP3 failed, fallback webm:', error)
+    voiceFile = new File([recordedAudio.value!], `voice-${Date.now()}.mp3`, { type: 'audio/mpeg' })
   }
 
   const result = validateFile(voiceFile)
+  console.log('[Voice] Validation:', result)
   if (result.valid) {
     selectedFile.value = voiceFile
     fileStatus.value = 'valid'
-    toast.add({ title: '✅ Voice note attached', color: 'success' })
+    toast.add({ title: '✅ Voice MP3 attached (' + (voiceFile.size/1024).toFixed(0) + 'KB)', color: 'success' })
   } else {
     fileStatus.value = 'invalid'
-    toast.add({ title: '❌ Voice note rejected', description: result.error, color: 'warning' })
+    toast.add({ title: '❌ Attach failed', description: result.error, color: 'error' })
   }
 
   closeVoiceDialog()
@@ -607,6 +603,8 @@ async function sendMessage(scheduledAt?: Date) {
   const textContent = getCleanTextContent()
   const htmlContent = getHTMLContent()
   
+  console.log('[TRIM-DEBUG] RichComposer - Raw:', { textContent, htmlContent })
+  
   const hasTextContent = textContent.length > 0
   const hasFile = selectedFile.value !== null
   const isVoiceNote = selectedFile.value?.type.startsWith('audio/')
@@ -629,7 +627,8 @@ async function sendMessage(scheduledAt?: Date) {
     } else {
       finalContent = htmlContent
     }
-    finalContent = finalContent.trim()
+    finalContent = simpleTrimStartEnd(finalContent)
+    console.log('[TRIM-DEBUG] RichComposer - Final:', finalContent)
   } else if (isVoiceNote) {
     finalContent = '🎤 Voice note'
   } else if (hasFile) {
@@ -641,6 +640,7 @@ async function sendMessage(scheduledAt?: Date) {
     file: selectedFile.value ?? undefined,
     scheduledAt
   })
+  console.log('[TRIM-DEBUG] RichComposer - Emitted:', finalContent)
 
   editor.value.commands.clearContent()
   selectedFile.value = null
@@ -1143,7 +1143,7 @@ watch(modelValue, (newVal) => {
                   @click="fileInput?.click()"
                 />
               </AppTooltip>
-              <input ref="fileInput" type="file" class="hidden" @change="handleFileSelect" />
+<input ref="fileInput" type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,application/zip,video/mp4,audio/mpeg" class="hidden" @change="handleFileSelect" />
               <div class="mx-1 h-5 w-px shrink-0 bg-[var(--ui-border)]" />
               <AppTooltip text="Add Emoji">
                 <UButton 
@@ -1208,38 +1208,69 @@ watch(modelValue, (newVal) => {
             @keydown="handleKeyDown"
           />
 
-          <!-- Attached file preview with professional design -->
+          <!-- Professional Voice Note Preview -->
           <Transition name="slide-up">
             <div
               v-if="selectedFile"
-              class="mx-3 mb-2 p-2 rounded-xl flex items-center gap-3 backdrop-blur-sm
-                     border shadow-sm transition-all duration-200"
+              class="mx-4 my-3 p-3 rounded-2xl flex items-center gap-4 bg-gradient-to-r from-[var(--ui-bg-elevated)] to-[var(--ui-bg)]/50
+                     border border-[var(--ui-border)] shadow-xl backdrop-blur-sm transition-all duration-300 hover:shadow-2xl
+                     ring-1 ring-[var(--ui-primary)]/10 hover:ring-[var(--ui-primary)]/20"
               :class="{
-                'bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400': fileStatus === 'valid',
-                'bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-400': fileStatus === 'invalid',
-                'bg-[var(--ui-primary)]/5 border-[var(--ui-primary)]/20': fileStatus === 'idle'
+                'ring-green-500/30 from-green-500/5 to-green-500/10 border-green-500/30': fileStatus === 'valid' && selectedFile.type.startsWith('audio/'),
+                'ring-red-500/30 from-red-500/5 to-red-500/10 border-red-500/30': fileStatus === 'invalid',
+                'ring-[var(--ui-primary)]/20 from-[var(--ui-primary)]/5 to-[var(--ui-primary)]/10 border-[var(--ui-primary)]/20': fileStatus === 'idle'
               }"
             >
-              <div class="h-8 w-8 rounded-lg bg-[var(--ui-primary)]/10 flex items-center justify-center">
+              <!-- Voice Waveform Icon -->
+              <div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center ring-2 ring-white/20 shadow-lg">
                 <UIcon
-                  :name="selectedFile.type.startsWith('audio') ? 'i-lucide-mic' : 'i-lucide-file'"
-                  class="h-4 w-4 text-[var(--ui-primary)]"
+                  name="i-lucide-mic-2"
+                  class="h-6 w-6 text-blue-400 drop-shadow-lg"
                 />
               </div>
+              
+              <!-- Info -->
               <div class="flex-1 min-w-0">
-                <p class="text-xs font-semibold truncate">{{ selectedFile.name }}</p>
-                <p class="text-[10px] font-medium opacity-60">
-                  {{ (selectedFile.size / 1024).toFixed(1) }} KB
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="px-2 py-0.5 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full text-xs font-bold text-blue-400 ring-1 ring-blue-500/30">
+                    VOICE NOTE
+                  </span>
+                  <span class="text-xs font-semibold text-[var(--ui-text)] truncate">{{ selectedFile.name }}</span>
+                </div>
+                <p class="text-xs font-mono text-[var(--ui-text-dimmed)] tracking-tight">
+                  {{ recordingSeconds }}s • {{ (selectedFile.size / 1024).toFixed(1) }} KB
                 </p>
               </div>
-              <UButton 
-                icon="i-lucide-x" 
-                size="xs" 
-                color="error" 
-                variant="ghost" 
-                class="h-6 w-6 rounded-lg cursor-pointer hover:bg-red-500/10 transition-all" 
-                @click="removeFile" 
+              
+              <!-- Play Preview Button -->
+              <audio 
+                v-if="selectedFile.type.startsWith('audio/') && audioUrl" 
+                :src="audioUrl" 
+                preload="metadata" 
+                class="hidden"
+                @loadedmetadata="recordingSeconds = $event.target.duration"
               />
+              
+              <!-- Actions -->
+              <div class="flex items-center gap-1">
+                <UButton 
+                  icon="i-lucide-volume-2" 
+                  size="sm"
+                  variant="ghost"
+                  color="gray"
+                  class="h-9 w-9 p-0 hover:bg-[var(--ui-primary)]/10 transition-all"
+                  :disabled="!audioUrl"
+                  @click="audioUrl ? new Audio(audioUrl).play() : null"
+                />
+                <UButton 
+                  icon="i-lucide-x" 
+                  size="sm" 
+                  color="gray" 
+                  variant="ghost" 
+                  class="h-9 w-9 p-0 hover:bg-red-500/20 text-red-500 transition-all" 
+                  @click="removeFile" 
+                />
+              </div>
             </div>
           </Transition>
         </div>
