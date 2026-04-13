@@ -17,6 +17,10 @@ import type { DmMember } from './modals/DmModal.vue'
 import type { WorkspacePayload } from './modals/WorkspaceModal.vue'
 import type { TeamPayload } from './modals/TeamModal.vue'
 
+defineEmits<{
+  navigate: []
+}>()
+
 const workspaceStore = useWorkspaceStore()
 const teamStore = useTeamStore()
 const channelStore = useChannelStore()

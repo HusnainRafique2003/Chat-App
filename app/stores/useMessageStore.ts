@@ -5,42 +5,42 @@ import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
 
 interface MessageState {
-  messages: Message[]
-  localScheduledMessages: Message[]
-  loading: boolean
-  loadingMore: boolean
-  searching: boolean
-  currentChannelId: string | null
-  userNameCache: Record<string, string>
-  pagination: {
-    current_page: number
-    per_page: number
-    total: number
-    last_page: number
-  }
+  messages: Message[]
+  localScheduledMessages: Message[]
+  loading: boolean
+  loadingMore: boolean
+  searching: boolean
+  currentChannelId: string | null
+  userNameCache: Record<string, string>
+  pagination: {
+    current_page: number
+    per_page: number
+    total: number
+    last_page: number
+  }
 }
 
 interface StoreActionResult {
-  success: boolean
-  error?: string
+  success: boolean
+  error?: string
 }
 
 interface MessageActionResult extends StoreActionResult {
-  message?: Message
+  message?: Message
 }
 
 interface SearchMessagesResult extends StoreActionResult {
-  messages?: Message[]
+  messages?: Message[]
 }
 
 function normalizeDateValue(value: unknown): string | null {
-  if (!value) return null
-  if (typeof value === 'string') return value
-  if (typeof value === 'object' && value !== null && '$date' in value) {
-    const dateValue = (value as { $date?: unknown }).$date
-    return typeof dateValue === 'string' ? dateValue : null
-  }
-  return null
+  if (!value) return null
+  if (typeof value === 'string') return value
+  if (typeof value === 'object' && value !== null && '$date' in value) {
+    const dateValue = (value as { $date?: unknown }).$date
+    return typeof dateValue === 'string' ? dateValue : null
+  }
+  return null
 }
 
 export const useMessageStore = defineStore('messages', {

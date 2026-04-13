@@ -69,7 +69,8 @@ onMounted(() => {
           workspaceStore.fetchWorkspaces()
           unwatch()
         }
-      }
+      },
+      { immediate: true }
     )
   }
 })
