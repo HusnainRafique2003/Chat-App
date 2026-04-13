@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { addChannelMember } from '~/composables/useChannelsApi'
+import { simpleTrimStartEnd } from '~/composables/useMessageUtils'
 import { canDeleteMessage, canEditMessage, createMessage, deleteMessage, markMessagesAsRead, reactToMessage, readMessages, searchMessages, updateMessage, type Message } from '~/composables/useMessagesApi'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
@@ -250,7 +251,7 @@ export const useMessageStore = defineStore('messages', {
               reactions_summary: m.reactions_summary || [],
               is_read_by_me: m.is_read_by_me ?? false,
               read_by_count: m.read_by_count ?? 0,
-              content: (m.content || m.message || m.text || m.body || '').trim(),
+              content: simpleTrimStartEnd(m.content || m.message || m.text || m.body || ''),
             }
           })
 
@@ -404,7 +405,7 @@ export const useMessageStore = defineStore('messages', {
               reactions_summary: newMessage.reactions_summary || [],
               is_read_by_me: true,
               read_by_count: newMessage.read_by_count ?? 0,
-              content: (newMessage.content || newMessage.message || content).trim(),
+              content: simpleTrimStartEnd(newMessage.content || newMessage.message || content),
             }
             // Only add message if we're currently viewing this channel
             if (this.currentChannelId === channelId) {
@@ -537,7 +538,7 @@ export const useMessageStore = defineStore('messages', {
                 ...updatedMessage,
                 id: updatedMessage.id || updatedMessage._id || messageId,
                 channel_id: channelId,
-                content: (updatedMessage.content || updatedMessage.message || content).trim(),
+                content: simpleTrimStartEnd(updatedMessage.content || updatedMessage.message || content),
               }
               console.log('[Message Store] Message updated successfully')
             }
@@ -873,7 +874,7 @@ export const useMessageStore = defineStore('messages', {
               reactions_summary: m.reactions_summary || [],
               is_read_by_me: m.is_read_by_me ?? false,
               read_by_count: m.read_by_count ?? 0,
-              content: (m.content || m.message || m.text || m.body || '').trim(),
+              content: simpleTrimStartEnd(m.content || m.message || m.text || m.body || ''),
             }
           })
 

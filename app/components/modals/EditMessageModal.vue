@@ -74,7 +74,7 @@ const getHTMLContent = (): string => {
   if (!html || html.trim() === '' || html === '<p></p>') {
     return ''
   }
-  return html.trim()
+  return simpleTrimStartEnd(html)
 }
 
 function insertBold() { editor.value?.chain().focus().toggleBold().run() }

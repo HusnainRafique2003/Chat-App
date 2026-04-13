@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
+
+const emit = defineEmits(['navigate'])
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useTeamStore } from '~/stores/useTeamStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'

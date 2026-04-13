@@ -1,5 +1,23 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+  vite: {
+    optimizeDeps: {
+      include: [
+        'lamejs',
+        'vue',
+        'vue-router',
+        'pinia',
+        '@vue/shared',
+        'axios',
+        '@tiptap/extension-code-block-lowlight',
+        '@tiptap/extension-link',
+        '@tiptap/extension-placeholder',
+        '@tiptap/starter-kit',
+        '@tiptap/vue-3',
+        'lowlight'
+      ]
+    }
+  },
   ssr: false,
   srcDir: 'app',
   devServer: {
@@ -83,6 +101,7 @@ export default defineNuxtConfig({
     optimizeDeps: {
       force: false,
       include: [
+        'lamejs',
         'vue',
         'vue-router',
         'pinia',
