@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { navigateTo, useRoute } from '#app'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import AppSidebar from '~/components/AppSidebar.vue'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useTeamStore } from '~/stores/useTeamStore'
@@ -38,7 +38,10 @@ function closeMobilePanels() {
   isWorkspaceMenuOpen.value = false
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // Wait for store to hydrate from localStorage before checking auth
+  await nextTick()
+  
   if (userStore.token && userStore.user) {
     workspaceStore.fetchWorkspaces()
   } else {
@@ -49,7 +52,8 @@ onMounted(() => {
           workspaceStore.fetchWorkspaces()
           unwatch()
         }
-      }
+      },
+      { immediate: true }
     )
   }
 })

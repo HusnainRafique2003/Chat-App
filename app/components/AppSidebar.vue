@@ -12,6 +12,10 @@ import ConfirmDeleteModal from './modals/ConfirmDeleteModal.vue'
 import type { ChannelPayload } from './modals/ChannelModal.vue'
 import type { DmMember } from './modals/DmModal.vue'
 
+defineEmits<{
+  navigate: []
+}>()
+
 const workspaceStore = useWorkspaceStore()
 const teamStore = useTeamStore()
 const channelStore = useChannelStore()

@@ -55,7 +55,20 @@ export const useWorkspaceStore = defineStore('workspace-data', {
           }
         }
       } catch (error) {
-        console.error('Failed to fetch workspaces:', error)
+        if (error instanceof Error) {
+          console.error('Failed to fetch workspaces:', {
+            message: error.message,
+            status: (error as any).response?.status,
+            data: (error as any).response?.data
+          })
+        } else {
+          console.error('Failed to fetch workspaces:', error)
+        }
+        // Check if it's a 401 unauthorized error
+        if ((error as any)?.response?.status === 401) {
+          // Token may be invalid/expired, don't retry automatically
+          // Let the auth middleware handle the redirect to login
+        }
       } finally {
         this.loading = false
       }
