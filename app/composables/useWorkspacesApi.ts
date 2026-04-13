@@ -22,6 +22,9 @@ workspacesApiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.token = token
     config.headers.Authorization = `Bearer ${token}`
+    console.log('[Workspaces API] Token attached:', token ? `${token.slice(0, 20)}...` : 'NO TOKEN')
+  } else {
+    console.warn('[Workspaces API] No token available for request')
   }
 
   return config

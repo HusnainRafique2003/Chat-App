@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { useToast } from '#ui/composables/useToast'
 import { computed, nextTick, ref, watch } from 'vue'
 import type { Message } from '~/composables/useMessagesApi'
 import { useMessageStore } from '~/stores/useMessageStore'
 import { useUserStore } from '~/stores/useUserStore'
-import EditMessageModal from '../modals/EditMessageModal.vue'
-import MessageDeleteModal from '../modals/MessageDeleteModal.vue'
+import { useToast } from '#ui/composables/useToast'
 import MessageBubble from './MessageBubble.vue'
 import RichMessageComposer from './RichMessageComposer.vue'
+import EditMessageModal from '../modals/EditMessageModal.vue'
+import MessageDeleteModal from '../modals/MessageDeleteModal.vue'
 
 interface Props {
  channelId: string
@@ -15,7 +15,7 @@ interface Props {
 }
 
 interface Emits {
-  (e: 'message-sent', data: { content: string; file?: File; scheduledAt?: Date }): void
+  (e: 'message-sent', data: { content: string; file?: File }): void
   (e: 'message-deleted', messageId: string): void
   (e: 'message-edited', data: { messageId: string; content: string; file?: File }): void
   (e: 'reaction-added', data: { messageId: string; emoji: string }): void
@@ -26,7 +26,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<Emits>()
-const toast = useToast()
+
 const messageStore = useMessageStore()
 const userStore = useUserStore()
 const messagesContainer = ref<HTMLElement>()
@@ -34,9 +34,9 @@ const editingMessage = ref<Message | null>(null)
 const showEditModal = ref(false)
 const deletingMessageId = ref<string | null>(null)
 const showDeleteModal = ref(false)
+const toast = useToast()
 const scrollThreshold = ref(100) // pixels from top to trigger loading more
 const shouldAutoScroll = ref(true) // Flag to control auto-scrolling to bottom
-const previousMessageCount = ref(0) // Track message count to detect new messages
 
 const sortedMessages = computed(() => {
   const messages = messageStore.sortedMessages
@@ -63,7 +63,6 @@ watch(
     console.log('[MessageList] Clearing store and fetching messages')
 
     shouldAutoScroll.value = true // Reset when switching channels
-    previousMessageCount.value = 0 // Reset message count tracker
     await messageStore.fetchMessages(trimmed)
     // Wait for DOM updates and then scroll to bottom with requestAnimationFrame
     await nextTick()
@@ -77,25 +76,8 @@ watch(
   { immediate: true }
 )
 
-// New watcher to auto-scroll when messages are added (including new messages sent)
-watch(
-  () => sortedMessages.value.length,
-  async (newLength, oldLength) => {
-    if (newLength > oldLength && shouldAutoScroll.value) {
-      console.log('[MessageList] New message detected, auto-scrolling to bottom', {
-        oldLength,
-        newLength,
-        difference: newLength - oldLength
-      })
-      
-      // Wait for DOM to update before scrolling
-      await nextTick()
-      requestAnimationFrame(() => {
-        scrollToBottom()
-      })
-    }
-  }
-)
+// Remove the watcher that auto-scrolls on every message length change
+// We'll control scrolling explicitly instead
 
 function scrollToBottom() {
   if (messagesContainer.value) {
@@ -120,8 +102,11 @@ async function handleScroll() {
     // Disable auto-scroll when loading more messages
     shouldAutoScroll.value = false
     
-    // Store current scroll state before loading more messages
-    const scrollHeightBefore = messagesContainer.value.scrollHeight
+    // Find the first visible message ID to maintain scroll position
+    const firstVisibleElement = messagesContainer.value.querySelector('[data-message-id]')
+    const firstVisibleMessageId = firstVisibleElement?.getAttribute('data-message-id')
+    
+    console.log('[MessageList] First visible message ID:', firstVisibleMessageId)
 
     const result = await messageStore.loadMoreMessages()
     
@@ -129,19 +114,16 @@ async function handleScroll() {
       // Wait for DOM update
       await nextTick()
       
-      // Restore scroll position by adjusting for the new content
-      requestAnimationFrame(() => {
-        if (messagesContainer.value) {
-          const scrollHeightAfter = messagesContainer.value.scrollHeight
-          const heightDifference = scrollHeightAfter - scrollHeightBefore
-          messagesContainer.value.scrollTop = scrollTop + heightDifference
-          console.log('[MessageList] Scroll position restored:', {
-            scrollTop,
-            heightDifference,
-            newScrollTop: scrollTop + heightDifference
-          })
-        }
-      })
+      // Scroll to the first visible message to maintain position
+      if (firstVisibleMessageId) {
+        requestAnimationFrame(() => {
+          const targetElement = messagesContainer.value?.querySelector(`[data-message-id="${firstVisibleMessageId}"]`)
+          if (targetElement) {
+            targetElement.scrollIntoView({ block: 'start', behavior: 'auto' })
+            console.log('[MessageList] Scrolled to message:', firstVisibleMessageId)
+          }
+        })
+      }
     }
   }
 }
@@ -219,64 +201,22 @@ async function handleDeleteMessage() {
 }
 
 async function handleReaction(messageId: string, emoji: string) {
-  const result = await messageStore.addReaction(props.channelId, messageId, emoji)
-  
-  if (!result.success && result.error) {
-    // Only show errors from actual API failures, not prevention errors
-    toast.add({
-      title: 'Reaction error',
-      description: result.error,
-      color: 'error'
-    })
-    return
-  }
-  
+  await messageStore.addReaction(props.channelId, messageId, emoji)
   emit('reaction-added', { messageId, emoji })
 }
 
-async function handleMessageSent(data: { content: string; file?: File; scheduledAt?: Date }) {
-  console.log('[MessageList DEBUG] handleMessageSent:', {
-    channelId: props.channelId,
-    content: data.content.slice(0, 50),
-    hasFile: !!data.file,
-    fileType: data.file?.type,
-    fileName: data.file?.name,
-    scheduled: !!data.scheduledAt
-  })
-
-  if (!props.channelId?.trim()) {
-    toast.add({ title: 'No channel selected', color: 'warning' })
-    return
-  }
-
-  if (!userStore.token) {
-    toast.add({ title: 'Not authenticated - missing token', color: 'error' })
-    return
-  }
-
-  try {
-    const result = await messageStore.createMessage(
-      props.channelId,
-      data.content,
-      data.file,
-      data.scheduledAt
-    )
-
-    if (result.success) {
-      console.log('[MessageList] Message sent OK:', result.message?.id)
-      toast.add({ title: 'Message sent!', color: 'success' })
-    } else {
-      console.error('[MessageList] Send failed:', result.error)
-      toast.add({ title: result.error || 'Failed to send message', color: 'error' })
-    }
-  } catch (error) {
-    const errMsg = error instanceof Error ? error.message : 'Unknown error'
-    console.error('[MessageList] Send error:', errMsg)
-    toast.add({ title: `Send error: ${errMsg}`, color: 'error' })
-  }
-
-  // Re-enable auto-scroll
+async function handleMessageSent(data: { content: string; file?: File }) {
+  // Emit the message-sent event to parent component
+  emit('message-sent', data)
+  
+  // Re-enable auto-scroll and scroll to bottom when user sends a message
   shouldAutoScroll.value = true
+  
+  // Wait for the message to be added to the store and DOM to update
+  await nextTick()
+  requestAnimationFrame(() => {
+    scrollToBottom()
+  })
 }
 </script>
 
@@ -314,7 +254,7 @@ async function handleMessageSent(data: { content: string; file?: File; scheduled
 
       <!-- Messages -->
       <template v-else>
-        <div v-for="(message, index) in sortedMessages" :key="message.id" :data-message-id="message.id">
+        <div v-for="message in sortedMessages" :key="message.id" :data-message-id="message.id">
           <MessageBubble
             :message="message"
             @edit="startEdit(message)"
