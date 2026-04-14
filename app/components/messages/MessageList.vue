@@ -216,12 +216,7 @@ async function handleMessageSent(data: { content: string; file?: File; scheduled
 
   const result = await messageStore.createMessage(props.channelId, data.content, data.file, data.scheduledAt)
   
-  if (result.success) {
-    toast.add({
-      title: 'Message sent!',
-      color: 'success'
-    })
-  } else {
+  if (!result.success) {
     toast.add({
       title: 'Failed to send message',
       description: result.error || 'Unknown error',
