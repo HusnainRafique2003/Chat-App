@@ -44,6 +44,12 @@ function normalizeDateValue(value: unknown): string | null {
   return null
 }
 
+function formatLocalForBackend(date?: Date): string | undefined {
+  if (!date) return undefined;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 export const useMessageStore = defineStore('messages', {
   state: (): MessageState => ({
     messages: [],
@@ -64,8 +70,29 @@ export const useMessageStore = defineStore('messages', {
   getters: {
     sortedMessages: (state) => {
       const activeChannelId = state.currentChannelId
+      const userStore = useUserStore()
+      const currentUserId = userStore.user?.id || (userStore.user as any)?._id
+      const now = Date.now()
+
       return [...state.messages, ...state.localScheduledMessages]
         .filter(message => !activeChannelId || message.channel_id === activeChannelId)
+        .filter(message => {
+          if (message.schedule_time) {
+            const dateStr = message.schedule_time.includes(' ') ? message.schedule_time.replace(' ', 'T') : message.schedule_time
+            const schedTime = new Date(dateStr).getTime()
+            
+            if (schedTime > now) {
+              const senderId = message.sender?.id || message.sender?._id || message.sender_id
+              if (senderId !== currentUserId) {
+                // Hide from receiver until the scheduled time arrives
+                return false
+              }
+              // Force status for sender so UI renders the 'Scheduled' indicator
+              message.status = 'scheduled'
+            }
+          }
+          return true
+        })
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
     },
     unreadCount: (state) => state.messages.filter(m => !m.is_read_by_me).length,
@@ -340,7 +367,7 @@ export const useMessageStore = defineStore('messages', {
           channel_id: channelId,
           message: content,
           file,
-          schedule_time: scheduledAt?.toISOString()
+          schedule_time: formatLocalForBackend(scheduledAt)
         })
         const data = response.data
 
@@ -399,7 +426,7 @@ export const useMessageStore = defineStore('messages', {
               ...newMessage,
               id: newMessage.id || newMessage._id,
               channel_id: channelId,
-              schedule_time: normalizeDateValue(newMessage.schedule_time) || scheduledAt?.toISOString() || null,
+              schedule_time: normalizeDateValue(newMessage.schedule_time) || formatLocalForBackend(scheduledAt) || null,
               status: newMessage.status || 'sent',
               sender: newMessage.sender || { id: newMessage.sender_id, name: senderName, email: '', is_active: true },
               reactions_summary: newMessage.reactions_summary || [],
