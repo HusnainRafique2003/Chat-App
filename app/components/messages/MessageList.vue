@@ -204,16 +204,17 @@ async function handleReaction(messageId: string, emoji: string) {
   emit('reaction-added', { messageId, emoji })
 }
 
-async function handleMessageSent(data: { content: string; file?: File }) {
+async function handleMessageSent(data: { content: string; file?: File; scheduledAt?: Date }) {
   console.log('[MessageList] handleMessageSent:', {
     channelId: props.channelId,
     content: data.content,
     hasFile: !!data.file,
     fileType: data.file?.type,
-    fileName: data.file?.name
+    fileName: data.file?.name,
+    scheduledAt: data.scheduledAt
   })
 
-  const result = await messageStore.createMessage(props.channelId, data.content, data.file)
+  const result = await messageStore.createMessage(props.channelId, data.content, data.file, data.scheduledAt)
   
   if (result.success) {
     toast.add({

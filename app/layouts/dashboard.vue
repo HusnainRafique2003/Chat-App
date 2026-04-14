@@ -102,9 +102,19 @@ watch(() => route.fullPath, () => {
 
 <template>
   <div class="h-screen h-[100dvh] w-full overflow-hidden bg-[var(--ui-bg-muted)] text-[var(--ui-text)]">
-    <div class="grid h-full w-full lg:grid-cols-[275px_minmax(0,1fr)]">
+    <div class="flex h-full w-full relative">
       
-      <aside class="flex h-full flex-col border-r border-[var(--ui-border)] bg-[var(--ui-bg)] min-h-0">
+      <!-- Mobile Backdrop Overlay -->
+      <div 
+        v-if="isMobileSidebarOpen"
+        class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden transition-opacity"
+        @click="closeMobilePanels"
+      ></div>
+
+      <aside 
+        class="absolute inset-y-0 left-0 z-50 flex h-full w-[275px] flex-col border-r border-[var(--ui-border)] bg-[var(--ui-bg)] transition-transform duration-300 ease-in-out lg:static lg:translate-x-0"
+        :class="isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+      >
         
         <div class="shrink-0 flex flex-col justify-center border-b border-[var(--ui-border)] px-5 h-[72px]">
           
@@ -158,8 +168,8 @@ watch(() => route.fullPath, () => {
         </div>
       </aside>
 
-      <div class="flex h-full flex-col min-w-0 min-h-0">
-        <header class="shrink-0 flex items-center border-b border-[var(--ui-border)] bg-[var(--ui-bg)]/90 px-5 sm:px-8 h-[72px] backdrop-blur-md relative z-50">
+      <div class="flex-1 flex h-full w-full flex-col min-w-0 min-h-0">
+        <header class="shrink-0 flex items-center border-b border-[var(--ui-border)] bg-[var(--ui-bg)]/90 px-5 sm:px-8 h-[72px] backdrop-blur-md relative z-30">
           <div class="flex items-center justify-between gap-4 w-full">
             
             <div class="min-w-0 flex items-center gap-3 flex-1">
