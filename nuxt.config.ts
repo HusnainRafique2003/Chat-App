@@ -10,7 +10,10 @@ export default defineNuxtConfig({
     public: {
       // Dev-only override token for debugging API calls from the browser.
       // Set via `NUXT_PUBLIC_DEV_API_TOKEN` in `.env.local`.
-      devApiToken: process.env.NUXT_PUBLIC_DEV_API_TOKEN || ''
+      devApiToken: process.env.NUXT_PUBLIC_DEV_API_TOKEN || '',
+      // Socket.IO server URL
+      // Set via `NUXT_PUBLIC_SOCKET_URL` in `.env.local`.
+      socketUrl: process.env.NUXT_PUBLIC_SOCKET_URL || 'http://178.104.58.236'
     }
   },
   app: {
