@@ -1,12 +1,10 @@
-# Voice MP3 Fix Progress
+# Fix Axios Error in Message Store
 
-## Plan Breakdown
-- [x] Step 1: Rewrite useVoiceMp3.ts → WebM normalization  
-- [x] Step 2: Update RichMessageComposer.vue → new API + validation  
-- [x] Step 3: Test voice recording → attach → send → playback  
-- [x] Step 4: Backend validation check (Network tab MIME)  
-- [x] Step 5: Cross-browser test  
-- [x] Step 6: Update TODO-voice-mp3-debug.md  
+## Steps:
+- [x] 1. Create TODO.md ✅
+- [x] 2. Add axios import to useMessageStore.ts ✅
+- [ ] 3. Test message sending  
+- [ ] 4. Complete task
 
-**✅ TASK COMPLETE - Voice notes fully working 🎤**
+**Status**: Axios import added. Test message sending (text/voice) to verify fix.
 
