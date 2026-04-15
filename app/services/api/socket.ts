@@ -1,4 +1,5 @@
-import { io, Socket as SocketType } from 'socket.io-client'
+import type { Socket as SocketType } from 'socket.io-client'
+import { io } from 'socket.io-client'
 
 interface SocketOptions {
   url: string
@@ -9,31 +10,31 @@ interface SocketOptions {
   transports?: string[]
 }
 
-type SocketEvent = 
-  | 'workspace_member_removed'
-  | 'workspace_member_invited'
-  | 'team_member_added'
-  | 'team_member_removed'
-  | 'channel_member_added'
-  | 'channel_member_removed'
-  | 'messageSend'
-  | 'messageReceived'
-  | 'userTyping'
-  | 'userTypingStop'
-  | 'connect'
-  | 'disconnect'
-  | 'connect_error'
-  | 'reconnect'
-  | 'reconnect_attempt'
-  | 'reconnect_failed'
+type SocketEvent
+  = | 'workspace_member_removed'
+    | 'workspace_member_invited'
+    | 'team_member_added'
+    | 'team_member_removed'
+    | 'channel_member_added'
+    | 'channel_member_removed'
+    | 'messageSend'
+    | 'messageReceived'
+    | 'userTyping'
+    | 'userTypingStop'
+    | 'connect'
+    | 'disconnect'
+    | 'connect_error'
+    | 'reconnect'
+    | 'reconnect_attempt'
+    | 'reconnect_failed'
 
 interface SocketEventMap {
-  workspace_member_removed: { userId: string; workspaceId: string }
-  workspace_member_invited: { userId: string; workspaceId: string; role: string }
-  team_member_added: { userId: string; teamId: string }
-  team_member_removed: { userId: string; teamId: string }
-  channel_member_added: { userId: string; channelId: string }
-  channel_member_removed: { userId: string; channelId: string }
+  workspace_member_removed: { userId: string, workspaceId: string }
+  workspace_member_invited: { userId: string, workspaceId: string, role: string }
+  team_member_added: { userId: string, teamId: string }
+  team_member_removed: { userId: string, teamId: string }
+  channel_member_added: { userId: string, channelId: string }
+  channel_member_removed: { userId: string, channelId: string }
   messageSend: any
   messageReceived: any
   userTyping: any
@@ -128,7 +129,7 @@ class SocketService {
   }
 
   private _getToken(): string {
-    if (process.client) {
+    if (import.meta.client) {
       return localStorage.getItem('auth_token') || ''
     }
     return ''
@@ -188,7 +189,7 @@ class SocketService {
   private _executeListeners<E extends SocketEvent>(event: E, data: any): void {
     const listeners = this.listeners.get(event)
     if (listeners) {
-      listeners.forEach(callback => {
+      listeners.forEach((callback) => {
         try {
           callback(data)
         } catch (error) {

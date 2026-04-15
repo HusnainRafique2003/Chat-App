@@ -38,7 +38,7 @@ const addingMemberId = ref<string | null>(null)
 const removingMemberId = ref<string | null>(null)
 
 const isSearching = ref(false)
-const searchResults = ref<Array<{ id: string; name: string; email: string; avatar?: string }>>([])
+const searchResults = ref<Array<{ id: string, name: string, email: string, avatar?: string }>>([])
 
 // Get the current user's ID
 const currentUserId = computed(() => userStore.user?.id || (userStore.user as any)?._id || '')
@@ -47,11 +47,11 @@ const currentUserId = computed(() => userStore.user?.id || (userStore.user as an
 function isCreator(userId: string) {
   const c = channelStore.currentChannel
   if (!c) return false
-  return c.created_id === userId ||
-         (c as any).creator_id === userId ||
-         (c as any).created_by === userId ||
-         (c as any).owner_id === userId ||
-         (c as any).user_id === userId
+  return c.created_id === userId
+    || (c as any).creator_id === userId
+    || (c as any).created_by === userId
+    || (c as any).owner_id === userId
+    || (c as any).user_id === userId
 }
 
 // Check if the currently logged-in user is the creator
@@ -83,11 +83,11 @@ const filteredMembers = computed(() => {
   if (searchQuery.value.trim() && searchResults.value.length > 0) {
     return searchResults.value
   }
-  
+
   if (!searchQuery.value.trim()) {
     return allAvailableMembers.value
   }
-  
+
   return []
 })
 
@@ -108,7 +108,7 @@ const getAvatarColor = (index: number) => {
     'bg-pink-500',
     'bg-green-500',
     'bg-orange-500',
-    'bg-red-500',
+    'bg-red-500'
   ]
   return colors[index % colors.length]
 }
@@ -133,18 +133,18 @@ async function performSearch(query: string) {
     }
 
     const response = await searchWorkspaceMembers(workspaceId, query)
-    
+
     if (response.data?.success || response.data?.data) {
       let results = Array.isArray(response.data?.data) ? response.data.data : response.data?.data?.members || []
-      
+
       // Filter out current members
       const currentMemberIds = new Set(props.members.map(m => m.user_id))
-      
+
       results = results.filter((member: any) => {
         const memberId = member.id || member._id || member.user_id
         return !currentMemberIds.has(memberId) && memberId !== currentUserId.value
       })
-      
+
       // Normalize the results
       searchResults.value = results.map((member: any) => ({
         id: member.id || member._id || member.user_id,
@@ -160,8 +160,8 @@ async function performSearch(query: string) {
     // Fallback to local filtering if search fails
     const query_lower = query.toLowerCase()
     searchResults.value = allAvailableMembers.value.filter(m =>
-      m.name.toLowerCase().includes(query_lower) ||
-      m.email.toLowerCase().includes(query_lower)
+      m.name.toLowerCase().includes(query_lower)
+      || m.email.toLowerCase().includes(query_lower)
     )
   } finally {
     isSearching.value = false
@@ -283,14 +283,14 @@ async function leaveChannel(userId: string) {
         description: 'You have successfully left the channel.',
         color: 'success'
       })
-      
+
       open.value = false // Close the modal immediately
-      
+
       // If they left the channel they are currently viewing, clear it from the UI
       if (channelStore.currentChannelId === props.channelId) {
         channelStore.clearCurrentChannel()
       }
-      
+
       // Refresh the channel list so it disappears from their sidebar
       const channel = channelStore.channels.find(c => c.id === props.channelId)
       if (channel) {
@@ -342,8 +342,10 @@ watch(open, (newVal) => {
     @cancel="open = false"
   >
     <div class="flex flex-col gap-4">
-      
-      <div v-if="isCurrentUserCreator" class="shrink-0">
+      <div
+        v-if="isCurrentUserCreator"
+        class="shrink-0"
+      >
         <label class="block text-sm font-medium text-[var(--ui-text)]">Search Members</label>
         <div class="relative mt-2">
           <UInput
@@ -352,18 +354,29 @@ watch(open, (newVal) => {
             placeholder="Search by name or email..."
           >
             <template #leading>
-              <UIcon name="i-lucide-search" class="h-4 w-4" />
+              <UIcon
+                name="i-lucide-search"
+                class="h-4 w-4"
+              />
             </template>
           </UInput>
-          <div v-if="isSearching" class="absolute right-3 top-1/2 -translate-y-1/2">
-            <UIcon name="i-lucide-loader" class="h-4 w-4 animate-spin text-[var(--ui-primary)]" />
+          <div
+            v-if="isSearching"
+            class="absolute right-3 top-1/2 -translate-y-1/2"
+          >
+            <UIcon
+              name="i-lucide-loader"
+              class="h-4 w-4 animate-spin text-[var(--ui-primary)]"
+            />
           </div>
         </div>
       </div>
 
       <div class="flex flex-col gap-6">
-        
-        <div v-if="isCurrentUserCreator" class="flex flex-col gap-3">
+        <div
+          v-if="isCurrentUserCreator"
+          class="flex flex-col gap-3"
+        >
           <div v-if="searchQuery || filteredMembers.length > 0">
             <h3 class="text-sm font-semibold text-[var(--ui-text)] mb-3">
               {{ searchQuery ? `Search Results (${filteredMembers.length})` : `Available Members (${filteredMembers.length})` }}
@@ -382,36 +395,56 @@ watch(open, (newVal) => {
                     {{ getInitials(member.name) }}
                   </div>
                   <div class="min-w-0">
-                    <p class="text-sm font-medium text-[var(--ui-text)] truncate">{{ member.name }}</p>
-                    <p class="text-xs text-[var(--ui-text-muted)] truncate">{{ member.email }}</p>
+                    <p class="text-sm font-medium text-[var(--ui-text)] truncate">
+                      {{ member.name }}
+                    </p>
+                    <p class="text-xs text-[var(--ui-text-muted)] truncate">
+                      {{ member.email }}
+                    </p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  @click="addMember(member.id)"
                   :disabled="addingMemberId !== null"
                   class="shrink-0 px-3 py-1.5 rounded-lg bg-[var(--ui-primary)] text-white text-xs font-medium hover:bg-[var(--ui-primary)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  @click="addMember(member.id)"
                 >
                   <span v-if="addingMemberId !== member.id">Add</span>
-                  <UIcon v-else name="i-lucide-loader" class="h-3 w-3 animate-spin" />
+                  <UIcon
+                    v-else
+                    name="i-lucide-loader"
+                    class="h-3 w-3 animate-spin"
+                  />
                 </button>
               </div>
-              <p v-if="searchQuery && filteredMembers.length === 0 && !isSearching" class="text-sm text-[var(--ui-text-muted)] text-center py-4">
+              <p
+                v-if="searchQuery && filteredMembers.length === 0 && !isSearching"
+                class="text-sm text-[var(--ui-text-muted)] text-center py-4"
+              >
                 No members found
               </p>
             </div>
           </div>
-          <div v-else class="text-sm text-[var(--ui-text-muted)] py-4 text-center">
+          <div
+            v-else
+            class="text-sm text-[var(--ui-text-muted)] py-4 text-center"
+          >
             All workspace members are already added
           </div>
         </div>
 
-        <div class="flex flex-col gap-3" :class="{ 'border-t border-[var(--ui-border)] pt-4': isCurrentUserCreator }">
+        <div
+          class="flex flex-col gap-3"
+          :class="{ 'border-t border-[var(--ui-border)] pt-4': isCurrentUserCreator }"
+        >
           <h3 class="text-sm font-semibold text-[var(--ui-text)] shrink-0">
             Channel Members ({{ currentMembers.length }})
           </h3>
-          
-          <div class="space-y-2 overflow-y-auto pr-2 pb-1 [scrollbar-width:thin]" :class="isCurrentUserCreator ? 'max-h-[35vh]' : 'max-h-[50vh]'">
+
+          <div
+            class="space-y-2 overflow-y-auto pr-2 pb-1 [scrollbar-width:thin]"
+            :class="isCurrentUserCreator ? 'max-h-[35vh]' : 'max-h-[50vh]'"
+          >
             <div
               v-for="(member, index) in currentMembers"
               :key="member.user_id"
@@ -426,28 +459,42 @@ watch(open, (newVal) => {
                 </div>
                 <div class="min-w-0">
                   <div class="flex items-center gap-2">
-                    <p class="text-sm font-medium text-[var(--ui-text)] truncate">{{ member.name }}</p>
-                    <span v-if="isCreator(member.user_id)" class="shrink-0 rounded-full bg-[var(--ui-primary)]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--ui-primary)]">Creator</span>
+                    <p class="text-sm font-medium text-[var(--ui-text)] truncate">
+                      {{ member.name }}
+                    </p>
+                    <span
+                      v-if="isCreator(member.user_id)"
+                      class="shrink-0 rounded-full bg-[var(--ui-primary)]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--ui-primary)]"
+                    >Creator</span>
                   </div>
-                  <p class="text-xs text-[var(--ui-text-muted)] truncate">{{ member.email }}</p>
+                  <p class="text-xs text-[var(--ui-text-muted)] truncate">
+                    {{ member.email }}
+                  </p>
                 </div>
               </div>
-              
+
               <button
                 v-if="isCurrentUserCreator && !isCreator(member.user_id)"
                 type="button"
-                @click="removeMember(member.user_id)"
                 :disabled="removingMemberId !== null"
                 class="shrink-0 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 text-xs font-medium hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                @click="removeMember(member.user_id)"
               >
                 <span v-if="removingMemberId !== member.user_id">Remove</span>
-                <UIcon v-else name="i-lucide-loader" class="h-3 w-3 animate-spin" />
+                <UIcon
+                  v-else
+                  name="i-lucide-loader"
+                  class="h-3 w-3 animate-spin"
+                />
               </button>
             </div>
           </div>
         </div>
 
-        <div v-if="!isCurrentUserCreator" class="pt-4 border-t border-[var(--ui-border)] flex justify-end">
+        <div
+          v-if="!isCurrentUserCreator"
+          class="pt-4 border-t border-[var(--ui-border)] flex justify-end"
+        >
           <UButton
             color="error"
             variant="soft"
@@ -458,7 +505,6 @@ watch(open, (newVal) => {
             @click="leaveChannel(currentUserId)"
           />
         </div>
-
       </div>
     </div>
   </BaseModal>

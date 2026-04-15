@@ -2,6 +2,9 @@ import { useRuntimeConfig } from '#app'
 import type { AxiosResponse } from 'axios'
 import axios from 'axios'
 import { useUserStore } from '~/stores/useUserStore'
+import type { ApiErrorContext } from './useApiErrorHandler'
+import { getUserFriendlyError } from './useApiErrorHandler'
+import { simpleTrimStartEnd } from './useMessageUtils'
 
 const API_BASE = 'http://178.104.58.236/api/messages'
 
@@ -10,8 +13,8 @@ function makeApiClient() {
     baseURL: API_BASE,
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
+      'Accept': 'application/json'
+    }
   })
 
   client.interceptors.request.use((config) => {
@@ -27,7 +30,7 @@ function makeApiClient() {
       hasToken: !!token,
       tokenLength: token?.length,
       tokenPreview: token ? token.slice(0, 15) + '...' : 'NO TOKEN',
-      source: userStore.token ? 'userStore' : devToken ? 'devToken' : 'none',
+      source: userStore.token ? 'userStore' : devToken ? 'devToken' : 'none'
     })
 
     if (token) {
@@ -54,8 +57,8 @@ function makeFileClient() {
     baseURL: API_FILES_BASE,
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
+      'Accept': 'application/json'
+    }
   })
 
   client.interceptors.request.use((config) => {
@@ -125,18 +128,16 @@ export interface Message {
 /**
  * Create a message in a channel.
  * POST /messages/create
- * 
+ *
  * @param data - Message data with channel_id, message content, and optional file
- * @returns Created message response
+ * @returns Created message response or error
  */
-import { simpleTrimStartEnd } from './useMessageUtils'
-
 export async function createMessage(data: {
   channel_id: string
   message: string
   file?: File
   schedule_time?: string
-}): Promise<AxiosResponse> {
+}): Promise<{ data: AxiosResponse | null, error: string | null }> {
   const trimmedMessage = simpleTrimStartEnd(data.message)
   try {
     console.log('[Messages API] Creating message:', {
@@ -157,48 +158,42 @@ export async function createMessage(data: {
       }
 
       const response = await apiClient.post('/create', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': 'multipart/form-data' }
       })
 
       console.log('[Messages API] Message with file created successfully')
-      return response
+      return { data: response, error: null }
     }
 
     // Text-only message
     const response = await apiClient.post('/create', {
       channel_id: data.channel_id,
       message: trimmedMessage,
-      schedule_time: data.schedule_time,
+      schedule_time: data.schedule_time
     })
 
     console.log('[Messages API] Text message created successfully')
-    return response
+    return { data: response, error: null }
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      const errorDetails = error.response?.data?.errors
-      const fileError = Array.isArray(errorDetails?.file) ? errorDetails.file[0] : ''
-      const detailedMessage = fileError || error.response?.data?.message || error.message
-
-      console.error('[Messages API] Failed to create message:', {
-        status: error.response?.status,
-        message: error.response?.data?.message,
-        errors: errorDetails,
-      })
-      throw new Error(detailedMessage)
-    }
-    throw error
+    console.error('[Messages API] Failed to create message:', {
+      status: (error as any)?.response?.status,
+      message: (error as any)?.response?.data?.message,
+      errors: (error as any)?.response?.data?.errors
+    })
+    const context: ApiErrorContext = { action: 'create-message', entity: 'message' }
+    return { data: null, error: getUserFriendlyError(error, context) }
   }
 }
 
 /**
  * Read messages for a channel.
  * GET /messages/read - Query params: channel_id, page, per_page
- * 
+ *
  * API Documentation:
  * Endpoint: GET /read
  * Headers: { Content-Type: application/json, token: {login_token} }
  * Success Response: { success: true, message: "...", data: { messages: [...], pagination: {...} } }
- * 
+ *
  * @param data - Query parameters with channel_id, page, and per_page
  * @returns Messages array with pagination metadata
  */
@@ -206,17 +201,17 @@ export async function readMessages(data: {
   channel_id: string
   page?: number
   per_page?: number
-}): Promise<AxiosResponse> {
+}): Promise<{ data: AxiosResponse | null, error: string | null }> {
   try {
     // Validate channel_id
     if (!data.channel_id || data.channel_id.trim() === '') {
-      throw new Error('channel_id is required')
+      return { data: null, error: 'channel_id is required' }
     }
 
     const params: Record<string, any> = {
       channel_id: data.channel_id.trim(),
       page: data.page || 1,
-      per_page: data.per_page || 20,
+      per_page: data.per_page || 20
     }
 
     console.log('[Messages API] Full request details:', {
@@ -230,54 +225,50 @@ export async function readMessages(data: {
     const response = await apiClient.get('/read', { params })
 
     console.log('[Messages API] Raw response status:', response.status)
-    console.log('[Messages API] Full response object:', response.data)
     console.log('[Messages API] Messages retrieved:', {
       status: response.status,
       messageCount: response.data?.data?.messages?.length || 0,
       channelId: data.channel_id,
-      hasPagination: !!response.data?.data?.pagination,
+      hasPagination: !!response.data?.data?.pagination
     })
 
-    return response
+    return { data: response, error: null }
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error('[Messages API] Failed to read messages:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        message: error.response?.data?.message,
-        url: error.config?.url,
-        params: error.config?.params,
-        channelId: data.channel_id,
-      })
-      throw new Error(error.response?.data?.message || error.message)
-    }
-    console.error('[Messages API] Non-axios error:', error)
-    throw error
+    console.error('[Messages API] Failed to read messages:', {
+      status: (error as any)?.response?.status,
+      statusText: (error as any)?.response?.statusText,
+      message: (error as any)?.response?.data?.message,
+      url: (error as any).config?.url,
+      params: (error as any).config?.params,
+      channelId: data.channel_id
+    })
+    const context: ApiErrorContext = { action: 'fetch-messages', entity: 'message' }
+    return { data: null, error: getUserFriendlyError(error, context) }
   }
 }
 
 /**
  * Update a message.
  * PATCH /messages/update
- * 
+ *
  * @param data - Update data with channel_id, message_id, updated content, and optional file
- * @returns Updated message response
+ * @returns Updated message response or error
  */
 export async function updateMessage(data: {
   channel_id: string
   message_id: string
   message: string
   file?: File
-}): Promise<AxiosResponse> {
+}): Promise<{ data: AxiosResponse | null, error: string | null }> {
   const trimmedMessage = simpleTrimStartEnd(data.message)
   try {
     console.log('[Messages API] Updating message:', {
       channel_id: data.channel_id,
       message_id: data.message_id,
-      hasFile: !!data.file,
+      hasFile: !!data.file
     })
 
-    // File upload uses multipart/form-data and POST with _method=PATCH for form-data fallback
+    // File upload uses multipart/form-data
     if (data.file) {
       const formData = new FormData()
       formData.append('channel_id', data.channel_id)
@@ -286,39 +277,37 @@ export async function updateMessage(data: {
       formData.append('file', data.file)
 
       const response = await apiClient.patch('/update', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': 'multipart/form-data' }
       })
 
       console.log('[Messages API] Message with file updated successfully')
-      return response
+      return { data: response, error: null }
     }
 
     // Text-only update
-      const response = await apiClient.patch('/update', {
-        channel_id: data.channel_id,
-        message_id: data.message_id,
-        message: trimmedMessage,
+    const response = await apiClient.patch('/update', {
+      channel_id: data.channel_id,
+      message_id: data.message_id,
+      message: trimmedMessage
     })
 
     console.log('[Messages API] Text message updated successfully')
-    return response
+    return { data: response, error: null }
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error('[Messages API] Failed to update message:', {
-        status: error.response?.status,
-        message: error.response?.data?.message,
-        messageId: data.message_id,
-      })
-      throw new Error(error.response?.data?.message || error.message)
-    }
-    throw error
+    console.error('[Messages API] Failed to update message:', {
+      status: (error as any)?.response?.status,
+      message: (error as any)?.response?.data?.message,
+      messageId: data.message_id
+    })
+    const context: ApiErrorContext = { action: 'update-message', entity: 'message' }
+    return { data: null, error: getUserFriendlyError(error, context) }
   }
 }
 
 /**
  * Delete a message.
  * DELETE /messages/delete
- * 
+ *
  * @param data - Delete data with channel_id and message_id
  * @returns Success response
  */
@@ -329,7 +318,7 @@ export async function deleteMessage(data: {
   try {
     console.log('[Messages API] Deleting message:', {
       channel_id: data.channel_id,
-      message_id: data.message_id,
+      message_id: data.message_id
     })
 
     const response = await apiClient.delete('/delete', { data })
@@ -341,7 +330,7 @@ export async function deleteMessage(data: {
       console.error('[Messages API] Failed to delete message:', {
         status: error.response?.status,
         message: error.response?.data?.message,
-        messageId: data.message_id,
+        messageId: data.message_id
       })
       throw new Error(error.response?.data?.message || error.message)
     }
@@ -399,21 +388,21 @@ export async function markMessagesAsRead(data: {
 /**
  * React to a message with emoji (WhatsApp-like behavior).
  * POST /messages/react
- * 
+ *
  * Implements WhatsApp-like reaction logic:
  * - User can only have ONE active reaction per message
  * - Reacting with different emoji replaces the previous one
  * - Reacting with the SAME emoji removes the reaction (toggle)
- * 
+ *
  * @param data - Reaction data including channel, messages, emoji, and optional previous emoji
- * @returns Updated message with new reaction state
+ * @returns Updated message with new reaction state or error
  */
 export async function reactToMessage(data: {
   channel_id: string
   message_ids: string[]
   emoji: string
-  previous_emoji?: string | null  // The user's current reaction emoji (if any)
-}): Promise<AxiosResponse> {
+  previous_emoji?: string | null // The user's current reaction emoji (if any)
+}): Promise<{ data: AxiosResponse | null, error: string | null }> {
   try {
     console.log('[Messages API] Reacting to message:', {
       channel_id: data.channel_id,
@@ -424,12 +413,12 @@ export async function reactToMessage(data: {
       isReplace: data.previous_emoji && data.emoji !== data.previous_emoji
     })
 
-    return await apiClient.post('/react', data)
+    const response = await apiClient.post('/react', data)
+    return { data: response, error: null }
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.message || error.message)
-    }
-    throw error
+    console.error('[Messages API] Failed to react to message:', error)
+    const context: ApiErrorContext = { action: 'react-message', entity: 'message' }
+    return { data: null, error: getUserFriendlyError(error, context) }
   }
 }
 
@@ -464,7 +453,7 @@ export { apiClient as messagesApiClient }
 /**
  * Check if the current user can edit a message.
  * Only the message sender can edit it.
- * 
+ *
  * @param message - The message to check
  * @param currentUserId - The current user's ID
  * @returns True if user owns the message
@@ -476,7 +465,7 @@ export function canEditMessage(message: Message, currentUserId: string): boolean
 /**
  * Check if the current user can delete a message.
  * Only the message sender can delete it.
- * 
+ *
  * @param message - The message to check
  * @param currentUserId - The current user's ID
  * @returns True if user owns the message

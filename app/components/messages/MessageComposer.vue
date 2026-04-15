@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { simpleTrimStartEnd } from '~/composables/useMessageUtils'
+
 interface Emits {
-  (e: 'send', data: { content: string; file?: File }): void
+  (e: 'send', data: { content: string, file?: File }): void
 }
 
 defineEmits<Emits>()
@@ -10,28 +12,28 @@ const selectedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement>()
 const isLoading = ref(false)
 
-function validateFile(file: File): { valid: boolean; error: string } {
+function validateFile(file: File): { valid: boolean, error: string } {
   const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-const ALLOWED_EXTENSIONS = new Set([
-    'jpg','jpeg','png','gif','webp','pdf','doc','docx','xls','xlsx','ppt','pptx','txt','zip','mp4','mp3','webm','ogg','wav'
+  const ALLOWED_EXTENSIONS = new Set([
+    'jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'zip', 'mp4', 'mp3', 'webm', 'ogg', 'wav'
   ])
   const ALLOWED_MIME_TYPES = new Set([
-    'image/jpeg','image/jpg','image/png','image/gif','image/webp',
-    'application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+    'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'text/plain',
     'application/zip',
-'video/mp4','audio/mpeg','audio/webm','audio/webm;codecs=opus','audio/ogg','audio/ogg;codecs=opus','audio/wav','audio/webm;codecs=vorbis'
+    'video/mp4', 'audio/mpeg', 'audio/webm', 'audio/webm;codecs=opus', 'audio/ogg', 'audio/ogg;codecs=opus', 'audio/wav', 'audio/webm;codecs=vorbis'
   ])
-  
+
   const sizeOk = file.size <= MAX_FILE_SIZE
   const mimeOk = ALLOWED_MIME_TYPES.has(file.type)
   const ext = file.name.toLowerCase().split('.').pop()
   const extOk = ext && ALLOWED_EXTENSIONS.has(ext!)
   const typeOk = mimeOk && extOk
 
-  if (!sizeOk) return { valid: false, error: `File too large (${(file.size/1024/1024).toFixed(1)}MB > 10MB)` }
+  if (!sizeOk) return { valid: false, error: `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB > 10MB)` }
   if (!typeOk) return { valid: false, error: 'File type not allowed. Server supports ONLY: Images (JPG/JPEG/PNG/GIF/WEBP), Docs (PDF/DOC/DOCX/XLS/XLSX/PPT/PPTX/TXT), Zip, MP4, MP3.' }
   return { valid: true, error: '' }
 }
@@ -60,8 +62,6 @@ function removeFile() {
     fileInput.value.value = ''
   }
 }
-
-import { simpleTrimStartEnd } from '~/composables/useMessageUtils';
 
 async function sendMessage() {
   const trimmedContent = simpleTrimStartEnd(content.value)
@@ -94,8 +94,14 @@ function handleKeyDown(event: KeyboardEvent) {
 <template>
   <div class="border-t border-[var(--ui-border)] bg-[var(--ui-bg)] p-4">
     <!-- File Preview -->
-    <div v-if="selectedFile" class="mb-3 flex items-center gap-2 p-2 bg-[var(--ui-bg-elevated)] rounded-lg">
-      <UIcon name="i-mdi-file" class="w-4 h-4 text-[var(--ui-primary)]" />
+    <div
+      v-if="selectedFile"
+      class="mb-3 flex items-center gap-2 p-2 bg-[var(--ui-bg-elevated)] rounded-lg"
+    >
+      <UIcon
+        name="i-mdi-file"
+        class="w-4 h-4 text-[var(--ui-primary)]"
+      />
       <span class="text-sm text-[var(--ui-text-muted)] flex-1">{{ selectedFile.name }}</span>
       <UButton
         icon="i-mdi-close"
@@ -115,7 +121,7 @@ function handleKeyDown(event: KeyboardEvent) {
         accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,application/zip,video/mp4,audio/mpeg"
         class="hidden"
         @change="handleFileSelect"
-      />
+      >
       <UButton
         icon="i-mdi-paperclip"
         size="lg"

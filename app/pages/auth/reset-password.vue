@@ -76,8 +76,12 @@ async function handleSubmit() {
     gradient="from-[var(--ui-warning)]/7 via-transparent to-[var(--ui-secondary)]/10"
   >
     <div class="mb-7">
-      <h2 class="text-xl font-black text-[var(--ui-text-highlighted)] sm:text-2xl">Set a new password</h2>
-      <p class="mt-2 text-sm leading-6 text-[var(--ui-text-muted)] sm:text-[0.95rem]">Use a strong password that you have not used elsewhere.</p>
+      <h2 class="text-xl font-black text-[var(--ui-text-highlighted)] sm:text-2xl">
+        Set a new password
+      </h2>
+      <p class="mt-2 text-sm leading-6 text-[var(--ui-text-muted)] sm:text-[0.95rem]">
+        Use a strong password that you have not used elsewhere.
+      </p>
     </div>
 
     <div
@@ -87,7 +91,10 @@ async function handleSubmit() {
       {{ successMessage }}
     </div>
 
-    <div v-if="successMessage" class="space-y-5">
+    <div
+      v-if="successMessage"
+      class="space-y-5"
+    >
       <div class="rounded-2xl border border-[var(--ui-success)]/20 bg-[var(--ui-success)]/8 px-4 py-4 text-sm text-[var(--ui-success)]">
         {{ successMessage }}
       </div>
@@ -102,7 +109,12 @@ async function handleSubmit() {
       />
     </div>
 
-    <form v-else class="space-y-5" novalidate @submit.prevent="handleSubmit">
+    <form
+      v-else
+      class="space-y-5"
+      novalidate
+      @submit.prevent="handleSubmit"
+    >
       <BaseInput
         v-model="token"
         label="Reset token"
@@ -135,7 +147,10 @@ async function handleSubmit() {
               aria-label="Toggle password visibility"
               @click="showPassword = !showPassword"
             >
-              <UIcon :name="showPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
+              <UIcon
+                :name="showPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'"
+                class="h-5 w-5"
+              />
             </button>
           </template>
         </BaseInput>
@@ -176,7 +191,10 @@ async function handleSubmit() {
             aria-label="Toggle confirm password visibility"
             @click="showPasswordConfirmation = !showPasswordConfirmation"
           >
-            <UIcon :name="showPasswordConfirmation ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
+            <UIcon
+              :name="showPasswordConfirmation ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'"
+              class="h-5 w-5"
+            />
           </button>
         </template>
       </BaseInput>
@@ -201,9 +219,15 @@ async function handleSubmit() {
       />
     </form>
 
-    <div v-if="!successMessage" class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]">
+    <div
+      v-if="!successMessage"
+      class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]"
+    >
       Return to
-      <NuxtLink to="/auth/login" class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80">
+      <NuxtLink
+        to="/auth/login"
+        class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80"
+      >
         sign in
       </NuxtLink>
     </div>

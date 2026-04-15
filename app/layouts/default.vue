@@ -23,7 +23,10 @@ function handleLogout() {
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center py-4">
           <!-- Logo -->
-          <NuxtLink to="/" class="flex items-center gap-2 font-bold text-2xl bg-gradient-to-r from-[var(--ui-primary)] to-[var(--ui-secondary)] bg-clip-text text-transparent">
+          <NuxtLink
+            to="/"
+            class="flex items-center gap-2 font-bold text-2xl bg-gradient-to-r from-[var(--ui-primary)] to-[var(--ui-secondary)] bg-clip-text text-transparent"
+          >
             <span>Chat</span><span class="text-[var(--ui-success)]">Sphere</span>
           </NuxtLink>
 
@@ -35,7 +38,10 @@ function handleLogout() {
               :to="item.to"
               class="flex items-center gap-2 px-3 py-2 rounded-lg text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] hover:bg-[var(--ui-bg-elevated)] transition-all duration-200 font-medium"
             >
-              <UIcon :name="item.icon" class="w-4 h-4" />
+              <UIcon
+                :name="item.icon"
+                class="w-4 h-4"
+              />
               {{ item.label }}
             </NuxtLink>
           </nav>
@@ -89,7 +95,10 @@ function handleLogout() {
         <div class="grid md:grid-cols-4 gap-8">
           <!-- Product -->
           <div>
-            <NuxtLink to="/" class="flex items-center gap-2 font-bold text-xl mb-4 bg-gradient-to-r from-[var(--ui-primary)] to-[var(--ui-secondary)] bg-clip-text text-transparent">
+            <NuxtLink
+              to="/"
+              class="flex items-center gap-2 font-bold text-xl mb-4 bg-gradient-to-r from-[var(--ui-primary)] to-[var(--ui-secondary)] bg-clip-text text-transparent"
+            >
               ChatSphere
             </NuxtLink>
             <p class="text-[var(--ui-text-muted)] mb-4 max-w-sm">
@@ -99,29 +108,80 @@ function handleLogout() {
 
           <!-- Links -->
           <div>
-            <h4 class="font-semibold text-[var(--ui-text)] mb-4">Product</h4>
+            <h4 class="font-semibold text-[var(--ui-text)] mb-4">
+              Product
+            </h4>
             <ul class="space-y-2 text-sm">
-              <li><NuxtLink to="/#features" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Features</NuxtLink></li>
-              <li><NuxtLink to="/#reviews" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Reviews</NuxtLink></li>
-              <li><NuxtLink to="/#get-started" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Get Started</NuxtLink></li>
+              <li>
+                <NuxtLink
+                  to="/#features"
+                  class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors"
+                >Features</NuxtLink>
+              </li>
+              <li>
+                <NuxtLink
+                  to="/#reviews"
+                  class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors"
+                >Reviews</NuxtLink>
+              </li>
+              <li>
+                <NuxtLink
+                  to="/#get-started"
+                  class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors"
+                >Get Started</NuxtLink>
+              </li>
             </ul>
           </div>
 
           <div>
-            <h4 class="font-semibold text-[var(--ui-text)] mb-4">Company</h4>
+            <h4 class="font-semibold text-[var(--ui-text)] mb-4">
+              Company
+            </h4>
             <ul class="space-y-2 text-sm">
-              <li><a href="#" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">About</a></li>
-              <li><a href="#" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Careers</a></li>
-              <li><a href="#" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Blog</a></li>
+              <li>
+                <a
+                  href="#"
+                  class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors"
+                >About</a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors"
+                >Careers</a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors"
+                >Blog</a>
+              </li>
             </ul>
           </div>
 
           <div>
-            <h4 class="font-semibold text-[var(--ui-text)] mb-4">Connect</h4>
+            <h4 class="font-semibold text-[var(--ui-text)] mb-4">
+              Connect
+            </h4>
             <ul class="space-y-2 text-sm">
-              <li><a href="#" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Discord</a></li>
-              <li><a href="#" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Twitter</a></li>
-              <li><a href="#" class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors">Support</a></li>
+              <li>
+                <a
+                  href="#"
+                  class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors"
+                >Discord</a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors"
+                >Twitter</a>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  class="text-[var(--ui-text-muted)] hover:text-[var(--ui-primary)] transition-colors"
+                >Support</a>
+              </li>
             </ul>
           </div>
         </div>

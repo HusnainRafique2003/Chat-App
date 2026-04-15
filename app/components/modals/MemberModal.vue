@@ -20,7 +20,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
-  existingMembers: () => [],
+  existingMembers: () => []
 })
 
 const emit = defineEmits<{
@@ -38,9 +38,9 @@ const selectedRole = ref<'admin' | 'member' | 'guest'>('member')
 const emailError = ref('')
 
 const roles = [
-  { value: 'admin',  label: 'Admin',  icon: 'i-mdi-shield-crown',  desc: 'Full control' },
-  { value: 'member', label: 'Member', icon: 'i-mdi-account',        desc: 'Standard access' },
-  { value: 'guest',  label: 'Guest',  icon: 'i-mdi-account-clock',  desc: 'Read-only access' },
+  { value: 'admin', label: 'Admin', icon: 'i-mdi-shield-crown', desc: 'Full control' },
+  { value: 'member', label: 'Member', icon: 'i-mdi-account', desc: 'Standard access' },
+  { value: 'guest', label: 'Guest', icon: 'i-mdi-account-clock', desc: 'Read-only access' }
 ]
 
 function addEmail() {
@@ -101,12 +101,16 @@ watch(open, (val) => {
     @confirm="handleSubmit"
     @cancel="emit('cancel')"
   >
-
     <!-- ADD MODE -->
-    <div v-if="mode === 'add'" class="flex flex-col gap-4">
-
+    <div
+      v-if="mode === 'add'"
+      class="flex flex-col gap-4"
+    >
       <!-- Email Input -->
-      <UFormField label="Email Addresses" :error="emailError">
+      <UFormField
+        label="Email Addresses"
+        :error="emailError"
+      >
         <div class="flex flex-col gap-2 sm:flex-row sm:items-start">
           <BaseInput
             v-model="emailInput"
@@ -116,32 +120,48 @@ watch(open, (val) => {
             class="flex-1"
             @enter="addEmail"
           />
-          <UButton icon="i-lucide-plus" color="primary" class="min-h-12 justify-center rounded-2xl px-4 sm:self-start" @click="addEmail" />
+          <UButton
+            icon="i-lucide-plus"
+            color="primary"
+            class="min-h-12 justify-center rounded-2xl px-4 sm:self-start"
+            @click="addEmail"
+          />
         </div>
       </UFormField>
 
       <!-- Email Tags -->
-      <div v-if="emailList.length > 0" class="flex flex-wrap gap-2">
+      <div
+        v-if="emailList.length > 0"
+        class="flex flex-wrap gap-2"
+      >
         <div
           v-for="email in emailList"
           :key="email"
           class="flex items-center gap-1.5 rounded-full border border-[var(--ui-primary)]/12 bg-[var(--ui-primary)]/8 px-3 py-1.5 text-xs font-medium text-[var(--ui-primary)]"
         >
-          <UIcon name="i-mdi-email" class="shrink-0 text-sm" />
+          <UIcon
+            name="i-mdi-email"
+            class="shrink-0 text-sm"
+          />
           <span class="break-all">{{ email }}</span>
           <button
             type="button"
             class="ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[var(--ui-error)]/10 hover:text-[var(--ui-error)]"
             @click="removeEmail(email)"
           >
-            <UIcon name="i-lucide-x" class="text-sm" />
+            <UIcon
+              name="i-lucide-x"
+              class="text-sm"
+            />
           </button>
         </div>
       </div>
 
       <!-- Role Selector -->
       <div class="flex flex-col gap-2">
-        <p class="text-sm font-medium text-default">Assign Role</p>
+        <p class="text-sm font-medium text-default">
+          Assign Role
+        </p>
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <button
             v-for="role in roles"
@@ -152,10 +172,17 @@ watch(open, (val) => {
               : 'border-default bg-muted hover:border-primary/40'"
             @click="selectedRole = role.value as any"
           >
-            <UIcon :name="role.icon" class="text-xl"
-              :class="selectedRole === role.value ? 'text-primary' : 'text-muted'" />
-            <p class="text-xs font-medium text-default">{{ role.label }}</p>
-            <p class="text-[10px] text-muted">{{ role.desc }}</p>
+            <UIcon
+              :name="role.icon"
+              class="text-xl"
+              :class="selectedRole === role.value ? 'text-primary' : 'text-muted'"
+            />
+            <p class="text-xs font-medium text-default">
+              {{ role.label }}
+            </p>
+            <p class="text-[10px] text-muted">
+              {{ role.desc }}
+            </p>
           </button>
         </div>
       </div>
@@ -171,18 +198,28 @@ watch(open, (val) => {
             :key="m.id"
             class="flex flex-wrap items-center gap-2 rounded bg-muted p-2"
           >
-            <UAvatar :alt="m.name" size="xs" />
+            <UAvatar
+              :alt="m.name"
+              size="xs"
+            />
             <span class="min-w-0 text-xs text-default sm:flex-1">{{ m.name }}</span>
             <span class="w-full text-xs text-muted sm:w-auto">{{ m.email }}</span>
-            <UBadge :label="m.role ?? 'member'" variant="soft" size="sm" class="sm:ml-auto" />
+            <UBadge
+              :label="m.role ?? 'member'"
+              variant="soft"
+              size="sm"
+              class="sm:ml-auto"
+            />
           </div>
         </div>
       </div>
-
     </div>
 
     <!-- REMOVE MODE -->
-    <div v-else-if="targetMember" class="flex flex-col gap-4">
+    <div
+      v-else-if="targetMember"
+      class="flex flex-col gap-4"
+    >
       <UAlert
         color="error"
         variant="soft"
@@ -191,14 +228,25 @@ watch(open, (val) => {
         :description="`${targetMember.name} will lose all access to ${entityType}: ${entityName}.`"
       />
       <div class="flex flex-col gap-3 rounded-lg bg-muted p-3 sm:flex-row sm:items-center">
-        <UAvatar :alt="targetMember.name" size="md" />
+        <UAvatar
+          :alt="targetMember.name"
+          size="md"
+        />
         <div>
-          <p class="text-sm font-semibold text-default">{{ targetMember.name }}</p>
-          <p class="text-xs text-muted">{{ targetMember.email }}</p>
-          <UBadge :label="targetMember.role ?? 'member'" variant="soft" size="sm" class="mt-1" />
+          <p class="text-sm font-semibold text-default">
+            {{ targetMember.name }}
+          </p>
+          <p class="text-xs text-muted">
+            {{ targetMember.email }}
+          </p>
+          <UBadge
+            :label="targetMember.role ?? 'member'"
+            variant="soft"
+            size="sm"
+            class="mt-1"
+          />
         </div>
       </div>
     </div>
-
   </BaseModal>
 </template>

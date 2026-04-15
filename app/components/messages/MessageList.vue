@@ -10,14 +10,14 @@ import MessageBubble from './MessageBubble.vue'
 import RichMessageComposer from './RichMessageComposer.vue'
 
 interface Props {
- channelId: string
+  channelId: string
   loading?: boolean
 }
 
 interface Emits {
   (e: 'message-deleted', messageId: string): void
-  (e: 'message-edited', data: { messageId: string; content: string; file?: File }): void
-  (e: 'reaction-added', data: { messageId: string; emoji: string }): void
+  (e: 'message-edited', data: { messageId: string, content: string, file?: File }): void
+  (e: 'reaction-added', data: { messageId: string, emoji: string }): void
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -97,22 +97,22 @@ async function handleScroll() {
   // When user scrolls near the top, load more messages
   if (scrollTop < scrollThreshold.value && messageStore.hasMoreMessages && !messageStore.loadingMore) {
     console.log('[MessageList] User scrolled to top, loading more messages')
-    
+
     // Disable auto-scroll when loading more messages
     shouldAutoScroll.value = false
-    
+
     // Find the first visible message ID to maintain scroll position
     const firstVisibleElement = messagesContainer.value.querySelector('[data-message-id]')
     const firstVisibleMessageId = firstVisibleElement?.getAttribute('data-message-id')
-    
+
     console.log('[MessageList] First visible message ID:', firstVisibleMessageId)
 
     const result = await messageStore.loadMoreMessages()
-    
+
     if (result.success) {
       // Wait for DOM update
       await nextTick()
-      
+
       // Scroll to the first visible message to maintain position
       if (firstVisibleMessageId) {
         requestAnimationFrame(() => {
@@ -142,10 +142,10 @@ function cancelEdit() {
 
 async function handleSaveEdit(content: string) {
   if (!editingMessage.value) return
-  
+
   const messageId = editingMessage.value.id
   const result = await messageStore.updateMessage(props.channelId, messageId, content)
-  
+
   if (result.success) {
     cancelEdit()
     emit('message-edited', { messageId, content })
@@ -177,10 +177,10 @@ function cancelDelete() {
 
 async function handleDeleteMessage() {
   if (!deletingMessageId.value) return
-  
+
   const messageId = deletingMessageId.value
   const result = await messageStore.deleteMessage(props.channelId, messageId)
-  
+
   if (result.success) {
     emit('message-deleted', messageId)
     toast.add({
@@ -195,7 +195,7 @@ async function handleDeleteMessage() {
     // Keep modal open so user can retry
     showDeleteModal.value = true
   }
-  
+
   cancelDelete()
 }
 
@@ -204,7 +204,7 @@ async function handleReaction(messageId: string, emoji: string) {
   emit('reaction-added', { messageId, emoji })
 }
 
-async function handleMessageSent(data: { content: string; file?: File; scheduledAt?: Date }) {
+async function handleMessageSent(data: { content: string, file?: File, scheduledAt?: Date }) {
   console.log('[MessageList] handleMessageSent:', {
     channelId: props.channelId,
     content: data.content,
@@ -215,7 +215,7 @@ async function handleMessageSent(data: { content: string; file?: File; scheduled
   })
 
   const result = await messageStore.createMessage(props.channelId, data.content, data.file, data.scheduledAt)
-  
+
   if (!result.success) {
     toast.add({
       title: 'Failed to send message',
@@ -223,7 +223,7 @@ async function handleMessageSent(data: { content: string; file?: File; scheduled
       color: 'error'
     })
   }
-  
+
   // Always scroll to bottom and re-enable auto-scroll
   shouldAutoScroll.value = true
   await nextTick()
@@ -242,32 +242,60 @@ async function handleMessageSent(data: { content: string; file?: File; scheduled
       @scroll="handleScroll"
     >
       <!-- Load More Indicator -->
-      <div v-if="messageStore.loadingMore" class="flex items-center justify-center py-4">
+      <div
+        v-if="messageStore.loadingMore"
+        class="flex items-center justify-center py-4"
+      >
         <div class="text-center">
-          <UIcon name="i-mdi-chevron-up" class="w-6 h-6 animate-bounce text-[var(--ui-primary)] mx-auto mb-2" />
-          <p class="text-sm text-[var(--ui-text-muted)]">Loading earlier messages...</p>
+          <UIcon
+            name="i-mdi-chevron-up"
+            class="w-6 h-6 animate-bounce text-[var(--ui-primary)] mx-auto mb-2"
+          />
+          <p class="text-sm text-[var(--ui-text-muted)]">
+            Loading earlier messages...
+          </p>
         </div>
       </div>
 
       <!-- Loading State -->
-      <div v-if="loading" class="flex items-center justify-center h-full">
+      <div
+        v-if="loading"
+        class="flex items-center justify-center h-full"
+      >
         <div class="text-center">
-          <UIcon name="i-mdi-loading" class="w-8 h-8 animate-spin text-[var(--ui-primary)] mx-auto mb-2" />
-          <p class="text-[var(--ui-text-muted)]">Loading messages...</p>
+          <UIcon
+            name="i-mdi-loading"
+            class="w-8 h-8 animate-spin text-[var(--ui-primary)] mx-auto mb-2"
+          />
+          <p class="text-[var(--ui-text-muted)]">
+            Loading messages...
+          </p>
         </div>
       </div>
 
       <!-- Empty State -->
-      <div v-else-if="sortedMessages.length === 0" class="flex items-center justify-center h-full">
+      <div
+        v-else-if="sortedMessages.length === 0"
+        class="flex items-center justify-center h-full"
+      >
         <div class="text-center">
-          <UIcon name="i-mdi-chat-outline" class="w-12 h-12 text-[var(--ui-text-dimmed)] mx-auto mb-3" />
-          <p class="text-[var(--ui-text-muted)]">No messages yet. Start the conversation!</p>
+          <UIcon
+            name="i-mdi-chat-outline"
+            class="w-12 h-12 text-[var(--ui-text-dimmed)] mx-auto mb-3"
+          />
+          <p class="text-[var(--ui-text-muted)]">
+            No messages yet. Start the conversation!
+          </p>
         </div>
       </div>
 
       <!-- Messages -->
       <template v-else>
-        <div v-for="message in sortedMessages" :key="message.id" :data-message-id="message.id">
+        <div
+          v-for="message in sortedMessages"
+          :key="message.id"
+          :data-message-id="message.id"
+        >
           <MessageBubble
             :message="message"
             @edit="startEdit(message)"

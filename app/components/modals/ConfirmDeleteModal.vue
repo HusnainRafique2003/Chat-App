@@ -8,7 +8,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  loading: false,
+  loading: false
 })
 
 const emit = defineEmits<{
@@ -82,8 +82,16 @@ watch(open, (val) => {
         :disabled="loading"
         @keyup.enter="handleConfirm"
       />
-      <p v-if="inputError" class="text-xs text-error">{{ inputError }}</p>
-      <p v-if="isMatch" class="text-xs text-success">
+      <p
+        v-if="inputError"
+        class="text-xs text-error"
+      >
+        {{ inputError }}
+      </p>
+      <p
+        v-if="isMatch"
+        class="text-xs text-success"
+      >
         ✓ Name matches — you can now delete this {{ entityType }}.
       </p>
     </div>

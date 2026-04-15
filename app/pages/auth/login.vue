@@ -77,11 +77,19 @@ function handlePasswordBlur() {
     gradient="from-[var(--ui-primary)]/7 via-transparent to-[var(--ui-secondary)]/10"
   >
     <div class="mb-7">
-      <h2 class="text-xl font-black text-[var(--ui-text-highlighted)] sm:text-2xl">Sign in</h2>
-      <p class="mt-2 text-sm leading-6 text-[var(--ui-text-muted)] sm:text-[0.95rem]">Use your workspace credentials to access the dashboard.</p>
+      <h2 class="text-xl font-black text-[var(--ui-text-highlighted)] sm:text-2xl">
+        Sign in
+      </h2>
+      <p class="mt-2 text-sm leading-6 text-[var(--ui-text-muted)] sm:text-[0.95rem]">
+        Use your workspace credentials to access the dashboard.
+      </p>
     </div>
 
-    <form class="space-y-5" novalidate @submit.prevent>
+    <form
+      class="space-y-5"
+      novalidate
+      @submit.prevent
+    >
       <BaseInput
         v-model="email"
         label="Work email"
@@ -115,12 +123,18 @@ function handlePasswordBlur() {
               aria-label="Toggle password visibility"
               @click="showPassword = !showPassword"
             >
-              <UIcon :name="showPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
+              <UIcon
+                :name="showPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'"
+                class="h-5 w-5"
+              />
             </button>
           </template>
         </BaseInput>
 
-        <div v-if="passwordStrength" class="mt-3 flex items-center gap-2">
+        <div
+          v-if="passwordStrength"
+          class="mt-3 flex items-center gap-2"
+        >
           <div class="h-2 flex-1 overflow-hidden rounded-full bg-[var(--ui-bg-muted)]">
             <div
               class="h-full rounded-full transition-all duration-300"
@@ -138,8 +152,13 @@ function handlePasswordBlur() {
       </div>
 
       <div class="flex items-center justify-between gap-4 pt-1">
-        <p class="text-sm text-[var(--ui-text-muted)]">Use the same email you registered with.</p>
-        <NuxtLink to="/auth/forgot-password" class="text-sm font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80">
+        <p class="text-sm text-[var(--ui-text-muted)]">
+          Use the same email you registered with.
+        </p>
+        <NuxtLink
+          to="/auth/forgot-password"
+          class="text-sm font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80"
+        >
           Forgot password?
         </NuxtLink>
       </div>
@@ -167,7 +186,10 @@ function handlePasswordBlur() {
 
     <div class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]">
       Don&apos;t have an account?
-      <NuxtLink to="/auth/register" class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80">
+      <NuxtLink
+        to="/auth/register"
+        class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80"
+      >
         Create one
       </NuxtLink>
     </div>

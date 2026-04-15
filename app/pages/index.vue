@@ -191,7 +191,10 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="page-shell">
-    <section id="home" class="page-section px-4 pb-12 pt-8 sm:px-6 lg:px-8 lg:pb-20 lg:pt-14">
+    <section
+      id="home"
+      class="page-section px-4 pb-12 pt-8 sm:px-6 lg:px-8 lg:pb-20 lg:pt-14"
+    >
       <div class="hero-panel mx-auto max-w-7xl px-6 py-8 sm:px-8 lg:px-12 lg:py-12">
         <div class="grid items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]">
           <div class="relative z-10 animate-in">
@@ -209,21 +212,40 @@ onBeforeUnmount(() => {
             </p>
 
             <div class="stagger-4 animate-in flex flex-col gap-4 sm:flex-row">
-              <UButton label="Create Workspace" size="xl" color="primary" class="px-6 py-3 text-sm font-semibold transition-transform duration-300 hover:-translate-y-1" @click="goToRegister" />
-              <UButton label="Sign In" size="xl" color="neutral" variant="soft" class="px-6 py-3 text-sm font-semibold transition-transform duration-300 hover:-translate-y-1" @click="goToLogin" />
+              <UButton
+                label="Create Workspace"
+                size="xl"
+                color="primary"
+                class="px-6 py-3 text-sm font-semibold transition-transform duration-300 hover:-translate-y-1"
+                @click="goToRegister"
+              />
+              <UButton
+                label="Sign In"
+                size="xl"
+                color="neutral"
+                variant="soft"
+                class="px-6 py-3 text-sm font-semibold transition-transform duration-300 hover:-translate-y-1"
+                @click="goToLogin"
+              />
             </div>
 
             <div class="stagger-5 animate-in mt-10 grid max-w-2xl gap-3 sm:grid-cols-3">
               <div class="flex h-full flex-col justify-between rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/72 px-4 py-3 text-sm text-[var(--ui-text-muted)]">
-                <div class="mb-1 font-semibold text-[var(--ui-text-highlighted)]">Channel-first</div>
+                <div class="mb-1 font-semibold text-[var(--ui-text-highlighted)]">
+                  Channel-first
+                </div>
                 Clear conversation lanes for every team.
               </div>
               <div class="flex h-full flex-col justify-between rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/72 px-4 py-3 text-sm text-[var(--ui-text-muted)]">
-                <div class="mb-1 font-semibold text-[var(--ui-text-highlighted)]">Workspace-ready</div>
+                <div class="mb-1 font-semibold text-[var(--ui-text-highlighted)]">
+                  Workspace-ready
+                </div>
                 Built for onboarding and team growth.
               </div>
               <div class="flex h-full flex-col justify-between rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/72 px-4 py-3 text-sm text-[var(--ui-text-muted)]">
-                <div class="mb-1 font-semibold text-[var(--ui-text-highlighted)]">Tactile UI</div>
+                <div class="mb-1 font-semibold text-[var(--ui-text-highlighted)]">
+                  Tactile UI
+                </div>
                 Warm surfaces with stronger readability.
               </div>
             </div>
@@ -233,20 +255,35 @@ onBeforeUnmount(() => {
             <div class="float-soft rounded-[1.75rem] border border-white/45 bg-white/70 p-5 shadow-[var(--shadow-lg)] backdrop-blur-xl dark:border-white/10 dark:bg-[rgba(12,18,32,0.74)]">
               <div class="mb-5 flex items-start justify-between">
                 <div>
-                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ui-text-dimmed)]">Live Product Preview</p>
-                  <h2 class="mt-2 text-xl font-bold text-[var(--ui-text-highlighted)] sm:text-2xl">Workspace Command Center</h2>
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ui-text-dimmed)]">
+                    Live Product Preview
+                  </p>
+                  <h2 class="mt-2 text-xl font-bold text-[var(--ui-text-highlighted)] sm:text-2xl">
+                    Workspace Command Center
+                  </h2>
                 </div>
-                <UBadge label="Online" color="success" variant="soft" />
+                <UBadge
+                  label="Online"
+                  color="success"
+                  variant="soft"
+                />
               </div>
 
               <div class="grid gap-4">
                 <div class="flex h-full flex-col rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/80 p-4">
                   <div class="mb-3 flex items-center justify-between">
                     <div>
-                      <p class="text-sm font-semibold text-[var(--ui-text)]">Engineering Workspace</p>
-                      <p class="text-xs text-[var(--ui-text-muted)]">12 members and 8 active channels</p>
+                      <p class="text-sm font-semibold text-[var(--ui-text)]">
+                        Engineering Workspace
+                      </p>
+                      <p class="text-xs text-[var(--ui-text-muted)]">
+                        12 members and 8 active channels
+                      </p>
                     </div>
-                    <UIcon name="i-mdi-arrow-top-right" class="h-5 w-5 text-[var(--ui-primary)]" />
+                    <UIcon
+                      name="i-mdi-arrow-top-right"
+                      class="h-5 w-5 text-[var(--ui-primary)]"
+                    />
                   </div>
                   <div class="space-y-2">
                     <div class="flex items-center justify-between rounded-xl bg-[var(--ui-bg-muted)] px-3 py-2 text-sm">
@@ -266,18 +303,28 @@ onBeforeUnmount(() => {
 
                 <div class="grid grid-cols-2 gap-4">
                   <div class="flex h-full flex-col rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/80 p-4">
-                    <p class="text-xs uppercase tracking-[0.16em] text-[var(--ui-text-dimmed)]">Average Response</p>
-                    <p class="mt-2 text-2xl font-black text-[var(--ui-text-highlighted)] sm:text-3xl">2.4m</p>
+                    <p class="text-xs uppercase tracking-[0.16em] text-[var(--ui-text-dimmed)]">
+                      Average Response
+                    </p>
+                    <p class="mt-2 text-2xl font-black text-[var(--ui-text-highlighted)] sm:text-3xl">
+                      2.4m
+                    </p>
                   </div>
                   <div class="flex h-full flex-col rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/80 p-4">
-                    <p class="text-xs uppercase tracking-[0.16em] text-[var(--ui-text-dimmed)]">Team Readiness</p>
-                    <p class="mt-2 text-2xl font-black text-[var(--ui-text-highlighted)] sm:text-3xl">High</p>
+                    <p class="text-xs uppercase tracking-[0.16em] text-[var(--ui-text-dimmed)]">
+                      Team Readiness
+                    </p>
+                    <p class="mt-2 text-2xl font-black text-[var(--ui-text-highlighted)] sm:text-3xl">
+                      High
+                    </p>
                   </div>
                 </div>
 
                 <div class="flex h-full flex-col rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/80 p-4">
                   <div class="mb-3 flex items-center justify-between">
-                    <p class="text-sm font-semibold text-[var(--ui-text)]">Launch Checklist</p>
+                    <p class="text-sm font-semibold text-[var(--ui-text)]">
+                      Launch Checklist
+                    </p>
                     <span class="text-xs text-[var(--ui-text-muted)]">Today</span>
                   </div>
                   <div class="space-y-3 text-sm">
@@ -304,44 +351,69 @@ onBeforeUnmount(() => {
 
     <section class="page-section stats-section px-4 py-10 sm:px-6 lg:px-8">
       <div class="mx-auto grid max-w-7xl gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <UCard v-for="stat in stats" :key="stat.label" class="metric-card animate-in h-full">
+        <UCard
+          v-for="stat in stats"
+          :key="stat.label"
+          class="metric-card animate-in h-full"
+        >
           <div class="flex h-full flex-col">
             <div class="mb-6 flex items-center justify-between gap-3">
               <div class="feature-icon-shell shrink-0">
-                <UIcon :name="stat.icon" class="h-7 w-7 text-[var(--ui-primary)]" />
+                <UIcon
+                  :name="stat.icon"
+                  class="h-7 w-7 text-[var(--ui-primary)]"
+                />
               </div>
               <span class="text-right text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ui-text-dimmed)]">Platform metric</span>
             </div>
             <div class="mt-auto text-3xl font-black text-[var(--ui-text-highlighted)] sm:text-4xl">
               {{ formatStat(stat) }}{{ stat.suffix || '' }}
             </div>
-            <p class="mt-3 text-sm uppercase tracking-[0.12em] text-[var(--ui-text-muted)]">{{ stat.label }}</p>
+            <p class="mt-3 text-sm uppercase tracking-[0.12em] text-[var(--ui-text-muted)]">
+              {{ stat.label }}
+            </p>
           </div>
         </UCard>
       </div>
     </section>
 
-    <section id="features" class="page-section px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
+    <section
+      id="features"
+      class="page-section px-4 py-20 sm:px-6 lg:px-8 lg:py-24"
+    >
       <div class="mx-auto max-w-7xl">
         <div class="mb-12 max-w-3xl animate-in">
           <div class="section-eyebrow mb-5">
             <span class="h-2.5 w-2.5 rounded-full bg-[var(--ui-primary)]" />
             Product capabilities
           </div>
-          <h2 class="section-title mb-5">Designed to feel credible to decision-makers and intuitive for teams.</h2>
+          <h2 class="section-title mb-5">
+            Designed to feel credible to decision-makers and intuitive for teams.
+          </h2>
           <p class="section-copy">
             A professional collaboration product needs more than visuals. It needs clarity in structure, confidence in tone, and enough polish to make the experience feel dependable from the start.
           </p>
         </div>
 
         <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          <UCard v-for="capability in capabilities" :key="capability.title" class="feature-panel animate-in h-full">
+          <UCard
+            v-for="capability in capabilities"
+            :key="capability.title"
+            class="feature-panel animate-in h-full"
+          >
             <div class="flex h-full flex-col">
               <div class="feature-icon-shell mb-6 shrink-0">
-                <UIcon :name="capability.icon" class="h-7 w-7 text-[var(--ui-primary)]" />
+                <UIcon
+                  :name="capability.icon"
+                  class="h-7 w-7 text-[var(--ui-primary)]"
+                />
               </div>
-              <h3 class="mb-4 text-xl font-bold text-[var(--ui-text-highlighted)] sm:text-2xl">{{ capability.title }}</h3>
-              <p class="section-copy mt-auto text-[0.98rem]">{{ capability.desc }}</p>
+              <h3 class="mb-4 text-xl font-bold text-[var(--ui-text-highlighted)] sm:text-2xl">
+                {{ capability.title }}
+              </h3>
+              <p class="section-copy mt-auto text-[0.98rem]">
+                {{ capability.desc }}
+              </p>
             </div>
           </UCard>
         </div>
@@ -363,16 +435,28 @@ onBeforeUnmount(() => {
           </p>
           <div class="space-y-4">
             <div class="flex h-full flex-col rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/72 p-4">
-              <p class="font-semibold text-[var(--ui-text-highlighted)]">Leadership clarity</p>
-              <p class="mt-1 text-sm text-[var(--ui-text-muted)]">Executives need confidence that information moves clearly across teams and priorities.</p>
+              <p class="font-semibold text-[var(--ui-text-highlighted)]">
+                Leadership clarity
+              </p>
+              <p class="mt-1 text-sm text-[var(--ui-text-muted)]">
+                Executives need confidence that information moves clearly across teams and priorities.
+              </p>
             </div>
             <div class="flex h-full flex-col rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/72 p-4">
-              <p class="font-semibold text-[var(--ui-text-highlighted)]">Operational speed</p>
-              <p class="mt-1 text-sm text-[var(--ui-text-muted)]">Operations teams benefit when channels, permissions, and workspace structure are simple and predictable.</p>
+              <p class="font-semibold text-[var(--ui-text-highlighted)]">
+                Operational speed
+              </p>
+              <p class="mt-1 text-sm text-[var(--ui-text-muted)]">
+                Operations teams benefit when channels, permissions, and workspace structure are simple and predictable.
+              </p>
             </div>
             <div class="flex h-full flex-col rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/72 p-4">
-              <p class="font-semibold text-[var(--ui-text-highlighted)]">Daily usability</p>
-              <p class="mt-1 text-sm text-[var(--ui-text-muted)]">A grounded visual system improves readability and makes long sessions feel calmer.</p>
+              <p class="font-semibold text-[var(--ui-text-highlighted)]">
+                Daily usability
+              </p>
+              <p class="mt-1 text-sm text-[var(--ui-text-muted)]">
+                A grounded visual system improves readability and makes long sessions feel calmer.
+              </p>
             </div>
           </div>
         </UCard>
@@ -386,13 +470,21 @@ onBeforeUnmount(() => {
             A professional path from signup to daily communication.
           </h2>
           <div class="space-y-5">
-            <div v-for="item in workflow" :key="item.step" class="grid gap-4 rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/72 p-5 sm:grid-cols-[auto_1fr]">
+            <div
+              v-for="item in workflow"
+              :key="item.step"
+              class="grid gap-4 rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/72 p-5 sm:grid-cols-[auto_1fr]"
+            >
               <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--ui-primary)] text-sm font-bold text-[var(--ui-primary-foreground)]">
                 {{ item.step }}
               </div>
               <div class="min-w-0">
-                <h3 class="text-lg font-bold text-[var(--ui-text-highlighted)] sm:text-xl">{{ item.title }}</h3>
-                <p class="mt-2 text-[var(--ui-text-muted)]">{{ item.desc }}</p>
+                <h3 class="text-lg font-bold text-[var(--ui-text-highlighted)] sm:text-xl">
+                  {{ item.title }}
+                </h3>
+                <p class="mt-2 text-[var(--ui-text-muted)]">
+                  {{ item.desc }}
+                </p>
               </div>
             </div>
           </div>
@@ -400,14 +492,19 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <section id="reviews" class="page-section px-4 py-20 sm:px-6 lg:px-8">
+    <section
+      id="reviews"
+      class="page-section px-4 py-20 sm:px-6 lg:px-8"
+    >
       <div class="mx-auto max-w-7xl">
         <div class="mb-12 max-w-3xl animate-in">
           <div class="section-eyebrow mb-5">
             <span class="h-2.5 w-2.5 rounded-full bg-[var(--ui-secondary)]" />
             Product perception
           </div>
-          <h2 class="section-title mb-5">The first impression should already feel like a serious product.</h2>
+          <h2 class="section-title mb-5">
+            The first impression should already feel like a serious product.
+          </h2>
           <p class="section-copy">
             Decision-makers judge clarity, trust, and product maturity fast. A stronger homepage helps communicate that the workspace experience behind it is worth adopting.
           </p>
@@ -423,14 +520,20 @@ onBeforeUnmount(() => {
         >
           <UCard class="review-panel h-full">
             <div class="flex h-full flex-col">
-              <p class="mb-8 flex-1 text-lg leading-relaxed text-[var(--ui-text)] sm:text-xl">&ldquo;{{ review.quote }}&rdquo;</p>
+              <p class="mb-8 flex-1 text-lg leading-relaxed text-[var(--ui-text)] sm:text-xl">
+                &ldquo;{{ review.quote }}&rdquo;
+              </p>
               <div class="flex items-center gap-4">
                 <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--ui-primary)] to-[var(--ui-secondary)] text-lg font-bold text-white">
                   {{ review.avatar }}
                 </div>
                 <div class="min-w-0">
-                  <p class="font-semibold text-[var(--ui-text-highlighted)]">{{ review.author }}</p>
-                  <p class="text-sm text-[var(--ui-text-muted)]">{{ review.role }}</p>
+                  <p class="font-semibold text-[var(--ui-text-highlighted)]">
+                    {{ review.author }}
+                  </p>
+                  <p class="text-sm text-[var(--ui-text-muted)]">
+                    {{ review.role }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -439,7 +542,10 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <section id="get-started" class="page-section px-4 pb-20 pt-6 sm:px-6 lg:px-8 lg:pb-24">
+    <section
+      id="get-started"
+      class="page-section px-4 pb-20 pt-6 sm:px-6 lg:px-8 lg:pb-24"
+    >
       <div class="cta-panel mx-auto max-w-6xl px-6 py-10 sm:px-8 lg:px-12 lg:py-14">
         <div class="relative z-10 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
           <div class="animate-in">
@@ -447,15 +553,30 @@ onBeforeUnmount(() => {
               <span class="h-2.5 w-2.5 rounded-full bg-[var(--ui-success)]" />
               Start the workspace
             </div>
-            <h2 class="section-title mb-4">Launch a cleaner communication system for your team.</h2>
+            <h2 class="section-title mb-4">
+              Launch a cleaner communication system for your team.
+            </h2>
             <p class="section-copy max-w-2xl">
               Create a workspace, invite members, and move into a product experience that already feels structured enough for real daily collaboration.
             </p>
           </div>
 
           <div class="animate-in flex flex-col gap-3 sm:flex-row lg:flex-col">
-            <UButton label="Start Registration" size="xl" color="primary" class="px-7 py-3 text-sm font-semibold transition-transform duration-300 hover:-translate-y-1" @click="goToRegister" />
-            <UButton label="Open Dashboard" size="xl" color="neutral" variant="soft" class="px-7 py-3 text-sm font-semibold transition-transform duration-300 hover:-translate-y-1" @click="goToDashboard" />
+            <UButton
+              label="Start Registration"
+              size="xl"
+              color="primary"
+              class="px-7 py-3 text-sm font-semibold transition-transform duration-300 hover:-translate-y-1"
+              @click="goToRegister"
+            />
+            <UButton
+              label="Open Dashboard"
+              size="xl"
+              color="neutral"
+              variant="soft"
+              class="px-7 py-3 text-sm font-semibold transition-transform duration-300 hover:-translate-y-1"
+              @click="goToDashboard"
+            />
           </div>
         </div>
       </div>

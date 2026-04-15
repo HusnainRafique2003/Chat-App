@@ -11,7 +11,7 @@ interface Props {
 withDefaults(defineProps<Props>(), {
   loading: false,
   hoverable: false,
-  color: 'primary',
+  color: 'primary'
 })
 </script>
 
@@ -33,10 +33,16 @@ withDefaults(defineProps<Props>(), {
           :class="`text-${color}`"
         />
         <div class="min-w-0 flex flex-col">
-          <p v-if="title" class="leading-tight font-semibold text-[var(--ui-text-highlighted)]">
+          <p
+            v-if="title"
+            class="leading-tight font-semibold text-[var(--ui-text-highlighted)]"
+          >
             {{ title }}
           </p>
-          <p v-if="description" class="mt-0.5 text-sm leading-tight text-[var(--ui-text-muted)]">
+          <p
+            v-if="description"
+            class="mt-0.5 text-sm leading-tight text-[var(--ui-text-muted)]"
+          >
             {{ description }}
           </p>
         </div>
@@ -45,7 +51,10 @@ withDefaults(defineProps<Props>(), {
 
     <!-- Body -->
     <div class="min-w-0 px-5 py-5">
-      <div v-if="loading" class="flex items-center justify-center py-8">
+      <div
+        v-if="loading"
+        class="flex items-center justify-center py-8"
+      >
         <UIcon
           name="i-lucide-loader-2"
           class="text-2xl text-muted animate-spin"

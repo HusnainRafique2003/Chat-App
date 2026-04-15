@@ -7,48 +7,48 @@ import { useUserStore } from '~/stores/useUserStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
 interface MessageState {
-  messages: Message[]
-  localScheduledMessages: Message[]
-  loading: boolean
-  loadingMore: boolean
-  searching: boolean
-  currentChannelId: string | null
-  userNameCache: Record<string, string>
-  pagination: {
-    current_page: number
-    per_page: number
-    total: number
-    last_page: number
-  }
+  messages: Message[]
+  localScheduledMessages: Message[]
+  loading: boolean
+  loadingMore: boolean
+  searching: boolean
+  currentChannelId: string | null
+  userNameCache: Record<string, string>
+  pagination: {
+    current_page: number
+    per_page: number
+    total: number
+    last_page: number
+  }
 }
 
 interface StoreActionResult {
-  success: boolean
-  error?: string
+  success: boolean
+  error?: string
 }
 
 interface MessageActionResult extends StoreActionResult {
-  message?: Message
+  message?: Message
 }
 
 interface SearchMessagesResult extends StoreActionResult {
-  messages?: Message[]
+  messages?: Message[]
 }
 
 function normalizeDateValue(value: unknown): string | null {
-  if (!value) return null
-  if (typeof value === 'string') return value
-  if (typeof value === 'object' && value !== null && '$date' in value) {
-    const dateValue = (value as { $date?: unknown }).$date
-    return typeof dateValue === 'string' ? dateValue : null
-  }
-  return null
+  if (!value) return null
+  if (typeof value === 'string') return value
+  if (typeof value === 'object' && value !== null && '$date' in value) {
+    const dateValue = (value as { $date?: unknown }).$date
+    return typeof dateValue === 'string' ? dateValue : null
+  }
+  return null
 }
 
 function formatLocalForBackend(date?: Date): string | undefined {
-  if (!date) return undefined;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  if (!date) return undefined
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
 export const useMessageStore = defineStore('messages', {
@@ -77,11 +77,11 @@ export const useMessageStore = defineStore('messages', {
 
       return [...state.messages, ...state.localScheduledMessages]
         .filter(message => !activeChannelId || message.channel_id === activeChannelId)
-        .filter(message => {
+        .filter((message) => {
           if (message.schedule_time) {
             const dateStr = message.schedule_time.includes(' ') ? message.schedule_time.replace(' ', 'T') : message.schedule_time
             const schedTime = new Date(dateStr).getTime()
-            
+
             if (schedTime > now) {
               const senderId = message.sender?.id || message.sender?._id || message.sender_id
               if (senderId !== currentUserId) {
@@ -96,13 +96,13 @@ export const useMessageStore = defineStore('messages', {
         })
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
     },
-    unreadCount: (state) => state.messages.filter(m => !m.is_read_by_me).length,
-    
+    unreadCount: state => state.messages.filter(m => !m.is_read_by_me).length,
+
     /**
      * Check if there are more messages to load
      */
-    hasMoreMessages: (state) => state.pagination.current_page < state.pagination.last_page,
-    
+    hasMoreMessages: state => state.pagination.current_page < state.pagination.last_page,
+
     /**
      * Returns a function to check if the current user owns a message
      */
@@ -121,7 +121,7 @@ export const useMessageStore = defineStore('messages', {
     buildUserNameCache() {
       const workspaceStore = useWorkspaceStore()
       const currentWorkspace = workspaceStore.currentWorkspace
-      
+
       if (currentWorkspace?.members) {
         this.userNameCache = {}
         currentWorkspace.members.forEach((member: any) => {
@@ -155,34 +155,35 @@ export const useMessageStore = defineStore('messages', {
      */
     getSenderName(senderId: string, senderName?: string, isCurrentUser?: boolean): string {
       const userStore = useUserStore()
-      
+
       // If sender name is already provided, use it
       if (senderName) {
         return senderName
       }
-      
+
       // If this is the current user, use their name
       if (isCurrentUser) {
         return userStore.user?.name || 'You'
       }
-      
+
       // Try to find in cache
       if (this.userNameCache[senderId]) {
         return this.userNameCache[senderId]
       }
-      
+
       // Fallback to ID
       return senderId || 'Unknown'
     },
 
     // 👇 Notice the 'silent = false' parameter added here 👇
     async fetchMessages(channelId: string, page = 1, retryCount = 0, silent = false): Promise<StoreActionResult> {
-      
-      // 👇 Only trigger the full-screen loader if this is NOT a silent poll 👇
+      const { showError } = useAppToast()
+      const errCtx = { action: 'fetch-messages', entityId: channelId }
+
       if (!silent) {
         this.loading = true
       }
-      
+
       // Clear messages if switching to a different channel
       if (this.currentChannelId && this.currentChannelId !== channelId) {
         console.log('[Message Store] Switching channels from', this.currentChannelId, 'to', channelId)
@@ -194,25 +195,29 @@ export const useMessageStore = defineStore('messages', {
           last_page: 1
         }
       }
-      
+
       this.currentChannelId = channelId
-      
+
       // Build user name cache from workspace members
       this.buildUserNameCache()
-      
+
       try {
         if (!silent) console.log('[Message Store] Fetching messages for channel:', { channelId, page, retryCount })
-        
-        const response = await readMessages({
+
+        const apiResult = await readMessages({
           channel_id: channelId,
           page,
           per_page: 20
         })
+        if (apiResult.error) {
+          return { success: false, error: apiResult.error }
+        }
+        const response = apiResult.data!
         const data = response.data
 
         // Extract messages from various possible response shapes
         let messagesArray: Message[] = []
-        
+
         if (data.success || data.data) {
           if (data.data?.messages && Array.isArray(data.data.messages)) messagesArray = data.data.messages
           else if (data.data?.messages?.data && Array.isArray(data.data.messages.data)) messagesArray = data.data.messages.data
@@ -246,7 +251,7 @@ export const useMessageStore = defineStore('messages', {
         })
 
         const looksLikeUserId = (value?: string | null) => Boolean(value && /^[a-f0-9]{24}$/i.test(value))
-        
+
         // Map the fresh incoming data
         const mappedIncomingMessages = messagesArray
           .filter((m: any) => !m.channel_id || m.channel_id === channelId)
@@ -254,7 +259,7 @@ export const useMessageStore = defineStore('messages', {
             const senderId = m.sender?.id || m.sender?._id || m.sender_id || ''
             const backendSenderName = m.sender?.name
             let senderName = backendSenderName
-             
+
             if ((!senderName || looksLikeUserId(senderName)) && senderId === currentUserId) {
               senderName = currentUserName || 'You'
             } else if (!senderName || looksLikeUserId(senderName)) {
@@ -262,7 +267,7 @@ export const useMessageStore = defineStore('messages', {
             }
 
             if (!senderName) senderName = 'Unknown'
-             
+
             return {
               ...m,
               id: m.id || m._id,
@@ -272,14 +277,14 @@ export const useMessageStore = defineStore('messages', {
               sender: {
                 ...(m.sender || {}),
                 id: senderId,
-                name: senderName, 
+                name: senderName,
                 email: m.sender?.email || '',
-                is_active: m.sender?.is_active ?? true 
+                is_active: m.sender?.is_active ?? true
               },
               reactions_summary: m.reactions_summary || [],
               is_read_by_me: m.is_read_by_me ?? false,
               read_by_count: m.read_by_count ?? 0,
-              content: simpleTrimStartEnd(m.content || m.message || m.text || m.body || ''),
+              content: simpleTrimStartEnd(m.content || m.message || m.text || m.body || '')
             }
           })
 
@@ -290,13 +295,13 @@ export const useMessageStore = defineStore('messages', {
           // If silent polling, we append only NEW messages
           const existingIds = new Set(this.messages.map(m => m.id))
           const newMessages = mappedIncomingMessages.filter(m => !existingIds.has(m.id))
-          
+
           if (newMessages.length > 0) {
             this.messages = [...this.messages, ...newMessages]
           }
 
           // Update reactions and edits on existing messages without replacing the array
-          mappedIncomingMessages.forEach(incoming => {
+          mappedIncomingMessages.forEach((incoming) => {
             const index = this.messages.findIndex(m => m.id === incoming.id)
             if (index !== -1) {
               this.messages[index] = incoming
@@ -323,18 +328,20 @@ export const useMessageStore = defineStore('messages', {
 
         return { success: true }
       } catch (error) {
+        showError(getUserFriendlyError(error, errCtx), errCtx)
+
         const errorMessage = error instanceof Error ? error.message : ''
         const is403NotMember = errorMessage.includes('You are not a member of this channel') || errorMessage.includes('not a member')
         const isDirectChannel = errorMessage.includes('Cannot add members to a direct channel')
         const isInactiveDirectChannel = errorMessage.includes('no longer a member of this direct channel')
-        
+
         if (is403NotMember && retryCount === 0 && !isDirectChannel && !isInactiveDirectChannel) {
           try {
             const userStore = useUserStore()
             if (!userStore.user?.id) return { success: false, error: 'User not authenticated' }
-            
+
             await addChannelMember({ channel_id: channelId, user_id: userStore.user.id })
-            
+
             // Pass the silent parameter to the retry as well!
             return this.fetchMessages(channelId, page, retryCount + 1, silent)
           } catch (memberError) {
@@ -345,11 +352,11 @@ export const useMessageStore = defineStore('messages', {
             return { success: false, error: `Failed to add member to channel: ${memberErrorMessage}` }
           }
         }
-        
+
         if (isDirectChannel || isInactiveDirectChannel || errorMessage.includes('already a member')) {
           return { success: false, error: errorMessage }
         }
-        
+
         const message = errorMessage || 'Failed to fetch messages'
         return { success: false, error: message }
       } finally {
@@ -363,13 +370,17 @@ export const useMessageStore = defineStore('messages', {
     async createMessage(channelId: string, content: string, file?: File, scheduledAt?: Date, retryCount = 0): Promise<MessageActionResult> {
       try {
         const userStore = useUserStore()
-        
-        const response = await createMessage({
+
+        const apiResult = await createMessage({
           channel_id: channelId,
           message: content,
           file,
           schedule_time: formatLocalForBackend(scheduledAt)
         })
+        if (apiResult.error) {
+          return { success: false, error: apiResult.error }
+        }
+        const response = apiResult.data!
         const data = response.data
 
         if (data.success) {
@@ -382,13 +393,13 @@ export const useMessageStore = defineStore('messages', {
 
           // Extract the newly created message from response
           let newMessage = data.data?.message || data.data
-          
+
           // If extraction still fails, construct message from request data + current user
           if (!newMessage || typeof newMessage !== 'object') {
             console.log('[Message Store] Message not found in response, constructing from request data')
             const currentUserId = userStore.user?.id || (userStore.user as any)?._id
             const currentUserName = userStore.user?.name || 'You'
-            
+
             // Construct a minimal message object with the data we have
             newMessage = {
               id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -419,10 +430,10 @@ export const useMessageStore = defineStore('messages', {
               reactions_summary: []
             }
           }
-          
+
           if (newMessage) {
             const senderName = this.getSenderName(newMessage.sender_id, newMessage.sender?.name, true)
-            
+
             const normalized = {
               ...newMessage,
               id: newMessage.id || newMessage._id,
@@ -433,7 +444,7 @@ export const useMessageStore = defineStore('messages', {
               reactions_summary: newMessage.reactions_summary || [],
               is_read_by_me: true,
               read_by_count: newMessage.read_by_count ?? 0,
-              content: simpleTrimStartEnd(newMessage.content || newMessage.message || content),
+              content: simpleTrimStartEnd(newMessage.content || newMessage.message || content)
             }
             // Only add message if we're currently viewing this channel
             if (this.currentChannelId === channelId) {
@@ -462,10 +473,10 @@ export const useMessageStore = defineStore('messages', {
       } catch (error) {
         // Check if error is "not a member of this channel"
         const errorMessage = error instanceof Error ? error.message : ''
-        const is403NotMember = errorMessage.includes('You are not a member of this channel') || 
-                                errorMessage.includes('not a member')
+        const is403NotMember = errorMessage.includes('You are not a member of this channel')
+          || errorMessage.includes('not a member')
         const isDirectChannel = errorMessage.includes('Cannot add members to a direct channel')
-        
+
         if (is403NotMember && retryCount === 0 && !isDirectChannel) {
           try {
             const userStore = useUserStore()
@@ -475,40 +486,40 @@ export const useMessageStore = defineStore('messages', {
             }
 
             console.log('[Message Store] Auto-adding user to channel for message creation:', { channelId, userId: userStore.user.id })
-            
+
             // Automatically add the user to the channel
             await addChannelMember({
               channel_id: channelId,
               user_id: userStore.user.id
             })
-            
+
             console.log('[Message Store] User successfully added to channel, retrying message creation')
-            
+
             // Retry creating message (with retryCount = 1 to prevent infinite retries)
             return this.createMessage(channelId, content, file, scheduledAt, retryCount + 1)
           } catch (memberError) {
             const memberErrorMessage = memberError instanceof Error ? memberError.message : 'Unknown error'
-            
+
             // If already a member, try creating message anyway
             if (memberErrorMessage.includes('already a member')) {
               console.log('[Message Store] User already a member, retrying message creation')
               return this.createMessage(channelId, content, file, scheduledAt, retryCount + 1)
             }
-            
-            console.error('[Message Store] Failed to add user to channel:', { 
-              error: memberErrorMessage, 
-              channelId 
+
+            console.error('[Message Store] Failed to add user to channel:', {
+              error: memberErrorMessage,
+              channelId
             })
             return { success: false, error: `Failed to add member to channel: ${memberErrorMessage}` }
           }
         }
-        
+
         // For direct channels or if already a member, just show the error
         if (isDirectChannel || errorMessage.includes('already a member')) {
           console.warn('[Message Store] Direct channel or already member, cannot auto-add:', { channelId, errorMessage })
           return { success: false, error: errorMessage }
         }
-        
+
         // Parse Laravel validation errors specifically
         let message = errorMessage || 'Failed to create message'
         if (axios.isAxiosError(error) && error.response?.data) {
@@ -548,12 +559,16 @@ export const useMessageStore = defineStore('messages', {
 
         console.log('[Message Store] Updating message:', { messageId, channelId, userId: userStore.user?.id })
 
-        const response = await updateMessage({
+        const apiResult = await updateMessage({
           channel_id: channelId,
           message_id: messageId,
           message: content,
           file
         })
+        if (apiResult.error) {
+          return { success: false, error: apiResult.error }
+        }
+        const response = apiResult.data!
         const data = response.data
 
         if (data.success) {
@@ -566,7 +581,7 @@ export const useMessageStore = defineStore('messages', {
                 ...updatedMessage,
                 id: updatedMessage.id || updatedMessage._id || messageId,
                 channel_id: channelId,
-                content: simpleTrimStartEnd(updatedMessage.content || updatedMessage.message || content),
+                content: simpleTrimStartEnd(updatedMessage.content || updatedMessage.message || content)
               }
               console.log('[Message Store] Message updated successfully')
             }
@@ -604,10 +619,14 @@ export const useMessageStore = defineStore('messages', {
 
         console.log('[Message Store] Deleting message:', { messageId, channelId, userId: userStore.user?.id })
 
-        const response = await deleteMessage({
+        const apiResult = await deleteMessage({
           channel_id: channelId,
           message_id: messageId
         })
+        if (apiResult.error) {
+          return { success: false, error: apiResult.error }
+        }
+        const response = apiResult.data!
         const data = response.data
 
         if (data.success) {
@@ -627,7 +646,11 @@ export const useMessageStore = defineStore('messages', {
     async searchMessages(query: string, channelId?: string): Promise<SearchMessagesResult> {
       this.searching = true
       try {
-        const response = await searchMessages(query, { channel_id: channelId })
+        const apiResult = await searchMessages(query, { channel_id: channelId })
+        if (apiResult.error) {
+          return { success: false, error: apiResult.error }
+        }
+        const response = apiResult.data!
         const data = response.data
 
         if (data.success && Array.isArray(data.data)) {
@@ -646,14 +669,18 @@ export const useMessageStore = defineStore('messages', {
 
     async markAsRead(channelId: string, messageIds: string[]) {
       try {
-        const response = await markMessagesAsRead({
+        const apiResult = await markMessagesAsRead({
           channel_id: channelId,
           message_ids: messageIds
         })
+        if (apiResult.error) {
+          return { success: false, error: apiResult.error }
+        }
+        const response = apiResult.data!
         const data = response.data
 
         if (data.success) {
-          messageIds.forEach(id => {
+          messageIds.forEach((id) => {
             const msg = this.messages.find(m => m.id === id && m.channel_id === channelId)
             if (msg) msg.is_read_by_me = true
           })
@@ -669,12 +696,12 @@ export const useMessageStore = defineStore('messages', {
 
     /**
      * Add or toggle a reaction on a message (WhatsApp-like behavior).
-     * 
+     *
      * Logic:
      * - If user hasn't reacted: Add new reaction
      * - If user reacted with SAME emoji: Remove reaction (toggle)
      * - If user reacted with DIFFERENT emoji: Replace with new emoji
-     * 
+     *
      * @param channelId - The channel containing the message
      * @param messageId - The message to react to
      * @param emoji - The emoji to react with
@@ -702,12 +729,16 @@ export const useMessageStore = defineStore('messages', {
         })
 
         // Call API with previous emoji info so backend can implement toggle/replace logic
-        const response = await reactToMessage({
+        const apiResult = await reactToMessage({
           channel_id: channelId,
           message_ids: [messageId],
           emoji,
           previous_emoji: previousEmoji
         })
+        if (apiResult.error) {
+          return { success: false, error: apiResult.error }
+        }
+        const response = apiResult.data!
         const data = response.data
 
         if (data.success && data.data?.message) {
@@ -737,7 +768,7 @@ export const useMessageStore = defineStore('messages', {
     /**
      * Deduplicate reactions to ensure only one reaction per user per message.
      * This is a CLIENT-SIDE workaround until backend implements the unique constraint.
-     * 
+     *
      * @param reactions - Array of reaction summaries from API
      * @returns Deduplicated reactions with only the latest emoji per user
      */
@@ -812,11 +843,15 @@ export const useMessageStore = defineStore('messages', {
           lastPage: this.pagination.last_page
         })
 
-        const response = await readMessages({
+        const apiResult = await readMessages({
           channel_id: this.currentChannelId,
           page: nextPage,
           per_page: 20
         })
+        if (apiResult.error) {
+          return { success: false, error: apiResult.error }
+        }
+        const response = apiResult.data!
         const data = response.data
 
         // Extract messages from response using same logic as fetchMessages
@@ -902,7 +937,7 @@ export const useMessageStore = defineStore('messages', {
               reactions_summary: m.reactions_summary || [],
               is_read_by_me: m.is_read_by_me ?? false,
               read_by_count: m.read_by_count ?? 0,
-              content: simpleTrimStartEnd(m.content || m.message || m.text || m.body || ''),
+              content: simpleTrimStartEnd(m.content || m.message || m.text || m.body || '')
             }
           })
 

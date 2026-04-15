@@ -5,7 +5,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   const socketUrl = config.public.socketUrl || 'http://178.104.58.236'
 
   // Initialize socket service on app start
-  if (process.client) {
+  if (import.meta.client) {
     socketService.initialize({
       url: socketUrl,
       reconnection: true,

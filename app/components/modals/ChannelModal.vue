@@ -25,10 +25,10 @@ const emit = defineEmits<{
 const open = defineModel<boolean>('open', { default: false })
 
 const form = ref<ChannelPayload>({
-  name: '', 
-  description: '', 
-  type: 'public', 
-  isPrivate: false,
+  name: '',
+  description: '',
+  type: 'public',
+  isPrivate: false
 })
 // 1. Dynamic Error State
 const nameError = computed(() => {
@@ -36,14 +36,14 @@ const nameError = computed(() => {
   if (!form.value.name || form.value.name === '') {
     return undefined
   }
-  
+
   const trimmedName = form.value.name.trim()
-  
+
   // If they have typed something, but it's less than 3 characters (excluding trailing spaces)
   if (form.value.name.length > 0 && trimmedName.length < 3) {
     return 'Channel name must be at least 3 characters.'
   }
-  
+
   return undefined
 })
 
@@ -65,12 +65,12 @@ watch(open, (val) => {
 function handleSubmit() {
   // Safety check just in case they bypass the disabled button
   if (isSubmitDisabled.value) return
-  
+
   const finalPayload: ChannelPayload = {
     ...form.value,
     type: form.value.isPrivate ? 'private' : 'public'
   }
-  
+
   emit('submit', finalPayload)
 }
 </script>
@@ -85,13 +85,16 @@ function handleSubmit() {
     :confirm-label="mode === 'create' ? 'Create Channel' : 'Save Changes'"
     :confirm-color="mode === 'create' ? 'primary' : 'warning'"
     :loading="loading"
-    :confirm-disabled="isSubmitDisabled" 
+    :confirm-disabled="isSubmitDisabled"
     @confirm="handleSubmit"
     @cancel="emit('cancel')"
   >
     <div class="flex flex-col gap-4">
-
-      <UFormField label="Channel Name" :error="nameError" required>
+      <UFormField
+        label="Channel Name"
+        :error="nameError"
+        required
+      >
         <UInput
           v-model="form.name"
           placeholder="e.g. general"
@@ -114,12 +117,18 @@ function handleSubmit() {
 
       <div class="flex items-center justify-between p-3 rounded-lg bg-[var(--ui-bg-muted)] border border-[var(--ui-border)]">
         <div>
-          <p class="text-sm font-medium text-[var(--ui-text)]">Private Channel</p>
-          <p class="text-xs text-[var(--ui-text-muted)]">Only selected members can view this channel.</p>
+          <p class="text-sm font-medium text-[var(--ui-text)]">
+            Private Channel
+          </p>
+          <p class="text-xs text-[var(--ui-text-muted)]">
+            Only selected members can view this channel.
+          </p>
         </div>
-        <USwitch v-model="form.isPrivate" color="primary" />
+        <USwitch
+          v-model="form.isPrivate"
+          color="primary"
+        />
       </div>
-
     </div>
   </BaseModal>
 </template>

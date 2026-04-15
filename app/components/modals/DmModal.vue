@@ -33,8 +33,8 @@ watch(open, (val) => {
 const filteredMembers = computed(() => {
   const query = searchQuery.value.toLowerCase().trim()
   if (!query) return props.members
-  
-  return props.members.filter(m => 
+
+  return props.members.filter(m =>
     m.name.toLowerCase().includes(query) || m.email.toLowerCase().includes(query)
   )
 })
@@ -55,7 +55,6 @@ function handleSelect(member: DmMember) {
     @cancel="emit('cancel')"
   >
     <div class="flex flex-col gap-4">
-      
       <UInput
         v-model="searchQuery"
         icon="i-lucide-search"
@@ -65,26 +64,32 @@ function handleSelect(member: DmMember) {
       />
 
       <div class="flex-1 overflow-y-auto space-y-1 max-h-[40vh] min-h-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div v-if="filteredMembers.length === 0" class="text-center py-8 text-sm text-[var(--ui-text-muted)]">
+        <div
+          v-if="filteredMembers.length === 0"
+          class="text-center py-8 text-sm text-[var(--ui-text-muted)]"
+        >
           No members found
         </div>
-        
+
         <button
           v-for="member in filteredMembers"
           :key="member.id"
-          @click="handleSelect(member)"
           class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--ui-bg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]"
+          @click="handleSelect(member)"
         >
           <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] font-bold">
             {{ member.name.charAt(0).toUpperCase() }}
           </div>
           <div class="min-w-0 flex-1">
-            <p class="truncate font-semibold text-[var(--ui-text-highlighted)]">{{ member.name }}</p>
-            <p class="truncate text-xs text-[var(--ui-text-muted)]">{{ member.email }}</p>
+            <p class="truncate font-semibold text-[var(--ui-text-highlighted)]">
+              {{ member.name }}
+            </p>
+            <p class="truncate text-xs text-[var(--ui-text-muted)]">
+              {{ member.email }}
+            </p>
           </div>
         </button>
       </div>
-
     </div>
   </BaseModal>
 </template>

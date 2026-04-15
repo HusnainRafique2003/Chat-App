@@ -49,8 +49,12 @@ async function handleSubmit() {
     gradient="from-[var(--ui-warning)]/7 via-transparent to-[var(--ui-error)]/10"
   >
     <div class="mb-7">
-      <h2 class="text-xl font-black text-[var(--ui-text-highlighted)] sm:text-2xl">Forgot password</h2>
-      <p class="mt-2 text-sm leading-6 text-[var(--ui-text-muted)] sm:text-[0.95rem]">Enter your work email and we&apos;ll guide you back into the app.</p>
+      <h2 class="text-xl font-black text-[var(--ui-text-highlighted)] sm:text-2xl">
+        Forgot password
+      </h2>
+      <p class="mt-2 text-sm leading-6 text-[var(--ui-text-muted)] sm:text-[0.95rem]">
+        Enter your work email and we&apos;ll guide you back into the app.
+      </p>
     </div>
 
     <div
@@ -60,7 +64,11 @@ async function handleSubmit() {
       {{ successMessage }}
     </div>
 
-    <form class="space-y-5" novalidate @submit.prevent="handleSubmit">
+    <form
+      class="space-y-5"
+      novalidate
+      @submit.prevent="handleSubmit"
+    >
       <BaseInput
         v-model="email"
         label="Work email"
@@ -96,7 +104,10 @@ async function handleSubmit() {
 
     <div class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]">
       Remembered your password?
-      <NuxtLink to="/auth/login" class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80">
+      <NuxtLink
+        to="/auth/login"
+        class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80"
+      >
         Sign in
       </NuxtLink>
     </div>

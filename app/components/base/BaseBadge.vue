@@ -10,7 +10,7 @@ interface Props {
 withDefaults(defineProps<Props>(), {
   color: 'primary',
   variant: 'soft',
-  size: 'md',
+  size: 'md'
 })
 </script>
 
@@ -21,7 +21,11 @@ withDefaults(defineProps<Props>(), {
     :size="size"
     class="rounded-full px-2.5 py-1 font-semibold tracking-[0.08em] uppercase"
   >
-    <UIcon v-if="icon" :name="icon" class="mr-1" />
+    <UIcon
+      v-if="icon"
+      :name="icon"
+      class="mr-1"
+    />
     {{ label }}
   </UBadge>
 </template>

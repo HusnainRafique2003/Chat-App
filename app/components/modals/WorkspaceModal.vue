@@ -15,7 +15,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  loading: false,
+  loading: false
 })
 
 const emit = defineEmits<{
@@ -27,14 +27,14 @@ const open = defineModel<boolean>('open', { default: false })
 
 const form = ref<WorkspacePayload>({
   name: '',
-  description: '',
+  description: ''
 })
 
 const errors = ref({ name: '', description: '' })
 
 const iconOptions = [
   'i-mdi-briefcase', 'i-mdi-rocket-launch', 'i-mdi-lightning-bolt',
-  'i-mdi-star', 'i-mdi-heart', 'i-mdi-fire', 'i-mdi-leaf', 'i-mdi-diamond',
+  'i-mdi-star', 'i-mdi-heart', 'i-mdi-fire', 'i-mdi-leaf', 'i-mdi-diamond'
 ]
 
 // Populate form when updating
@@ -83,9 +83,12 @@ function handleSubmit() {
     @cancel="emit('cancel')"
   >
     <div class="flex flex-col gap-4">
-
       <!-- Name -->
-      <UFormField label="Workspace Name" :error="errors.name" required>
+      <UFormField
+        label="Workspace Name"
+        :error="errors.name"
+        required
+      >
         <UInput
           v-model="form.name"
           placeholder="e.g. Engineering Team"
@@ -95,7 +98,10 @@ function handleSubmit() {
       </UFormField>
 
       <!-- Description -->
-      <UFormField label="Description" :error="errors.description">
+      <UFormField
+        label="Description"
+        :error="errors.description"
+      >
         <UTextarea
           v-model="form.description"
           placeholder="What is this workspace for?"
@@ -106,7 +112,6 @@ function handleSubmit() {
 
       <!-- Private Toggle -->
       <!-- Removed as not in API spec -->
-
     </div>
   </BaseModal>
 </template>

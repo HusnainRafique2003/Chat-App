@@ -5,25 +5,25 @@
 
 export function trimMessageBlock(content: string): string {
   if (!content || typeof content !== 'string') return ''
-  
+
   // Split into lines
   const lines = content.split(/\r?\n/)
-  
+
   // Trim leading empty lines
   let startIndex = 0
   while (startIndex < lines.length && lines[startIndex].trim() === '') {
     startIndex++
   }
-  
+
   // Trim trailing empty lines
   let endIndex = lines.length - 1
   while (endIndex > startIndex && lines[endIndex].trim() === '') {
     endIndex--
   }
-  
+
   // Join remaining lines with original newlines
   if (startIndex > endIndex) return ''
-  
+
   const trimmedLines = lines.slice(startIndex, endIndex + 1)
   return trimmedLines.join('\n')
 }
@@ -33,15 +33,15 @@ export function trimMessageBlock(content: string): string {
  */
 export function trimHtmlMessageBlock(html: string): string {
   if (!html) return ''
-  
+
   // Quick text content check first
   const textContent = html.replace(/<[^>]*>/g, '').trim()
   if (!textContent) return ''
-  
+
   // Parse HTML and trim outer whitespace blocks from text nodes
   const tempDiv = document.createElement('div')
   tempDiv.innerHTML = html
-  
+
   // Recursive trim function for text nodes
   function trimTextNodes(node: Node): void {
     if (node.nodeType === Node.TEXT_NODE) {
@@ -52,9 +52,9 @@ export function trimHtmlMessageBlock(html: string): string {
       ;(node as Element).childNodes.forEach(trimTextNodes)
     }
   }
-  
+
   trimTextNodes(tempDiv)
-  
+
   // Clean up empty elements
   const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_ELEMENT)
   let currentNode: Element | null = null
@@ -63,7 +63,7 @@ export function trimHtmlMessageBlock(html: string): string {
       currentNode.remove()
     }
   }
-  
+
   return tempDiv.innerHTML
 }
 
@@ -79,4 +79,3 @@ export function simpleTrimStartEnd(content: string): string {
  * Legacy trim alias for minimal disruption
  */
 export const trimMessage = simpleTrimStartEnd
-

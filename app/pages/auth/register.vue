@@ -154,7 +154,12 @@ function goBackToSignup() {
       {{ successMessage }}
     </div>
 
-    <form v-if="step === 'signup'" class="space-y-5" novalidate @submit.prevent="handleSignup">
+    <form
+      v-if="step === 'signup'"
+      class="space-y-5"
+      novalidate
+      @submit.prevent="handleSignup"
+    >
       <BaseInput
         v-model="signupForm.name"
         label="Full name"
@@ -210,7 +215,10 @@ function goBackToSignup() {
               aria-label="Toggle password visibility"
               @click="showPassword = !showPassword"
             >
-              <UIcon :name="showPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
+              <UIcon
+                :name="showPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'"
+                class="h-5 w-5"
+              />
             </button>
           </template>
         </BaseInput>
@@ -254,7 +262,10 @@ function goBackToSignup() {
             aria-label="Toggle confirm password visibility"
             @click="showConfirmPassword = !showConfirmPassword"
           >
-            <UIcon :name="showConfirmPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" class="h-5 w-5" />
+            <UIcon
+              :name="showConfirmPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'"
+              class="h-5 w-5"
+            />
           </button>
         </template>
       </BaseInput>
@@ -279,7 +290,12 @@ function goBackToSignup() {
       />
     </form>
 
-    <form v-else class="space-y-5" novalidate @submit.prevent="handleVerify">
+    <form
+      v-else
+      class="space-y-5"
+      novalidate
+      @submit.prevent="handleVerify"
+    >
       <BaseInput
         v-model="verifyForm.email"
         label="Email"
@@ -336,16 +352,29 @@ function goBackToSignup() {
       </div>
     </form>
 
-    <div v-if="step === 'signup'" class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]">
+    <div
+      v-if="step === 'signup'"
+      class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]"
+    >
       Already have an account?
-      <NuxtLink to="/auth/login" class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80">
+      <NuxtLink
+        to="/auth/login"
+        class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80"
+      >
         Sign in
       </NuxtLink>
     </div>
 
-    <div v-else class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]">
+    <div
+      v-else
+      class="mt-8 border-t border-[var(--ui-border)]/60 pt-6 text-center text-sm text-[var(--ui-text-muted)]"
+    >
       Need a different email?
-      <button type="button" class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80" @click="goBackToSignup">
+      <button
+        type="button"
+        class="ml-1 font-semibold text-[var(--ui-primary)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80"
+        @click="goBackToSignup"
+      >
         Edit details
       </button>
     </div>

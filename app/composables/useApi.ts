@@ -1,6 +1,9 @@
 import type { AxiosRequestConfig, AxiosResponse } from 'axios'
 import axios from 'axios'
 import { onUnmounted, ref } from 'vue'
+import { useUserStore } from '~/stores/useUserStore'
+import type { ApiErrorContext } from './useApiErrorHandler'
+import { getUserFriendlyError } from './useApiErrorHandler'
 
 const API_BASE = 'http://178.104.58.236/api/auth'
 
@@ -55,12 +58,11 @@ export function useApi<T = unknown>(url: string, config?: AxiosRequestConfig) {
 
       data.value = response.data
     } catch (err) {
+      const context: ApiErrorContext = { action: 'fetch-data' }
       if (axios.isCancel(err)) {
         error.value = 'Request was cancelled.'
-      } else if (axios.isAxiosError(err)) {
-        error.value = err.response?.data?.message ?? err.message ?? 'Request failed.'
       } else {
-        error.value = 'An unexpected error occurred.'
+        error.value = getUserFriendlyError(err, context)
       }
     } finally {
       loading.value = false
@@ -83,14 +85,8 @@ export async function postApi<T = unknown>(url: string, data: unknown, config?: 
   try {
     return await apiClient.post<T>(url, data, config)
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      const message = typeof error.response?.data?.message === 'string'
-        ? error.response.data.message
-        : error.message
-      throw new Error(message || 'Request failed')
-    }
-
-    throw error
+    const context: ApiErrorContext = { action: 'post-' + (url.split('/')[0] || 'data') }
+    throw new Error(getUserFriendlyError(error, context))
   }
 }
 

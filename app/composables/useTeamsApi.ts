@@ -1,7 +1,8 @@
+import { useRuntimeConfig } from '#app'
 import type { AxiosResponse } from 'axios'
 import axios from 'axios'
-import { useRuntimeConfig } from '#app'
 import { useUserStore } from '~/stores/useUserStore'
+import { handleApiError } from './useApiErrorHelper'
 
 const API_BASE = 'http://178.104.58.236/api'
 
@@ -10,8 +11,8 @@ function makeClient() {
     baseURL: API_BASE,
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
+      'Accept': 'application/json'
+    }
   })
 
   client.interceptors.request.use((config) => {
@@ -45,10 +46,9 @@ export async function getTeams(workspaceId: string): Promise<AxiosResponse> {
     })
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      console.error('[Teams API] Failed:', error.response?.status, error.response?.data?.message)
-      throw new Error(error.response?.data?.message || error.message)
+      console.error('[Teams API] Failed:', (error as any).response?.status, (error as any).response?.data?.message)
     }
-    throw error
+    handleApiError(error, { action: 'fetch-teams', entity: 'team' })
   }
 }
 /**
@@ -64,10 +64,7 @@ export async function createTeam(data: {
   try {
     return await teamsApiClient.post('/team/create', data)
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.message || error.message)
-    }
-    throw error
+    handleApiError(error, { action: 'create-team', entity: 'team' })
   }
 }
 
@@ -84,10 +81,7 @@ export async function updateTeam(data: {
   try {
     return await teamsApiClient.put('/team', data)
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.message || error.message)
-    }
-    throw error
+    handleApiError(error, { action: 'update-team', entity: 'team' })
   }
 }
 
@@ -101,31 +95,22 @@ export async function deleteTeam(data: {
   try {
     return await teamsApiClient.delete('/team/delete', { data })
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.message || error.message)
-    }
-    throw error
+    handleApiError(error, { action: 'delete-team', entity: 'team' })
   }
 }
-export async function addTeamMember(data: { team_id: string; workspace_id: string; user_ids: string[] }) {
+export async function addTeamMember(data: { team_id: string, workspace_id: string, user_ids: string[] }) {
   try {
     return await teamsApiClient.post('/team/add-member', data)
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.message || error.message)
-    }
-    throw error
+    handleApiError(error, { action: 'add-member', entity: 'team' })
   }
 }
 
-export async function removeTeamMember(data: { team_id: string; workspace_id: string; user_ids: string[] }) {
+export async function removeTeamMember(data: { team_id: string, workspace_id: string, user_ids: string[] }) {
   try {
     return await teamsApiClient.post('/team/remove-member', data)
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.message || error.message)
-    }
-    throw error
+    handleApiError(error, { action: 'remove-member', entity: 'team' })
   }
 }
 export { teamsApiClient }

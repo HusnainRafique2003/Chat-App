@@ -1,6 +1,6 @@
+import { useRuntimeConfig } from '#app'
 import type { AxiosResponse } from 'axios'
 import axios from 'axios'
-import { useRuntimeConfig } from '#app'
 import { useUserStore } from '~/stores/useUserStore'
 
 const API_BASE = 'http://178.104.58.236/api'
@@ -10,8 +10,8 @@ function makeClient() {
     baseURL: API_BASE,
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
+      'Accept': 'application/json'
+    }
   })
 
   client.interceptors.request.use((config) => {
@@ -49,10 +49,7 @@ export async function createChannel(data: {
   try {
     return await channelsApiClient.post('/channels/create', data)
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.message || error.message)
-    }
-    throw error
+    handleApiError(error, { action: 'create-channel', entity: 'channel' })
   }
 }
 
@@ -68,10 +65,7 @@ export async function updateChannel(data: {
   try {
     return await channelsApiClient.put('/channels', data)
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.message || error.message)
-    }
-    throw error
+    handleApiError(error, { action: 'update-channel', entity: 'channel' })
   }
 }
 
@@ -90,10 +84,9 @@ export async function getChannels(teamId: string, workspaceId?: string): Promise
     return await channelsApiClient.get('/channels/read', { params })
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      console.error('[Channels API] Failed:', error.response?.status, error.response?.data?.message)
-      throw new Error(error.response?.data?.message || error.message)
+      console.error('[Channels API] Failed:', (error as any).response?.status, (error as any).response?.data?.message)
     }
-    throw error
+    handleApiError(error, { action: 'fetch-channels', entity: 'channel' })
   }
 }
 
@@ -107,10 +100,7 @@ export async function deleteChannel(data: {
   try {
     return await channelsApiClient.delete('/channels/delete', { data })
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.message || error.message)
-    }
-    throw error
+    handleApiError(error, { action: 'delete-channel', entity: 'channel' })
   }
 }
 
@@ -125,10 +115,7 @@ export async function addChannelMember(data: {
   try {
     return await channelsApiClient.post('/channels/add-member', data)
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.message || error.message)
-    }
-    throw error
+    handleApiError(error, { action: 'add-member', entity: 'channel' })
   }
 }
 
@@ -143,10 +130,7 @@ export async function removeChannelMember(data: {
   try {
     return await channelsApiClient.delete('/channels/remove-member', { data })
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.message || error.message)
-    }
-    throw error
+    handleApiError(error, { action: 'remove-member', entity: 'channel' })
   }
 }
 

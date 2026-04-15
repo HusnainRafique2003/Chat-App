@@ -31,13 +31,13 @@ let messagePollingInterval: ReturnType<typeof setInterval> | null = null
 function startPolling(channelId: string) {
   // Clear any existing poll before starting a new one
   stopPolling()
-  
+
   // Fetch messages every 3 seconds (3000ms)
   messagePollingInterval = setInterval(async () => {
-    // NOTE FOR LATER: 
+    // NOTE FOR LATER:
     // When your teammate finishes Socket.io, delete this setInterval!
     // Instead, you will just do: socket.on('new_message', (msg) => messageStore.messages.push(msg))
-    
+
     try {
       // Assuming your messageStore has a fetchMessages function.
       // If it takes a 'silent' boolean to prevent loading spinners, pass true!
@@ -129,7 +129,7 @@ function syncScheduledMessagesFromStorage() {
   messageStore.setLocalScheduledMessages(jobs.map(toLocalScheduledMessage))
 }
 
-async function handleMessageSent(data: { content: string; file?: File; scheduledAt?: Date }) {
+async function handleMessageSent(data: { content: string, file?: File, scheduledAt?: Date }) {
   if (!channelStore.currentChannelId) return
 
   if (data.scheduledAt) {
@@ -203,7 +203,7 @@ async function handleMessageSent(data: { content: string; file?: File; scheduled
   }
 }
 
-async function handleMessageEdited(data: { messageId: string; content: string; file?: File }) {
+async function handleMessageEdited(data: { messageId: string, content: string, file?: File }) {
   if (!channelStore.currentChannelId) return
 
   const result = await messageStore.updateMessage(
@@ -254,7 +254,7 @@ onMounted(() => {
   scheduledMessageInterval = setInterval(() => {
     processDueScheduledMessages(sendScheduledJob)
   }, 1000)
-  
+
   // If a channel is already selected on mount, start polling immediately
   if (channelStore.currentChannelId) {
     startPolling(channelStore.currentChannelId)
@@ -291,8 +291,13 @@ onUnmounted(() => {
       class="flex h-full w-full flex-col items-center justify-center px-6 text-center"
     >
       <div class="max-w-md">
-        <UIcon name="i-mdi-chat-outline" class="mx-auto mb-4 h-16 w-16 text-[var(--ui-text-dimmed)]" />
-        <p class="text-sm text-[var(--ui-text-muted)] sm:text-base">Select a channel from the sidebar to open messages</p>
+        <UIcon
+          name="i-mdi-chat-outline"
+          class="mx-auto mb-4 h-16 w-16 text-[var(--ui-text-dimmed)]"
+        />
+        <p class="text-sm text-[var(--ui-text-muted)] sm:text-base">
+          Select a channel from the sidebar to open messages
+        </p>
       </div>
     </div>
   </div>

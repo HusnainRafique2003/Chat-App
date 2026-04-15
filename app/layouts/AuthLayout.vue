@@ -24,9 +24,15 @@ withDefaults(defineProps<Props>(), {
               {{ badge }}
             </div>
 
-            <NuxtLink to="/" class="group mb-8 inline-flex items-center gap-3">
+            <NuxtLink
+              to="/"
+              class="group mb-8 inline-flex items-center gap-3"
+            >
               <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--ui-primary)] text-[var(--ui-primary-foreground)] shadow-[var(--shadow-md)] transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-[1.02]">
-                <Icon name="i-mdi-message-draw" class="h-5 w-5" />
+                <Icon
+                  name="i-mdi-message-draw"
+                  class="h-5 w-5"
+                />
               </div>
               <div>
                 <p class="text-base font-black text-[var(--ui-text-highlighted)]">ChatSphere</p>
@@ -37,23 +43,38 @@ withDefaults(defineProps<Props>(), {
             <h1 class="max-w-xl text-3xl font-black leading-[1.04] text-[var(--ui-text-highlighted)] sm:text-[2.6rem] lg:text-[3.1rem]">
               {{ title }}
             </h1>
-            <p v-if="subtitle" class="mt-4 max-w-xl text-base leading-7 text-[var(--ui-text-muted)] sm:text-[1.02rem]">
+            <p
+              v-if="subtitle"
+              class="mt-4 max-w-xl text-base leading-7 text-[var(--ui-text-muted)] sm:text-[1.02rem]"
+            >
               {{ subtitle }}
             </p>
           </div>
 
           <div class="grid gap-4 sm:grid-cols-3">
             <div class="flex h-full flex-col justify-between rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/72 p-4 transition-all duration-300 hover:-translate-y-1 hover:border-[var(--ui-border-accented)] hover:bg-[var(--ui-bg)]/90">
-              <p class="text-xs uppercase tracking-[0.14em] text-[var(--ui-text-dimmed)]">Secure access</p>
-              <p class="mt-2 font-semibold text-[var(--ui-text-highlighted)]">Protected auth flow</p>
+              <p class="text-xs uppercase tracking-[0.14em] text-[var(--ui-text-dimmed)]">
+                Secure access
+              </p>
+              <p class="mt-2 font-semibold text-[var(--ui-text-highlighted)]">
+                Protected auth flow
+              </p>
             </div>
             <div class="flex h-full flex-col justify-between rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/72 p-4 transition-all duration-300 hover:-translate-y-1 hover:border-[var(--ui-border-accented)] hover:bg-[var(--ui-bg)]/90">
-              <p class="text-xs uppercase tracking-[0.14em] text-[var(--ui-text-dimmed)]">Workspace ready</p>
-              <p class="mt-2 font-semibold text-[var(--ui-text-highlighted)]">Built for teams</p>
+              <p class="text-xs uppercase tracking-[0.14em] text-[var(--ui-text-dimmed)]">
+                Workspace ready
+              </p>
+              <p class="mt-2 font-semibold text-[var(--ui-text-highlighted)]">
+                Built for teams
+              </p>
             </div>
             <div class="flex h-full flex-col justify-between rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)]/72 p-4 transition-all duration-300 hover:-translate-y-1 hover:border-[var(--ui-border-accented)] hover:bg-[var(--ui-bg)]/90">
-              <p class="text-xs uppercase tracking-[0.14em] text-[var(--ui-text-dimmed)]">Clean onboarding</p>
-              <p class="mt-2 font-semibold text-[var(--ui-text-highlighted)]">Professional first step</p>
+              <p class="text-xs uppercase tracking-[0.14em] text-[var(--ui-text-dimmed)]">
+                Clean onboarding
+              </p>
+              <p class="mt-2 font-semibold text-[var(--ui-text-highlighted)]">
+                Professional first step
+              </p>
             </div>
           </div>
         </div>

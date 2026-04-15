@@ -12,7 +12,7 @@ const lang = computed(() => uiLocale.value.code ?? 'en')
 const dir = computed(() => uiLocale.value.dir ?? 'ltr')
 
 onMounted(async () => {
-  if (process.client && userStore.isLoggedIn) {
+  if (import.meta.client && userStore.isLoggedIn) {
     await userStore.validateAuth()
   }
 })

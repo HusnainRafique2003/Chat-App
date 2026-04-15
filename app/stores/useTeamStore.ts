@@ -62,7 +62,7 @@ export const useTeamStore = defineStore('team-data', {
             ...t,
             id: t.id || t._id,
             members: t.members || [],
-            members_count: t.members_count ?? (t.members?.length || 0),
+            members_count: t.members_count ?? (t.members?.length || 0)
           }))
 
           if (this.teams.length > 0 && !this.currentTeamId) {
@@ -75,14 +75,14 @@ export const useTeamStore = defineStore('team-data', {
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        
+
         // 404 just means this workspace has no teams yet - not a real error
         if (errorMessage.includes('404') || errorMessage.includes('not found')) {
           console.log('[Team Store] No teams found for workspace:', workspaceId, '- This is normal if workspace is empty')
         } else {
           console.error('[Team Store] Failed to fetch teams:', error)
         }
-        
+
         this.teams = []
       } finally {
         this.loading = false
@@ -91,7 +91,7 @@ export const useTeamStore = defineStore('team-data', {
 
     // --- NEW ACTIONS: Create, Update, Delete ---
 
-    async createTeam(data: { workspace_id: string; name: string; description?: string; color?: string }) {
+    async createTeam(data: { workspace_id: string, name: string, description?: string, color?: string }) {
       this.loading = true
       try {
         const response = await createTeam(data)
@@ -103,7 +103,7 @@ export const useTeamStore = defineStore('team-data', {
             newTeam.id = newTeam.id || newTeam._id
             newTeam.members = newTeam.members || []
             this.teams.push(newTeam)
-            
+
             // Switch to the newly created team
             this.setCurrentTeam(newTeam.id)
             return { success: true, team: newTeam }
@@ -117,7 +117,7 @@ export const useTeamStore = defineStore('team-data', {
       }
     },
 
-    async updateTeam(teamId: string, data: { name?: string; description?: string; color?: string }) {
+    async updateTeam(teamId: string, data: { name?: string, description?: string, color?: string }) {
       this.loading = true
       try {
         const response = await updateTeam({ team_id: teamId, ...data })
@@ -151,7 +151,7 @@ export const useTeamStore = defineStore('team-data', {
         if (responseData.success) {
           // Remove from local state
           this.teams = this.teams.filter(t => t.id !== teamId && t._id !== teamId)
-          
+
           // If they deleted their active team, fallback to the first available one
           if (this.currentTeamId === teamId) {
             this.currentTeamId = this.teams.length > 0 ? (this.teams[0].id || this.teams[0]._id as string) : null

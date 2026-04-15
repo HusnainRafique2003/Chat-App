@@ -9,8 +9,8 @@ const workspacesApiClient = axios.create({
   baseURL: WORKSPACES_BASE,
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
+    'Accept': 'application/json'
+  }
 })
 
 workspacesApiClient.interceptors.request.use((config) => {
@@ -107,7 +107,7 @@ export async function updateWorkspace(data: {
       id: data.workspace_id,
       name: data.name
     }
-    
+
     // Some backends reject empty strings for optional fields, so we only send description if it exists
     if (data.description && data.description.trim() !== '') {
       payload.description = data.description
@@ -124,15 +124,15 @@ export async function deleteWorkspace(data: {
 }): Promise<AxiosResponse> {
   try {
     // Send both 'id' and 'workspace_id' just to be safe
-    return await workspacesApiClient.delete('/delete', { 
-      data: { workspace_id: data.workspace_id, id: data.workspace_id } 
+    return await workspacesApiClient.delete('/delete', {
+      data: { workspace_id: data.workspace_id, id: data.workspace_id }
     })
   } catch (error) {
     throw handleApiError(error)
   }
 }
 
-export async function addWorkspaceMember(data: { workspace_id: string; user_ids: string[] }) {
+export async function addWorkspaceMember(data: { workspace_id: string, user_ids: string[] }) {
   try {
     return await workspacesApiClient.post('/add-members', data)
   } catch (error) {
@@ -143,7 +143,7 @@ export async function addWorkspaceMember(data: { workspace_id: string; user_ids:
   }
 }
 
-export async function removeWorkspaceMember(data: { workspace_id: string; user_ids: string[] }) {
+export async function removeWorkspaceMember(data: { workspace_id: string, user_ids: string[] }) {
   try {
     return await workspacesApiClient.delete('/remove-members', { data })
   } catch (error) {

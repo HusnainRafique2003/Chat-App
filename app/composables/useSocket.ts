@@ -6,7 +6,7 @@ export function useSocket() {
 
   // Auto-cleanup on unmount
   onUnmounted(() => {
-    listeners.forEach(unsubscribe => {
+    listeners.forEach((unsubscribe) => {
       try {
         unsubscribe()
       } catch (error) {

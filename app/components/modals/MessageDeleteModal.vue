@@ -6,7 +6,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  loading: false,
+  loading: false
 })
 
 const emit = defineEmits<{

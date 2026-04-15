@@ -15,7 +15,7 @@ const STORAGE_KEY = 'chat-scheduled-messages'
 let isProcessingScheduledMessages = false
 
 function canUseStorage() {
-  return process.client && typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+  return import.meta.client && typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
 }
 
 function readScheduledJobs(): ScheduledMessageJob[] {
@@ -37,7 +37,7 @@ function writeScheduledJobs(jobs: ScheduledMessageJob[]) {
 }
 
 function createJobId() {
-  if (process.client && typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+  if (import.meta.client && typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID()
   }
   return `scheduled-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`

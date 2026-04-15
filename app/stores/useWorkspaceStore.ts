@@ -50,7 +50,7 @@ export const useWorkspaceStore = defineStore('workspace-data', {
           this.workspaces = workspacesData.map((w: any) => ({
             ...w,
             id: w.id || w._id,
-            members: w.members || w.users || [],
+            members: w.members || w.users || []
           }))
 
           if (this.workspaces.length > 0 && !this.currentWorkspaceId) {
@@ -94,15 +94,15 @@ export const useWorkspaceStore = defineStore('workspace-data', {
           // 2. If we found the specific workspace, extract its members
           if (workspaceData) {
             const index = this.workspaces.findIndex(w => w.id === workspaceId || w._id === workspaceId)
-            
+
             if (index > -1) {
-              let rawMembers = workspaceData.members || workspaceData.users || workspaceData.workspace_members || []
+              const rawMembers = workspaceData.members || workspaceData.users || workspaceData.workspace_members || []
               const freshMembers = rawMembers.map((m: any) => m.user ? m.user : m)
 
               // Force Vue Reactivity to update the UI
-              this.workspaces[index] = { 
-                ...this.workspaces[index], 
-                members: freshMembers 
+              this.workspaces[index] = {
+                ...this.workspaces[index],
+                members: freshMembers
               }
             }
           }
@@ -114,7 +114,7 @@ export const useWorkspaceStore = defineStore('workspace-data', {
 
     // --- NEW ACTIONS: Create, Update, Delete ---
 
-    async createWorkspace(data: { name: string; description?: string }) {
+    async createWorkspace(data: { name: string, description?: string }) {
       this.loading = true
       try {
         const response = await createWorkspace(data)
@@ -126,7 +126,7 @@ export const useWorkspaceStore = defineStore('workspace-data', {
             newWorkspace.id = newWorkspace.id || newWorkspace._id
             newWorkspace.members = newWorkspace.members || []
             this.workspaces.push(newWorkspace)
-            
+
             // Switch to the newly created workspace
             this.setCurrentWorkspace(newWorkspace.id)
             return { success: true, workspace: newWorkspace }
@@ -140,7 +140,7 @@ export const useWorkspaceStore = defineStore('workspace-data', {
       }
     },
 
-    async updateWorkspace(workspaceId: string, data: { name?: string; description?: string }) {
+    async updateWorkspace(workspaceId: string, data: { name?: string, description?: string }) {
       this.loading = true
       try {
         const response = await updateWorkspace({ workspace_id: workspaceId, ...data })
@@ -174,7 +174,7 @@ export const useWorkspaceStore = defineStore('workspace-data', {
         if (responseData.success) {
           // Remove from local state
           this.workspaces = this.workspaces.filter(w => w.id !== workspaceId && w._id !== workspaceId)
-          
+
           // If they deleted their active workspace, fallback to the first available one
           if (this.currentWorkspaceId === workspaceId) {
             this.currentWorkspaceId = this.workspaces.length > 0 ? (this.workspaces[0].id || this.workspaces[0]._id as string) : null

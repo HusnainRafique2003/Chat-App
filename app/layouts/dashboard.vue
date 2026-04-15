@@ -103,53 +103,67 @@ watch(() => route.fullPath, () => {
 <template>
   <div class="h-screen h-[100dvh] w-full overflow-hidden bg-[var(--ui-bg-muted)] text-[var(--ui-text)]">
     <div class="flex h-full w-full relative">
-      
       <!-- Mobile Backdrop Overlay -->
-      <div 
+      <div
         v-if="isMobileSidebarOpen"
         class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden transition-opacity"
         @click="closeMobilePanels"
-      ></div>
+      />
 
-      <aside 
+      <aside
         class="absolute inset-y-0 left-0 z-50 flex h-full w-[275px] flex-col border-r border-[var(--ui-border)] bg-[var(--ui-bg)] transition-transform duration-300 ease-in-out lg:static lg:translate-x-0"
         :class="isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'"
       >
-        
         <div class="shrink-0 flex flex-col justify-center border-b border-[var(--ui-border)] px-5 h-[72px]">
-          
           <div class="group flex items-center justify-between min-w-0 w-full mb-0.5">
-            <NuxtLink to="/dashboard" class="min-w-0 truncate pr-2 hover:opacity-80 transition-opacity relative z-10">
-              <p class="font-black text-[var(--ui-text-highlighted)] truncate" :title="workspaceStore.currentWorkspace?.name">
+            <NuxtLink
+              to="/dashboard"
+              class="min-w-0 truncate pr-2 hover:opacity-80 transition-opacity relative z-10"
+            >
+              <p
+                class="font-black text-[var(--ui-text-highlighted)] truncate"
+                :title="workspaceStore.currentWorkspace?.name"
+              >
                 {{ workspaceStore.currentWorkspace?.name || 'No Workspace' }}
               </p>
             </NuxtLink>
             <button
               v-if="workspaceStore.currentWorkspaceId"
-              @click.stop.prevent="triggerWorkspaceModal"
               class="opacity-0 group-hover:opacity-100 flex h-6 w-6 shrink-0 items-center justify-center rounded-md hover:bg-[var(--ui-bg-elevated)] text-[var(--ui-text-muted)] hover:text-[var(--ui-text)] transition-all cursor-pointer relative z-50"
               title="Add member to workspace"
+              @click.stop.prevent="triggerWorkspaceModal"
             >
-              <UIcon name="i-lucide-user-plus" class="h-4 w-4" />
+              <UIcon
+                name="i-lucide-user-plus"
+                class="h-4 w-4"
+              />
             </button>
           </div>
 
           <div class="group flex items-center justify-between min-w-0 w-full">
-            <NuxtLink to="/dashboard" class="min-w-0 truncate pr-2 hover:opacity-80 transition-opacity relative z-10">
-              <p class="text-xs text-[var(--ui-text-muted)] truncate" :title="teamStore.currentTeam?.name">
+            <NuxtLink
+              to="/dashboard"
+              class="min-w-0 truncate pr-2 hover:opacity-80 transition-opacity relative z-10"
+            >
+              <p
+                class="text-xs text-[var(--ui-text-muted)] truncate"
+                :title="teamStore.currentTeam?.name"
+              >
                 {{ teamStore.currentTeam?.name || 'No Team' }}
               </p>
             </NuxtLink>
             <button
               v-if="teamStore.currentTeamId"
-              @click.stop.prevent="triggerTeamModal"
               class="opacity-0 group-hover:opacity-100 flex h-5 w-5 shrink-0 items-center justify-center rounded-md hover:bg-[var(--ui-bg-elevated)] text-[var(--ui-text-muted)] hover:text-[var(--ui-text)] transition-all cursor-pointer relative z-50"
               title="Add member to team"
+              @click.stop.prevent="triggerTeamModal"
             >
-              <UIcon name="i-lucide-user-plus" class="h-3.5 w-3.5" />
+              <UIcon
+                name="i-lucide-user-plus"
+                class="h-3.5 w-3.5"
+              />
             </button>
           </div>
-
         </div>
 
         <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
@@ -171,34 +185,42 @@ watch(() => route.fullPath, () => {
       <div class="flex-1 flex h-full w-full flex-col min-w-0 min-h-0">
         <header class="shrink-0 flex items-center border-b border-[var(--ui-border)] bg-[var(--ui-bg)]/90 px-5 sm:px-8 h-[72px] backdrop-blur-md relative z-30">
           <div class="flex items-center justify-between gap-4 w-full">
-            
             <div class="min-w-0 flex items-center gap-3 flex-1">
               <button
                 type="button"
                 class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg-muted)] text-[var(--ui-text)] transition-colors hover:bg-[var(--ui-bg-elevated)] lg:hidden"
                 @click="toggleMobileSidebar"
               >
-                <UIcon name="i-lucide-menu" class="h-5 w-5" />
+                <UIcon
+                  name="i-lucide-menu"
+                  class="h-5 w-5"
+                />
               </button>
 
               <div class="min-w-0 flex-1">
                 <ChannelHeader />
               </div>
             </div>
-            
+
             <div class="text-right shrink-0 border-l border-[var(--ui-border)] pl-4 ml-2 hidden sm:block">
-              <p class="text-sm font-semibold text-[var(--ui-text)] truncate max-w-[150px]">{{ userStore.user?.name }}</p>
-              <p class="text-xs text-[var(--ui-text-muted)] truncate max-w-[150px]">{{ userStore.user?.email }}</p>
+              <p class="text-sm font-semibold text-[var(--ui-text)] truncate max-w-[150px]">
+                {{ userStore.user?.name }}
+              </p>
+              <p class="text-xs text-[var(--ui-text-muted)] truncate max-w-[150px]">
+                {{ userStore.user?.email }}
+              </p>
             </div>
-            
+
             <button
               type="button"
               class="inline-flex items-center gap-2 rounded-xl border border-[var(--ui-border)] px-3 py-2 text-xs font-semibold text-[var(--ui-text)] transition-colors hover:bg-[var(--ui-bg-muted)] sm:hidden"
               @click="handleLogout"
             >
-              <UIcon name="i-lucide-log-out" class="h-4 w-4" />
+              <UIcon
+                name="i-lucide-log-out"
+                class="h-4 w-4"
+              />
             </button>
-
           </div>
         </header>
 
@@ -206,7 +228,6 @@ watch(() => route.fullPath, () => {
           <slot />
         </main>
       </div>
-
     </div>
 
     <WorkspaceMemberModal
@@ -222,6 +243,5 @@ watch(() => route.fullPath, () => {
       :team-id="teamStore.currentTeamId"
       :team-name="teamStore.currentTeam?.name || ''"
     />
-
   </div>
 </template>

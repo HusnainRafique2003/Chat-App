@@ -60,11 +60,11 @@ const currentMembers = computed(() => {
 const availableMembers = computed(() => {
   const workspaceMembers = workspaceStore.currentWorkspace?.members || []
   const teamMemberIds = new Set(currentMembers.value.map((m: any) => m.id))
-  
+
   return workspaceMembers.filter((wMember: any) => {
     const id = wMember.id || wMember._id || wMember.user_id
     if (teamMemberIds.has(id)) return false
-    
+
     if (searchQuery.value) {
       const q = searchQuery.value.toLowerCase()
       const name = (wMember.name || '').toLowerCase()
@@ -85,13 +85,13 @@ const getAvatarColor = (index: number) => {
 async function handleAddMember(userId: string) {
   addingMemberId.value = userId
   try {
-    const response = await addTeamMember({ 
-      team_id: props.teamId, 
+    const response = await addTeamMember({
+      team_id: props.teamId,
       workspace_id: workspaceStore.currentWorkspaceId || '',
-      user_ids: [userId] 
+      user_ids: [userId]
     })
     toast.add({ title: 'Member added to team', color: 'success' })
-    
+
     // ⚡ INSTANT UI UPDATE: Use the exact array the backend just gave us! ⚡
     if (response.data?.data?.members && teamStore.currentTeam) {
       teamStore.currentTeam.members = response.data.data.members
@@ -114,10 +114,10 @@ async function handleAddMember(userId: string) {
 async function handleRemoveMember(userId: string) {
   removingMemberId.value = userId
   try {
-    const response = await removeTeamMember({ 
-      team_id: props.teamId, 
+    const response = await removeTeamMember({
+      team_id: props.teamId,
       workspace_id: workspaceStore.currentWorkspaceId || '',
-      user_ids: [userId] 
+      user_ids: [userId]
     })
     toast.add({ title: 'Member removed from team', color: 'success' })
     if (response.data?.data?.members && teamStore.currentTeam) {
@@ -157,55 +157,133 @@ watch(open, (newVal) => {
     @cancel="open = false"
   >
     <div class="flex flex-col gap-4">
-      <div v-if="isCurrentUserCreator" class="shrink-0">
+      <div
+        v-if="isCurrentUserCreator"
+        class="shrink-0"
+      >
         <label class="block text-sm font-medium text-[var(--ui-text)]">Search Workspace Members</label>
         <div class="relative mt-2">
-          <UInput v-model="searchQuery" type="search" placeholder="Search by name or email..." >
-            <template #leading><UIcon name="i-lucide-search" class="h-4 w-4" /></template>
+          <UInput
+            v-model="searchQuery"
+            type="search"
+            placeholder="Search by name or email..."
+          >
+            <template #leading>
+              <UIcon
+                name="i-lucide-search"
+                class="h-4 w-4"
+              />
+            </template>
           </UInput>
         </div>
       </div>
 
       <div class="flex flex-col gap-6">
-        <div v-if="isCurrentUserCreator" class="flex flex-col gap-3">
+        <div
+          v-if="isCurrentUserCreator"
+          class="flex flex-col gap-3"
+        >
           <div>
-            <h3 class="text-sm font-semibold text-[var(--ui-text)] mb-3">Available to Add ({{ availableMembers.length }})</h3>
+            <h3 class="text-sm font-semibold text-[var(--ui-text)] mb-3">
+              Available to Add ({{ availableMembers.length }})
+            </h3>
             <div class="space-y-2 max-h-[28vh] overflow-y-auto pr-2 pb-1 [scrollbar-width:thin]">
-              <div v-for="(member, index) in availableMembers" :key="member.id || member._id || member.user_id" class="flex items-center justify-between p-3 rounded-lg bg-[var(--ui-bg-muted)] border border-[var(--ui-border)] hover:bg-[var(--ui-bg-muted)]/80 transition-colors">
+              <div
+                v-for="(member, index) in availableMembers"
+                :key="member.id || member._id || member.user_id"
+                class="flex items-center justify-between p-3 rounded-lg bg-[var(--ui-bg-muted)] border border-[var(--ui-border)] hover:bg-[var(--ui-bg-muted)]/80 transition-colors"
+              >
                 <div class="flex items-center gap-3 min-w-0">
-                  <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white text-xs font-bold" :class="getAvatarColor(index)">{{ getInitials(member.name || 'U') }}</div>
+                  <div
+                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white text-xs font-bold"
+                    :class="getAvatarColor(index)"
+                  >
+                    {{ getInitials(member.name || 'U') }}
+                  </div>
                   <div class="min-w-0">
-                    <p class="text-sm font-medium text-[var(--ui-text)] truncate">{{ member.name }}</p>
-                    <p class="text-xs text-[var(--ui-text-muted)] truncate">{{ member.email }}</p>
+                    <p class="text-sm font-medium text-[var(--ui-text)] truncate">
+                      {{ member.name }}
+                    </p>
+                    <p class="text-xs text-[var(--ui-text-muted)] truncate">
+                      {{ member.email }}
+                    </p>
                   </div>
                 </div>
-                <button type="button" @click="handleAddMember(member.id || member._id || member.user_id)" :disabled="addingMemberId !== null" class="shrink-0 px-3 py-1.5 rounded-lg bg-[var(--ui-primary)] text-white text-xs font-medium hover:bg-[var(--ui-primary)]/90 transition-colors disabled:opacity-50">
+                <button
+                  type="button"
+                  :disabled="addingMemberId !== null"
+                  class="shrink-0 px-3 py-1.5 rounded-lg bg-[var(--ui-primary)] text-white text-xs font-medium hover:bg-[var(--ui-primary)]/90 transition-colors disabled:opacity-50"
+                  @click="handleAddMember(member.id || member._id || member.user_id)"
+                >
                   <span v-if="addingMemberId !== (member.id || member._id || member.user_id)">Add</span>
-                  <UIcon v-else name="i-lucide-loader" class="h-3 w-3 animate-spin" />
+                  <UIcon
+                    v-else
+                    name="i-lucide-loader"
+                    class="h-3 w-3 animate-spin"
+                  />
                 </button>
               </div>
-              <p v-if="availableMembers.length === 0" class="text-sm text-[var(--ui-text-muted)] text-center py-4">No workspace members left to add.</p>
+              <p
+                v-if="availableMembers.length === 0"
+                class="text-sm text-[var(--ui-text-muted)] text-center py-4"
+              >
+                No workspace members left to add.
+              </p>
             </div>
           </div>
         </div>
 
-        <div class="flex flex-col gap-3" :class="{ 'border-t border-[var(--ui-border)] pt-4': isCurrentUserCreator }">
-          <h3 class="text-sm font-semibold text-[var(--ui-text)] shrink-0">Team Members ({{ currentMembers.length }})</h3>
-          <div class="space-y-2 overflow-y-auto pr-2 pb-1 [scrollbar-width:thin]" :class="isCurrentUserCreator ? 'max-h-[35vh]' : 'max-h-[50vh]'">
-            <div v-for="(member, index) in currentMembers" :key="member.id" class="flex items-center justify-between p-3 rounded-lg bg-[var(--ui-bg-muted)] border border-[var(--ui-border)]">
+        <div
+          class="flex flex-col gap-3"
+          :class="{ 'border-t border-[var(--ui-border)] pt-4': isCurrentUserCreator }"
+        >
+          <h3 class="text-sm font-semibold text-[var(--ui-text)] shrink-0">
+            Team Members ({{ currentMembers.length }})
+          </h3>
+          <div
+            class="space-y-2 overflow-y-auto pr-2 pb-1 [scrollbar-width:thin]"
+            :class="isCurrentUserCreator ? 'max-h-[35vh]' : 'max-h-[50vh]'"
+          >
+            <div
+              v-for="(member, index) in currentMembers"
+              :key="member.id"
+              class="flex items-center justify-between p-3 rounded-lg bg-[var(--ui-bg-muted)] border border-[var(--ui-border)]"
+            >
               <div class="flex items-center gap-3 min-w-0">
-                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white text-xs font-bold" :class="getAvatarColor(index)">{{ getInitials(member.name) }}</div>
+                <div
+                  class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white text-xs font-bold"
+                  :class="getAvatarColor(index)"
+                >
+                  {{ getInitials(member.name) }}
+                </div>
                 <div class="min-w-0">
                   <div class="flex items-center gap-2">
-                    <p class="text-sm font-medium text-[var(--ui-text)] truncate">{{ member.name }}</p>
-                    <span v-if="isCreator(member.id)" class="shrink-0 rounded-full bg-[var(--ui-primary)]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--ui-primary)]">Creator</span>
+                    <p class="text-sm font-medium text-[var(--ui-text)] truncate">
+                      {{ member.name }}
+                    </p>
+                    <span
+                      v-if="isCreator(member.id)"
+                      class="shrink-0 rounded-full bg-[var(--ui-primary)]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--ui-primary)]"
+                    >Creator</span>
                   </div>
-                  <p class="text-xs text-[var(--ui-text-muted)] truncate">{{ member.email }}</p>
+                  <p class="text-xs text-[var(--ui-text-muted)] truncate">
+                    {{ member.email }}
+                  </p>
                 </div>
               </div>
-              <button v-if="isCurrentUserCreator && !isCreator(member.id)" type="button" @click="handleRemoveMember(member.id)" :disabled="removingMemberId !== null" class="shrink-0 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 text-xs font-medium hover:bg-red-500/20 transition-colors disabled:opacity-50">
+              <button
+                v-if="isCurrentUserCreator && !isCreator(member.id)"
+                type="button"
+                :disabled="removingMemberId !== null"
+                class="shrink-0 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 text-xs font-medium hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                @click="handleRemoveMember(member.id)"
+              >
                 <span v-if="removingMemberId !== member.id">Remove</span>
-                <UIcon v-else name="i-lucide-loader" class="h-3 w-3 animate-spin" />
+                <UIcon
+                  v-else
+                  name="i-lucide-loader"
+                  class="h-3 w-3 animate-spin"
+                />
               </button>
             </div>
           </div>

@@ -24,14 +24,14 @@ const emit = defineEmits<{
 const open = defineModel<boolean>('open', { default: false })
 
 const colorOptions = [
-  { label: 'Indigo',  value: 'bg-indigo-500'  },
-  { label: 'Violet',  value: 'bg-violet-500'  },
-  { label: 'Sky',     value: 'bg-sky-500'     },
+  { label: 'Indigo', value: 'bg-indigo-500' },
+  { label: 'Violet', value: 'bg-violet-500' },
+  { label: 'Sky', value: 'bg-sky-500' },
   { label: 'Emerald', value: 'bg-emerald-500' },
-  { label: 'Amber',   value: 'bg-amber-500'   },
-  { label: 'Rose',    value: 'bg-rose-500'    },
-  { label: 'Pink',    value: 'bg-pink-500'    },
-  { label: 'Teal',    value: 'bg-teal-500'    },
+  { label: 'Amber', value: 'bg-amber-500' },
+  { label: 'Rose', value: 'bg-rose-500' },
+  { label: 'Pink', value: 'bg-pink-500' },
+  { label: 'Teal', value: 'bg-teal-500' }
 ]
 
 const form = ref<TeamPayload>({ name: '', description: '', color: 'bg-indigo-500' })
@@ -73,10 +73,11 @@ function handleSubmit() {
     @cancel="emit('cancel')"
   >
     <div class="flex flex-col gap-4">
-
       <!-- Color Picker -->
       <div class="flex flex-col gap-2">
-        <p class="text-sm font-medium text-default">Team Color</p>
+        <p class="text-sm font-medium text-default">
+          Team Color
+        </p>
         <div class="flex gap-2 flex-wrap">
           <button
             v-for="c in colorOptions"
@@ -92,7 +93,11 @@ function handleSubmit() {
       </div>
 
       <!-- Name -->
-      <UFormField label="Team Name" :error="errors.name" required>
+      <UFormField
+        label="Team Name"
+        :error="errors.name"
+        required
+      >
         <UInput
           v-model="form.name"
           placeholder="e.g. Frontend Squad"
@@ -110,7 +115,6 @@ function handleSubmit() {
           class="w-full"
         />
       </UFormField>
-
     </div>
   </BaseModal>
 </template>

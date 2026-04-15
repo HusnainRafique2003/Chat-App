@@ -84,7 +84,7 @@ function openLinkDialog() {
   const { from, to } = editor.value.state.selection
   const selectedText = editor.value.state.doc.textBetween(from, to, '')
   const linkAttrs = editor.value.getAttributes('link')
-  
+
   // Simple link insertion for now
   const url = prompt('Enter URL:', linkAttrs.href || '')
   if (url) {
@@ -141,14 +141,29 @@ onUnmounted(() => {
     @confirm="handleConfirm"
     @cancel="handleCancel"
   >
-<div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-4">
       <!-- Rich Editor Toolbar -->
       <div class="flex items-center gap-1 p-2 border-b border-[var(--ui-border)] bg-[var(--ui-bg-elevated)] rounded-lg">
-        <UButton icon="i-lucide-bold" size="sm" variant="ghost" @click="insertBold" />
-        <UButton icon="i-lucide-italic" size="sm" variant="ghost" @click="insertItalic" />
-        <UButton icon="i-lucide-link" size="sm" variant="ghost" @click="openLinkDialog" />
+        <UButton
+          icon="i-lucide-bold"
+          size="sm"
+          variant="ghost"
+          @click="insertBold"
+        />
+        <UButton
+          icon="i-lucide-italic"
+          size="sm"
+          variant="ghost"
+          @click="insertItalic"
+        />
+        <UButton
+          icon="i-lucide-link"
+          size="sm"
+          variant="ghost"
+          @click="openLinkDialog"
+        />
       </div>
-      
+
       <!-- Editor -->
       <div class="relative">
         <label class="text-sm font-semibold text-[var(--ui-text)] block mb-2 sr-only">
@@ -159,13 +174,16 @@ onUnmounted(() => {
           class="w-full min-h-[100px] px-3 py-3 rounded-lg bg-[var(--ui-bg-elevated)] border border-[var(--ui-border)] text-[var(--ui-text)] focus-within:ring-2 focus-within:ring-[var(--ui-primary)]"
         />
       </div>
-      
+
       <!-- Status -->
       <div class="flex items-center justify-between pt-2 border-t border-[var(--ui-border)]">
         <p class="text-xs text-[var(--ui-text-muted)]">
           Rich text editor (links preserved)
         </p>
-        <p v-if="hasChanges" class="text-xs text-[var(--ui-primary)] font-semibold">
+        <p
+          v-if="hasChanges"
+          class="text-xs text-[var(--ui-primary)] font-semibold"
+        >
           ✓ Changes detected
         </p>
       </div>

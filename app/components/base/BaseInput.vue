@@ -81,11 +81,17 @@ const fieldClass = computed(() => {
       @focus="emit('focus', $event)"
       @keyup.enter="emit('enter', model)"
     >
-      <template v-if="$slots.leading" #leading>
+      <template
+        v-if="$slots.leading"
+        #leading
+      >
         <slot name="leading" />
       </template>
 
-      <template v-if="$slots.trailing" #trailing>
+      <template
+        v-if="$slots.trailing"
+        #trailing
+      >
         <slot name="trailing" />
       </template>
     </UInput>

@@ -21,9 +21,9 @@ export function useSocketMemberEvents() {
   function setupWorkspaceMemberRemovedListener() {
     on('workspace_member_removed', async (data) => {
       console.log('[Socket] Workspace member removed:', data)
-      
+
       const { userId, workspaceId } = data
-      
+
       if (workspaceStore.currentWorkspaceId === workspaceId) {
         // If current user was removed, refresh workspace list
         if (userId === userStore.user?.id) {
@@ -42,9 +42,9 @@ export function useSocketMemberEvents() {
   function setupWorkspaceMemberInvitedListener() {
     on('workspace_member_invited', async (data) => {
       console.log('[Socket] Workspace member invited:', data)
-      
+
       const { userId, workspaceId, role } = data
-      
+
       if (workspaceStore.currentWorkspaceId === workspaceId) {
         // Refresh workspace members to include the newly invited user
         await workspaceStore.refreshWorkspaceMembers(workspaceId)
@@ -63,9 +63,9 @@ export function useSocketMemberEvents() {
   function setupTeamMemberAddedListener() {
     on('team_member_added', async (data) => {
       console.log('[Socket] Team member added:', data)
-      
+
       const { userId, teamId } = data
-      
+
       if (teamStore.currentTeamId === teamId) {
         // Refresh the team to get updated member list
         const team = teamStore.teams.find(t => t.id === teamId)
@@ -83,9 +83,9 @@ export function useSocketMemberEvents() {
   function setupTeamMemberRemovedListener() {
     on('team_member_removed', async (data) => {
       console.log('[Socket] Team member removed:', data)
-      
+
       const { userId, teamId } = data
-      
+
       if (teamStore.currentTeamId === teamId) {
         const team = teamStore.teams.find(t => t.id === teamId)
         if (team) {
@@ -107,9 +107,9 @@ export function useSocketMemberEvents() {
   function setupChannelMemberAddedListener() {
     on('channel_member_added', async (data) => {
       console.log('[Socket] Channel member added:', data)
-      
+
       const { userId, channelId } = data
-      
+
       const channel = channelStore.channels.find(c => c.id === channelId)
       if (channel) {
         // Refresh channels to get updated member list
@@ -124,9 +124,9 @@ export function useSocketMemberEvents() {
   function setupChannelMemberRemovedListener() {
     on('channel_member_removed', async (data) => {
       console.log('[Socket] Channel member removed:', data)
-      
+
       const { userId, channelId } = data
-      
+
       const channel = channelStore.channels.find(c => c.id === channelId)
       if (channel) {
         // If current user was removed from channel, remove it from the list

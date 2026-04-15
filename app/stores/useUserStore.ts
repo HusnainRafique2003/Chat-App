@@ -29,17 +29,17 @@ interface UserGetters {
 interface UserActions {
   setAuth(user: ApiUser, authToken?: string): void
   clearAuth(): void
-  login(email: string, password: string): Promise<{ success: boolean; error?: string; message?: string }>
+  login(email: string, password: string): Promise<{ success: boolean, error?: string, message?: string }>
   register(form: {
     name: string
     email: string
     workspace: string
     password: string
     password_confirmation: string
-  }): Promise<{ success: boolean; error?: string; message?: string; user?: ApiUser | null }>
-  verifySignup(email: string, token: string): Promise<{ success: boolean; error?: string; message?: string }>
-  forgotPassword(email: string): Promise<{ success: boolean; error?: string; message?: string }>
-  resetPassword(token: string, password: string, password_confirmation: string): Promise<{ success: boolean; error?: string; message?: string }>
+  }): Promise<{ success: boolean, error?: string, message?: string, user?: ApiUser | null }>
+  verifySignup(email: string, token: string): Promise<{ success: boolean, error?: string, message?: string }>
+  forgotPassword(email: string): Promise<{ success: boolean, error?: string, message?: string }>
+  resetPassword(token: string, password: string, password_confirmation: string): Promise<{ success: boolean, error?: string, message?: string }>
   logout(): Promise<{ success: boolean }>
   validateAuth(): Promise<{ valid: boolean }>
 }
@@ -55,8 +55,6 @@ function extractMessage(error: unknown, fallback: string) {
   return fallback
 }
 
-
-
 export const useUserStore = defineStore<'user', UserState, UserGetters, UserActions>('user', {
   state: (): UserState => ({
     user: null,
@@ -65,7 +63,7 @@ export const useUserStore = defineStore<'user', UserState, UserGetters, UserActi
   }),
 
   getters: {
-    isLoggedIn: (state) => Boolean(state.user?.is_active && state.token)
+    isLoggedIn: state => Boolean(state.user?.is_active && state.token)
   },
 
   persist: {
