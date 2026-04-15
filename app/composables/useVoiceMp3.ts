@@ -46,8 +46,81 @@ export async function normalizeVoiceBlob(blob: Blob): Promise<File> {
 // Legacy export compatibility
 export { normalizeVoiceBlob as convertToMp3 }
 
-// For future MP3 if needed (disabled)
-// export async function convertToMp3Deprecated(blob: Blob): Promise<File> {
-//   throw new Error('MP3 conversion disabled - use WebM fallback')
-// }
+// Dynamic import for lamejs (ES module + UMD compatibility)
+let LameJS: any = null
+async function loadLameJS() {
+  if (!LameJS) {
+    try {
+      const lamejs = await import('lamejs')
+      LameJS = lamejs.default || lamejs
+      console.log('[Voice MP3] lamejs loaded successfully:', !!LameJS?.Mp3Encoder)
+    } catch (error) {
+      console.error('[Voice MP3] Failed to load lamejs:', error)
+      LameJS = null
+    }
+  }
+  return LameJS
+}
+
+
+/**
+ * Convert recorded audio blob to MP3 for backend compatibility
+ */
+export async function recordToMp3(blob: Blob): Promise<File> {
+  const LameJS = await loadLameJS()
+  if (!LameJS?.Mp3Encoder) {
+    console.error('[Voice MP3] lamejs failed to load, falling back to WebM')
+    return normalizeVoiceBlob(blob)
+  }
+  
+  const AudioContext = window.AudioContext || (window as any).webkitAudioContext
+  const audioContext = new AudioContext()
+  
+  try {
+    const arrayBuffer = await blob.arrayBuffer()
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+    
+    const mp3encoder = new LameJS.Mp3Encoder(1, audioBuffer.sampleRate || 44100, 128) // mono, 128kbps
+    const samples = audioBuffer.getChannelData(0)
+    const sampleBlockSize = 1152 // MP3 frame size
+    const mp3Data: Uint8Array[] = []
+    
+    // Encode in blocks
+    for (let i = 0; i < samples.length; i += sampleBlockSize) {
+      const sampleChunk = samples.subarray(i, Math.min(i + sampleBlockSize, samples.length))
+      const mp3buf = mp3encoder.encodeBuffer(sampleChunk)
+      if (mp3buf.length > 0) {
+        mp3Data.push(mp3buf)
+      }
+    }
+    
+    // Flush encoder
+    const mp3buf = mp3encoder.flush()
+    if (mp3buf.length > 0) {
+      mp3Data.push(mp3buf)
+    }
+    
+    const mp3Blob = new Blob(mp3Data, { type: 'audio/mp3' })
+    const file = new File([mp3Blob], `voice-${Date.now()}.mp3`, { type: 'audio/mpeg' })
+    
+    console.log('[Voice MP3] Converted successfully:', {
+      inputType: blob.type,
+      inputSize: blob.size,
+      outputSize: file.size,
+      sampleRate: audioBuffer.sampleRate,
+      duration: audioBuffer.duration
+    })
+    
+    return file
+  } catch (error) {
+    console.error('[Voice MP3] Conversion failed:', error)
+    // Fallback to normalized WebM
+    return normalizeVoiceBlob(blob)
+  } finally {
+    if (audioContext.state === 'running') {
+      await audioContext.close()
+    }
+  }
+}
+
 

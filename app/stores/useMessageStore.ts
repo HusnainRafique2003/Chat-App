@@ -1,9 +1,10 @@
+import axios from 'axios'
 import { defineStore } from 'pinia'
 import { addChannelMember } from '~/composables/useChannelsApi'
 import { simpleTrimStartEnd } from '~/composables/useMessageUtils'
 import { canDeleteMessage, canEditMessage, createMessage, deleteMessage, markMessagesAsRead, reactToMessage, readMessages, searchMessages, updateMessage, type Message } from '~/composables/useMessagesApi'
-import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
+import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
 interface MessageState {
   messages: Message[]
