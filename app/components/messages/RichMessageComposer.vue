@@ -4,8 +4,8 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { simpleTrimStartEnd, trimMessageBlock } from '~/composables/useMessageUtils'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { simpleTrimStartEnd } from '~/composables/useMessageUtils'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 
@@ -36,8 +36,7 @@ const ALLOWED_MIME_TYPES = new Set([
   'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'text/plain', 'application/zip', 'video/mp4', 'audio/mpeg', 'audio/webm', 'audio/webm;codecs=opus',
-  'audio/ogg', 'audio/ogg;codecs=opus', 'audio/wav', 'audio/webm;codecs=vorbis'
+  'text/plain', 'application/zip', 'video/mp4', 'audio/mpeg', 'audio/webm', 'audio/webm;codecs=opus', 'audio/ogg', 'audio/wav'
 ])
 
 function validateFile(file: File): { valid: boolean; error: string } {
@@ -312,8 +311,12 @@ const recordingTime = computed(() => {
   return `${m}:${s}`
 })
 
+
 async function convertRecordedAudio(blob: Blob): Promise<File> {
-  return new File([blob], `voice-note-${Date.now()}.webm`, { type: blob.type || 'audio/webm' })
+  console.log('[Voice] Recording blob details:', blob.type, blob.size, '→ converting to MP3 (backend accepts)')
+  const file = await recordToMp3(blob)
+  console.log('[Voice] MP3 converted:', file.name, file.type, file.size)
+  return file
 }
 
 async function openVoiceDialog() {
@@ -360,15 +363,14 @@ function stopRecording() {
 
 async function attachVoiceNote() {
   if (!recordedAudio.value) return
-  const voiceFile = await convertRecordedAudio(recordedAudio.value)
-  const result = validateFile(voiceFile)
-  if (result.valid) {
+  try {
+    const voiceFile = await convertRecordedAudio(recordedAudio.value)
     selectedFile.value = voiceFile
     fileStatus.value = 'valid'
-    toast.add({ title: `✅ Voice note attached (${(voiceFile.size / 1024).toFixed(0)}KB)`, color: 'success' })
-  } else {
-    fileStatus.value = 'invalid'
-    toast.add({ title: '❌ Attach failed', description: result.error, color: 'error' })
+    toast.add({ title: `✅ Voice note ready (${(voiceFile.size / 1024).toFixed(0)}KB)`, color: 'success' })
+  } catch (error) {
+    console.error('[Voice Attach] Error:', error)
+    toast.add({ title: '❌ Voice processing failed', color: 'error' })
   }
   closeVoiceDialog()
 }
