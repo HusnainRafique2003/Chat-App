@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useToast } from '#ui/composables/useToast'
 import { computed, nextTick, ref, watch } from 'vue'
-import type { Message } from '~/composables/useMessagesApi'
+import type { Message } from '~/types/message'
 import { useMessageStore } from '~/stores/useMessageStore'
 import { useUserStore } from '~/stores/useUserStore'
 import EditMessageModal from '../modals/EditMessageModal.vue'
@@ -36,14 +36,10 @@ const showDeleteModal = ref(false)
 const toast = useToast()
 const scrollThreshold = ref(100) // pixels from top to trigger loading more
 const shouldAutoScroll = ref(true) // Flag to control auto-scrolling to bottom
+const lastFetchKey = ref('')
 
 const sortedMessages = computed(() => {
-  const messages = messageStore.sortedMessages
-  console.log('[MessageList] Computed sortedMessages:', {
-    count: messages.length,
-    messages: messages.map(m => ({ id: m.id, content: m.content?.slice(0, 30), sender: m.sender?.name }))
-  })
-  return messages
+  return messageStore.sortedMessages
 })
 
 watch(
@@ -56,10 +52,12 @@ watch(
     const trimmed = newChannelId.trim()
     if (!trimmed) return
 
-    console.log('[MessageList] Store ready with token:', token.slice(0, 20) + '...')
+    const fetchKey = `${trimmed}:${token}`
+    if (lastFetchKey.value === fetchKey) {
+      return
+    }
 
-    console.log('[MessageList] Switching to channel:', trimmed)
-    console.log('[MessageList] Clearing store and fetching messages')
+    lastFetchKey.value = fetchKey
 
     shouldAutoScroll.value = true // Reset when switching channels
     await messageStore.fetchMessages(trimmed)
@@ -96,16 +94,12 @@ async function handleScroll() {
 
   // When user scrolls near the top, load more messages
   if (scrollTop < scrollThreshold.value && messageStore.hasMoreMessages && !messageStore.loadingMore) {
-    console.log('[MessageList] User scrolled to top, loading more messages')
-
     // Disable auto-scroll when loading more messages
     shouldAutoScroll.value = false
 
     // Find the first visible message ID to maintain scroll position
     const firstVisibleElement = messagesContainer.value.querySelector('[data-message-id]')
     const firstVisibleMessageId = firstVisibleElement?.getAttribute('data-message-id')
-
-    console.log('[MessageList] First visible message ID:', firstVisibleMessageId)
 
     const result = await messageStore.loadMoreMessages()
 
@@ -119,7 +113,6 @@ async function handleScroll() {
           const targetElement = messagesContainer.value?.querySelector(`[data-message-id="${firstVisibleMessageId}"]`)
           if (targetElement) {
             targetElement.scrollIntoView({ block: 'start', behavior: 'auto' })
-            console.log('[MessageList] Scrolled to message:', firstVisibleMessageId)
           }
         })
       }
@@ -205,15 +198,6 @@ async function handleReaction(messageId: string, emoji: string) {
 }
 
 async function handleMessageSent(data: { content: string, file?: File, scheduledAt?: Date }) {
-  console.log('[MessageList] handleMessageSent:', {
-    channelId: props.channelId,
-    content: data.content,
-    hasFile: !!data.file,
-    fileType: data.file?.type,
-    fileName: data.file?.name,
-    scheduledAt: data.scheduledAt
-  })
-
   const result = await messageStore.createMessage(props.channelId, data.content, data.file, data.scheduledAt)
 
   if (!result.success) {

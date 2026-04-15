@@ -4,7 +4,8 @@ import { useToast } from '#ui/composables/useToast'
 import { useTeamStore } from '~/stores/useTeamStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
-import { addTeamMember, removeTeamMember } from '~/composables/useTeamsApi'
+import type { Team, TeamMember } from '~/types/team'
+import type { WorkspaceMember } from '~/types/workspace'
 
 const props = defineProps<{
   teamId: string
@@ -22,13 +23,35 @@ const searchQuery = ref('')
 const addingMemberId = ref<string | null>(null)
 const removingMemberId = ref<string | null>(null)
 
-const currentUserId = computed(() => userStore.user?.id || (userStore.user as any)?._id || '')
+type LegacyUser = { _id?: string }
+type LegacyTeam = Team & { created_id?: string, owner_id?: string, user_id?: string }
+type TeamMemberRecord = TeamMember & {
+  id?: string
+  _id?: string
+  user?: {
+    name?: string
+    email?: string
+    avatar?: string
+  }
+}
+type DisplayTeamMember = {
+  id: string
+  name: string
+  email: string
+  avatar: string
+  role: string
+}
+
+const currentUserId = computed(() => {
+  const currentUser = userStore.user as (typeof userStore.user & LegacyUser)
+  return currentUser?.id || currentUser?._id || ''
+})
 
 function isCreator(userId: string) {
   if (!userId) return false
-  const t = teamStore.currentTeam
+  const t = teamStore.currentTeam as LegacyTeam | undefined
   if (!t) return false
-  return t.creator_id === userId || (t as any).created_id === userId || (t as any).owner_id === userId || (t as any).user_id === userId
+  return t.creator_id === userId || t.created_id === userId || t.owner_id === userId || t.user_id === userId
 }
 
 const isCurrentUserCreator = computed(() => {
@@ -38,13 +61,13 @@ const isCurrentUserCreator = computed(() => {
 
 // === SMART MAPPING: Match Team IDs to Workspace User Details ===
 const currentMembers = computed(() => {
-  const tMembers = teamStore.currentTeam?.members || []
+  const tMembers = (teamStore.currentTeam?.members || []) as TeamMemberRecord[]
   const wMembers = workspaceStore.currentWorkspace?.members || []
 
   return tMembers
-    .map((tMember: any) => {
+    .map((tMember): DisplayTeamMember => {
       const tUserId = tMember.user_id || tMember.id || tMember._id || (typeof tMember === 'string' ? tMember : '')
-      const foundUser = wMembers.find((w: any) => (w.id || w._id || w.user_id) === tUserId)
+      const foundUser = wMembers.find((w: WorkspaceMember) => (w.id || w._id || w.user_id) === tUserId)
 
       return {
         id: tUserId,
@@ -54,14 +77,14 @@ const currentMembers = computed(() => {
         role: tMember.role || 'member'
       }
     })
-    .filter((member: any) => member.id && member.name)
+    .filter(member => Boolean(member.id && member.name))
 })
 
 const availableMembers = computed(() => {
   const workspaceMembers = workspaceStore.currentWorkspace?.members || []
-  const teamMemberIds = new Set(currentMembers.value.map((m: any) => m.id))
+  const teamMemberIds = new Set(currentMembers.value.map(member => member.id))
 
-  return workspaceMembers.filter((wMember: any) => {
+  return workspaceMembers.filter((wMember: WorkspaceMember) => {
     const id = wMember.id || wMember._id || wMember.user_id
     if (teamMemberIds.has(id)) return false
 
@@ -83,60 +106,44 @@ const getAvatarColor = (index: number) => {
 }
 
 async function handleAddMember(userId: string) {
+  if (!workspaceStore.currentWorkspaceId) {
+    toast.add({ title: 'Error', description: 'Workspace is not selected.', color: 'error' })
+    return
+  }
+
   addingMemberId.value = userId
   try {
-    const response = await addTeamMember({
-      team_id: props.teamId,
-      workspace_id: workspaceStore.currentWorkspaceId || '',
-      user_ids: [userId]
-    })
+    const response = await teamStore.addMembers(props.teamId, workspaceStore.currentWorkspaceId, [userId])
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to add member')
+    }
+
     toast.add({ title: 'Member added to team', color: 'success' })
-
-    // ⚡ INSTANT UI UPDATE: Use the exact array the backend just gave us! ⚡
-    if (response.data?.data?.members && teamStore.currentTeam) {
-      teamStore.currentTeam.members = response.data.data.members
-    } else if (teamStore.currentTeam) {
-      // Bulletproof fallback: push the string ID
-      if (!teamStore.currentTeam.members) teamStore.currentTeam.members = []
-      teamStore.currentTeam.members.push(userId)
-    }
-
-    if (workspaceStore.currentWorkspaceId) {
-      teamStore.fetchTeams(workspaceStore.currentWorkspaceId)
-    }
-  } catch (error: any) {
-    toast.add({ title: 'Error', description: error.message || 'Failed to add member', color: 'error' })
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to add member'
+    toast.add({ title: 'Error', description: errorMessage, color: 'error' })
   } finally {
     addingMemberId.value = null
   }
 }
 
 async function handleRemoveMember(userId: string) {
+  if (!workspaceStore.currentWorkspaceId) {
+    toast.add({ title: 'Error', description: 'Workspace is not selected.', color: 'error' })
+    return
+  }
+
   removingMemberId.value = userId
   try {
-    const response = await removeTeamMember({
-      team_id: props.teamId,
-      workspace_id: workspaceStore.currentWorkspaceId || '',
-      user_ids: [userId]
-    })
-    toast.add({ title: 'Member removed from team', color: 'success' })
-    if (response.data?.data?.members && teamStore.currentTeam) {
-      teamStore.currentTeam.members = response.data.data.members
-    } else if (teamStore.currentTeam && teamStore.currentTeam.members) {
-      // Bulletproof fallback: handle both strings and objects
-      teamStore.currentTeam.members = teamStore.currentTeam.members.filter(
-        (m: any) => {
-          const id = typeof m === 'string' ? m : (m.id || m._id || m.user_id)
-          return id !== userId
-        }
-      )
+    const response = await teamStore.removeMembers(props.teamId, workspaceStore.currentWorkspaceId, [userId])
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to remove member')
     }
 
-    if (workspaceStore.currentWorkspaceId) {
-      teamStore.fetchTeams(workspaceStore.currentWorkspaceId)
-    }
-  } catch (error: any) {
-    toast.add({ title: 'Error', description: error.message || 'Failed to remove member', color: 'error' })
+    toast.add({ title: 'Member removed from team', color: 'success' })
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to remove member'
+    toast.add({ title: 'Error', description: errorMessage, color: 'error' })
   } finally {
     removingMemberId.value = null
   }

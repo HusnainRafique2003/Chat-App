@@ -1,16 +1,37 @@
 import { defineStore } from 'pinia'
-import { getWorkspaces, getWorkspace, createWorkspace, updateWorkspace, deleteWorkspace } from '~/composables/useWorkspacesApi'
-import type { ApiUser } from '~/stores/useUserStore'
+import {
+  addWorkspaceMemberRequest,
+  createWorkspaceRequest,
+  deleteWorkspaceRequest,
+  fetchAvailableWorkspaceMembersRequest,
+  getWorkspaceRequest,
+  getWorkspacesRequest,
+  removeWorkspaceMemberRequest,
+  searchWorkspaceMembersRequest,
+  updateWorkspaceRequest
+} from '~/services/workspaceService'
+import type { Workspace } from '~/types/workspace'
+import { extractWorkspace, extractWorkspaces } from '~/utils/workspaceNormalizer'
 
-export interface Workspace {
-  id: string
+interface StoreMemberRecord {
+  id?: string
   _id?: string
-  name: string
-  description: string
-  creator_id: string
-  created_at: string
-  updated_at: string
-  members: ApiUser[]
+  user_id?: string
+  name?: string
+  email?: string
+  avatar?: string
+  user?: {
+    name?: string
+    email?: string
+  }
+}
+
+interface MemberListPayload {
+  data?: StoreMemberRecord[] | {
+    members?: StoreMemberRecord[]
+    available_members?: StoreMemberRecord[]
+  }
+  available_members?: StoreMemberRecord[]
 }
 
 interface State {
@@ -19,6 +40,14 @@ interface State {
   currentWorkspaceId: string | null
 }
 
+interface WorkspacePayload {
+  success?: boolean
+  message?: string
+}
+
+let workspaceListRequest: Promise<void> | null = null
+const workspaceMembersRequests = new Map<string, Promise<void>>()
+
 export const useWorkspaceStore = defineStore('workspace-data', {
   state: (): State => ({
     workspaces: [],
@@ -26,113 +55,102 @@ export const useWorkspaceStore = defineStore('workspace-data', {
     currentWorkspaceId: null
   }),
   persist: {
-    enabled: true,
-    pick: ['currentWorkspaceId'] // Only persist the ID, not the whole list
+    pick: ['currentWorkspaceId']
   },
   getters: {
-    currentWorkspace: state => state.workspaces.find(w => w.id === state.currentWorkspaceId)
+    currentWorkspace: state => state.workspaces.find(workspace => workspace.id === state.currentWorkspaceId)
   },
 
   actions: {
     async fetchWorkspaces() {
+      if (this.loading && workspaceListRequest) {
+        await workspaceListRequest
+        return
+      }
+
       this.loading = true
+
+      workspaceListRequest = (async () => {
+        const result = await getWorkspacesRequest()
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to fetch workspaces')
+        }
+
+        const payload = result.data?.data
+        this.workspaces = extractWorkspaces(payload)
+
+        if (this.workspaces.length > 0 && !this.currentWorkspaceId) {
+          this.currentWorkspaceId = this.workspaces[0]?.id || null
+        }
+      })()
+
       try {
-        const response = await getWorkspaces()
-        const data = response.data
-
-        if (data.success || data.data) {
-          let workspacesData: any[] = []
-
-          if (Array.isArray(data.data)) workspacesData = data.data
-          else if (data.data?.workspaces && Array.isArray(data.data.workspaces)) workspacesData = data.data.workspaces
-          else if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) workspacesData = [data.data]
-
-          this.workspaces = workspacesData.map((w: any) => ({
-            ...w,
-            id: w.id || w._id,
-            members: w.members || w.users || []
-          }))
-
-          if (this.workspaces.length > 0 && !this.currentWorkspaceId) {
-            this.currentWorkspaceId = this.workspaces[0]?.id || null
-          }
-        }
+        await workspaceListRequest
       } catch (error) {
-        if (error instanceof Error) {
-          console.error('Failed to fetch workspaces:', {
-            message: error.message,
-            status: (error as any).response?.status,
-            data: (error as any).response?.data
-          })
-        } else {
-          console.error('Failed to fetch workspaces:', error)
-        }
-        // Check if it's a 401 unauthorized error
-        if ((error as any)?.response?.status === 401) {
-          // Token may be invalid/expired, don't retry automatically
-          // Let the auth middleware handle the redirect to login
-        }
+        console.error('Failed to fetch workspaces:', error)
       } finally {
+        workspaceListRequest = null
         this.loading = false
       }
     },
 
     async refreshWorkspaceMembers(workspaceId: string) {
-      try {
-        const response = await getWorkspace(workspaceId)
-        const data = response.data
+      const existingRequest = workspaceMembersRequests.get(workspaceId)
+      if (existingRequest) {
+        await existingRequest
+        return
+      }
 
-        if (data?.success || data?.data) {
-          // 1. Handle if the backend returns an array of all workspaces
-          let workspaceData = null
-          if (Array.isArray(data.data)) {
-            workspaceData = data.data.find((w: any) => w.id === workspaceId || w._id === workspaceId)
-          } else {
-            workspaceData = data.data?.workspace || data.data || data
-          }
+      const request = (async () => {
+        const result = await getWorkspaceRequest(workspaceId)
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to fetch workspace')
+        }
 
-          // 2. If we found the specific workspace, extract its members
-          if (workspaceData) {
-            const index = this.workspaces.findIndex(w => w.id === workspaceId || w._id === workspaceId)
+        const workspace = extractWorkspace(result.data?.data, workspaceId)
+        if (!workspace) {
+          return
+        }
 
-            if (index > -1) {
-              const rawMembers = workspaceData.members || workspaceData.users || workspaceData.workspace_members || []
-              const freshMembers = rawMembers.map((m: any) => m.user ? m.user : m)
-
-              // Force Vue Reactivity to update the UI
-              this.workspaces[index] = {
-                ...this.workspaces[index],
-                members: freshMembers
-              }
-            }
+        const index = this.workspaces.findIndex(item => item.id === workspaceId || item._id === workspaceId)
+        if (index > -1) {
+          this.workspaces[index] = {
+            ...this.workspaces[index],
+            members: workspace.members
           }
         }
+      })()
+
+      workspaceMembersRequests.set(workspaceId, request)
+
+      try {
+        await request
       } catch (error) {
         console.error('Failed to refresh workspace members:', error)
+      } finally {
+        workspaceMembersRequests.delete(workspaceId)
       }
     },
 
-    // --- NEW ACTIONS: Create, Update, Delete ---
-
     async createWorkspace(data: { name: string, description?: string }) {
       this.loading = true
+
       try {
-        const response = await createWorkspace(data)
-        const responseData = response.data
-
-        if (responseData.success) {
-          const newWorkspace = responseData.data?.workspace || responseData.data || responseData.workspace
-          if (newWorkspace) {
-            newWorkspace.id = newWorkspace.id || newWorkspace._id
-            newWorkspace.members = newWorkspace.members || []
-            this.workspaces.push(newWorkspace)
-
-            // Switch to the newly created workspace
-            this.setCurrentWorkspace(newWorkspace.id)
-            return { success: true, workspace: newWorkspace }
-          }
+        const result = await createWorkspaceRequest(data)
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to create workspace' }
         }
-        return { success: false, error: responseData.message || 'Failed to create workspace' }
+
+        const payload = result.data?.data as WorkspacePayload | undefined
+        const workspace = extractWorkspace(result.data?.data)
+
+        if (payload?.success && workspace) {
+          this.workspaces.push(workspace)
+          this.setCurrentWorkspace(workspace.id)
+          return { success: true, workspace }
+        }
+
+        return { success: false, error: payload?.message || 'Failed to create workspace' }
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to create workspace' }
       } finally {
@@ -142,22 +160,26 @@ export const useWorkspaceStore = defineStore('workspace-data', {
 
     async updateWorkspace(workspaceId: string, data: { name?: string, description?: string }) {
       this.loading = true
-      try {
-        const response = await updateWorkspace({ workspace_id: workspaceId, ...data })
-        const responseData = response.data
 
-        if (responseData.success) {
-          const updatedWorkspace = responseData.data?.workspace || responseData.data
-          if (updatedWorkspace) {
-            const index = this.workspaces.findIndex(w => w.id === workspaceId || w._id === workspaceId)
-            if (index > -1) {
-              // Merge the updated data into the existing state
-              this.workspaces[index] = { ...this.workspaces[index], ...updatedWorkspace }
-            }
-            return { success: true }
-          }
+      try {
+        const result = await updateWorkspaceRequest({ workspace_id: workspaceId, ...data })
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to update workspace' }
         }
-        return { success: false, error: responseData.message || 'Failed to update workspace' }
+
+        const payload = result.data?.data as WorkspacePayload | undefined
+        const workspace = extractWorkspace(result.data?.data)
+
+        if (payload?.success && workspace) {
+          const index = this.workspaces.findIndex(item => item.id === workspaceId || item._id === workspaceId)
+          if (index > -1) {
+            this.workspaces[index] = { ...this.workspaces[index], ...workspace }
+          }
+
+          return { success: true }
+        }
+
+        return { success: false, error: payload?.message || 'Failed to update workspace' }
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to update workspace' }
       } finally {
@@ -167,21 +189,25 @@ export const useWorkspaceStore = defineStore('workspace-data', {
 
     async deleteWorkspace(workspaceId: string) {
       this.loading = true
+
       try {
-        const response = await deleteWorkspace({ workspace_id: workspaceId })
-        const responseData = response.data
+        const result = await deleteWorkspaceRequest({ workspace_id: workspaceId })
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to delete workspace' }
+        }
 
-        if (responseData.success) {
-          // Remove from local state
-          this.workspaces = this.workspaces.filter(w => w.id !== workspaceId && w._id !== workspaceId)
+        const payload = result.data?.data as WorkspacePayload | undefined
+        if (payload?.success) {
+          this.workspaces = this.workspaces.filter(item => item.id !== workspaceId && item._id !== workspaceId)
 
-          // If they deleted their active workspace, fallback to the first available one
           if (this.currentWorkspaceId === workspaceId) {
-            this.currentWorkspaceId = this.workspaces.length > 0 ? (this.workspaces[0].id || this.workspaces[0]._id as string) : null
+            this.currentWorkspaceId = this.workspaces[0]?.id || this.workspaces[0]?._id || null
           }
+
           return { success: true }
         }
-        return { success: false, error: responseData.message || 'Failed to delete workspace' }
+
+        return { success: false, error: payload?.message || 'Failed to delete workspace' }
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to delete workspace' }
       } finally {
@@ -189,7 +215,88 @@ export const useWorkspaceStore = defineStore('workspace-data', {
       }
     },
 
-    // --- State Management ---
+    async searchMembers(workspaceId: string, query: string) {
+      try {
+        const result = await searchWorkspaceMembersRequest(workspaceId, query)
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to search members', members: [] }
+        }
+
+        const payload = result.data as MemberListPayload
+        const source = Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload?.data?.members)
+            ? payload.data.members
+            : []
+
+        const members = source.map(member => ({
+          id: member.id || member._id || member.user_id,
+          name: member.name || member.user?.name || 'Unknown',
+          email: member.email || member.user?.email || '',
+          avatar: member.avatar
+        }))
+
+        return { success: true, members }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to search members', members: [] }
+      }
+    },
+
+    async fetchAvailableMembers(workspaceId: string) {
+      try {
+        const result = await fetchAvailableWorkspaceMembersRequest(workspaceId)
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to fetch available members', members: [] }
+        }
+
+        const payload = result.data as MemberListPayload
+        const source = Array.isArray(payload?.data?.available_members)
+          ? payload.data.available_members
+          : Array.isArray(payload?.available_members)
+            ? payload.available_members
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : []
+
+        const members = source.map(member => ({
+          id: member.id || member._id || member.user_id,
+          name: member.name || 'Unknown User',
+          email: member.email || ''
+        }))
+
+        return { success: true, members }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to fetch available members', members: [] }
+      }
+    },
+
+    async addMembers(workspaceId: string, userIds: string[]) {
+      try {
+        const result = await addWorkspaceMemberRequest({ workspace_id: workspaceId, user_ids: userIds })
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to add workspace member' }
+        }
+
+        await this.refreshWorkspaceMembers(workspaceId)
+        return { success: true }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to add workspace member' }
+      }
+    },
+
+    async removeMembers(workspaceId: string, userIds: string[]) {
+      try {
+        const result = await removeWorkspaceMemberRequest({ workspace_id: workspaceId, user_ids: userIds })
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to remove workspace member' }
+        }
+
+        await this.refreshWorkspaceMembers(workspaceId)
+        return { success: true }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to remove workspace member' }
+      }
+    },
 
     setCurrentWorkspace(id: string) {
       this.currentWorkspaceId = id

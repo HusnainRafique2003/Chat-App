@@ -4,8 +4,8 @@ import { useToast } from '#ui/composables/useToast'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
-import { addChannelMember, removeChannelMember } from '~/composables/useChannelsApi'
-import { searchWorkspaceMembers } from '~/composables/useWorkspacesApi'
+import type { Channel } from '~/types/channel'
+import type { WorkspaceMember } from '~/types/workspace'
 
 interface MemberData {
   user_id: string
@@ -22,10 +22,6 @@ interface Props {
 }
 
 const props = defineProps<Props>()
-const emit = defineEmits<{
-  'update:open': [value: boolean]
-}>()
-
 const open = defineModel<boolean>('open', { default: false })
 
 const channelStore = useChannelStore()
@@ -40,18 +36,35 @@ const removingMemberId = ref<string | null>(null)
 const isSearching = ref(false)
 const searchResults = ref<Array<{ id: string, name: string, email: string, avatar?: string }>>([])
 
+type LegacyUser = { _id?: string }
+type LegacyChannel = Channel & {
+  creator_id?: string
+  created_by?: string
+  owner_id?: string
+  user_id?: string
+}
+type WorkspaceMemberRecord = WorkspaceMember & {
+  user?: {
+    name?: string
+    email?: string
+  }
+}
+
 // Get the current user's ID
-const currentUserId = computed(() => userStore.user?.id || (userStore.user as any)?._id || '')
+const currentUserId = computed(() => {
+  const currentUser = userStore.user as (typeof userStore.user & LegacyUser)
+  return currentUser?.id || currentUser?._id || ''
+})
 
 // Helper to reliably identify the channel creator from any ID
 function isCreator(userId: string) {
-  const c = channelStore.currentChannel
+  const c = channelStore.currentChannel as LegacyChannel | undefined
   if (!c) return false
   return c.created_id === userId
-    || (c as any).creator_id === userId
-    || (c as any).created_by === userId
-    || (c as any).owner_id === userId
-    || (c as any).user_id === userId
+    || c.creator_id === userId
+    || c.created_by === userId
+    || c.owner_id === userId
+    || c.user_id === userId
 }
 
 // Check if the currently logged-in user is the creator
@@ -66,11 +79,11 @@ const allAvailableMembers = computed(() => {
   const currentMemberIds = new Set(props.members.map(m => m.user_id))
 
   return workspaceMembers
-    .filter((member: any) => {
+    .filter((member: WorkspaceMemberRecord) => {
       const memberId = member.id || member._id || member.user_id
       return !currentMemberIds.has(memberId) && memberId !== currentUserId.value
     })
-    .map((member: any) => ({
+    .map((member: WorkspaceMemberRecord) => ({
       id: member.id || member._id || member.user_id,
       name: member.name || member.user?.name || 'Unknown',
       email: member.email || member.user?.email || '',
@@ -132,36 +145,21 @@ async function performSearch(query: string) {
       return
     }
 
-    const response = await searchWorkspaceMembers(workspaceId, query)
-
-    if (response.data?.success || response.data?.data) {
-      let results = Array.isArray(response.data?.data) ? response.data.data : response.data?.data?.members || []
-
-      // Filter out current members
-      const currentMemberIds = new Set(props.members.map(m => m.user_id))
-
-      results = results.filter((member: any) => {
-        const memberId = member.id || member._id || member.user_id
-        return !currentMemberIds.has(memberId) && memberId !== currentUserId.value
-      })
-
-      // Normalize the results
-      searchResults.value = results.map((member: any) => ({
-        id: member.id || member._id || member.user_id,
-        name: member.name || member.user?.name || 'Unknown',
-        email: member.email || member.user?.email || '',
-        avatar: member.avatar
-      }))
-    } else {
+    const response = await workspaceStore.searchMembers(workspaceId, query)
+    if (!response.success) {
       searchResults.value = []
+      return
     }
+
+    const currentMemberIds = new Set(props.members.map(m => m.user_id))
+    searchResults.value = response.members.filter(member => !currentMemberIds.has(member.id) && member.id !== currentUserId.value)
   } catch (error) {
     console.error('Search error:', error)
     // Fallback to local filtering if search fails
-    const query_lower = query.toLowerCase()
+    const queryLower = query.toLowerCase()
     searchResults.value = allAvailableMembers.value.filter(m =>
-      m.name.toLowerCase().includes(query_lower)
-      || m.email.toLowerCase().includes(query_lower)
+      m.name.toLowerCase().includes(queryLower)
+      || m.email.toLowerCase().includes(queryLower)
     )
   } finally {
     isSearching.value = false
@@ -180,12 +178,9 @@ async function addMember(userId: string) {
 
   addingMemberId.value = userId
   try {
-    const response = await addChannelMember({
-      channel_id: props.channelId,
-      user_id: userId
-    })
+    const response = await channelStore.addMember(props.channelId, userId)
 
-    if (response.data?.success || response.status === 200) {
+    if (response.success) {
       toast.add({
         title: 'Member added',
         description: 'Member has been added to the channel',
@@ -193,15 +188,10 @@ async function addMember(userId: string) {
       })
       searchQuery.value = ''
       searchResults.value = []
-      // Refresh the channel to update members list
-      const channel = channelStore.currentChannel
-      if (channel?.id) {
-        await channelStore.fetchChannels(channel.team_id, channel.workspace_id)
-      }
     } else {
       toast.add({
         title: 'Error',
-        description: response.data?.message || 'Failed to add member',
+        description: response.error || 'Failed to add member',
         color: 'error'
       })
     }
@@ -230,26 +220,18 @@ async function removeMember(userId: string) {
 
   removingMemberId.value = userId
   try {
-    const response = await removeChannelMember({
-      channel_id: props.channelId,
-      user_id: userId
-    })
+    const response = await channelStore.removeMember(props.channelId, userId)
 
-    if (response.data?.success || response.status === 200) {
+    if (response.success) {
       toast.add({
         title: 'Member removed',
         description: 'Member has been removed from the channel',
         color: 'success'
       })
-      // Refresh the channel to update members list
-      const channel = channelStore.currentChannel
-      if (channel?.id) {
-        await channelStore.fetchChannels(channel.team_id, channel.workspace_id)
-      }
     } else {
       toast.add({
         title: 'Error',
-        description: response.data?.message || 'Failed to remove member',
+        description: response.error || 'Failed to remove member',
         color: 'error'
       })
     }
@@ -272,12 +254,9 @@ async function leaveChannel(userId: string) {
 
   removingMemberId.value = userId
   try {
-    const response = await removeChannelMember({
-      channel_id: props.channelId,
-      user_id: userId
-    })
+    const response = await channelStore.removeMember(props.channelId, userId)
 
-    if (response.data?.success || response.status === 200) {
+    if (response.success) {
       toast.add({
         title: 'Left channel',
         description: 'You have successfully left the channel.',
@@ -299,7 +278,7 @@ async function leaveChannel(userId: string) {
     } else {
       toast.add({
         title: 'Error',
-        description: response.data?.message || 'Failed to leave channel',
+        description: response.error || 'Failed to leave channel',
         color: 'error'
       })
     }
@@ -316,9 +295,11 @@ async function leaveChannel(userId: string) {
 }
 
 // Debounce search
-let searchTimeout: any
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
 watch(searchQuery, (newQuery) => {
-  clearTimeout(searchTimeout)
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
   searchTimeout = setTimeout(() => {
     performSearch(newQuery)
   }, 300)

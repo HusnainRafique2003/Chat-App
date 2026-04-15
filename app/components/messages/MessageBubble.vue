@@ -2,19 +2,20 @@
 import { useToast } from '#ui/composables/useToast'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import FileViewerModal from '~/components/modals/FileViewerModal.vue'
-import type { Message } from '~/composables/useMessagesApi'
-import { downloadMessageFile } from '~/composables/useMessagesApi'
+import { downloadMessageFile } from '~/services/messageService'
 import { useUserStore } from '~/stores/useUserStore'
+import type { Message } from '~/types/message'
+import { simpleTrimStartEnd } from '~/utils/messageHelpers'
 
 interface Props {
-
   message: Message
-
 }
 
-
-
-// const emit = defineEmits<Emits>() // unused
+const emit = defineEmits<{
+  edit: []
+  delete: []
+  react: [emoji: string]
+}>()
 const userStore = useUserStore()
 
 const showReactions = ref(false)
@@ -93,9 +94,9 @@ const canPreview = computed(() => isImage.value || isVideo.value || isPDF.value 
 
 // --- Auth & Ownership ---
 const isOwn = computed(() => {
-  const currentUserId = userStore.user?.id || (userStore.user as any)?._id
-
-  const messageSenderId = props.message.sender_id || props.message.sender?.id || (props.message.sender as any)?._id
+  const currentUserId = userStore.user?.id || ((userStore.user as { _id?: string } | null)?._id)
+  const senderRecord = props.message.sender as { _id?: string } | null
+  const messageSenderId = props.message.sender_id || props.message.sender?.id || senderRecord?._id
 
   return messageSenderId === currentUserId
 })
@@ -103,7 +104,7 @@ const isOwn = computed(() => {
 const emojis = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '✨']
 // const userReactionEmoji = computed(() => {
 //   const userReaction = props.message.reactions_summary.find(r => r.reacted_by_me)
-// 
+//
 //   return userReaction?.emoji || null
 // })
 
@@ -209,7 +210,7 @@ async function handleDownload() {
           v-for="emoji in emojis"
           :key="emoji"
           class="text-lg hover:scale-125 transition-all"
-          @click="$emit('react', emoji); showReactions = false"
+          @click="emit('react', emoji); showReactions = false"
         >
           {{ emoji }}
         </button>
@@ -358,7 +359,7 @@ async function handleDownload() {
           size="xs"
           color="neutral"
           variant="ghost"
-          @click="$emit('edit')"
+          @click="emit('edit')"
         />
         <UButton
           v-if="isOwn"
@@ -366,7 +367,7 @@ async function handleDownload() {
           size="xs"
           color="error"
           variant="ghost"
-          @click="$emit('delete')"
+          @click="emit('delete')"
         />
       </div>
     </div>

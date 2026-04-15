@@ -1,35 +1,38 @@
 import { defineStore } from 'pinia'
 import {
-  createChannel,
-  getChannels,
-  updateChannel,
-  deleteChannel
-} from '~/composables/useChannelsApi'
-
-export interface ChannelMember {
-  user_id: string
-  role: string
-}
-
-export interface Channel {
-  id: string
-  _id: string
-  name: string
-  description?: string
-  workspace_id: string
-  team_id: string
-  type: 'public' | 'private' | 'direct'
-  direct_id: null
-  created_id: string
-  members: ChannelMember[]
-  created_at: string
-  updated_at: string
-}
+  addChannelMemberRequest,
+  createChannelRequest,
+  deleteChannelRequest,
+  getChannelsRequest,
+  removeChannelMemberRequest,
+  updateChannelRequest
+} from '~/services/channelService'
+import type { Channel } from '~/types/channel'
+import { extractChannel, extractChannels, normalizeChannel } from '~/utils/channelNormalizer'
 
 interface State {
   channels: Channel[]
   loading: boolean
   currentChannelId: string | null
+}
+
+interface ChannelPayload {
+  success?: boolean
+  message?: string
+}
+
+const channelRequests = new Map<string, Promise<void>>()
+
+function hasChannelUser(channel: Channel, targetUserId: string): boolean {
+  if (channel.direct_user_id === targetUserId || channel.user_id === targetUserId) {
+    return true
+  }
+
+  return channel.members.some(member =>
+    member.user_id === targetUserId
+    || member.id === targetUserId
+    || member._id === targetUserId
+  )
 }
 
 export const useChannelStore = defineStore('channel-data', {
@@ -38,67 +41,48 @@ export const useChannelStore = defineStore('channel-data', {
     loading: false,
     currentChannelId: null
   }),
-  persist: { enabled: true, pick: ['currentChannelId'] },
+  persist: { pick: ['currentChannelId'] },
   getters: {
-    currentChannel: state =>
-      state.channels.find(c => c.id === state.currentChannelId)
+    currentChannel: state => state.channels.find(channel => channel.id === state.currentChannelId)
   },
 
   actions: {
     async fetchChannels(teamId: string, workspaceId?: string) {
+      const requestKey = `${teamId}:${workspaceId || 'none'}`
+      const existingRequest = channelRequests.get(requestKey)
+      if (existingRequest) {
+        await existingRequest
+        return
+      }
+
       this.loading = true
-      try {
-        const response = await getChannels(teamId, workspaceId)
-        const data = response.data
 
-        if (data.success || data.data) {
-          let channelsData: any[] = []
-
-          if (Array.isArray(data.data)) {
-            channelsData = data.data
-          } else if (data.data?.channels && Array.isArray(data.data.channels)) {
-            channelsData = data.data.channels
-          } else if (data.data?.data && Array.isArray(data.data.data)) {
-            channelsData = data.data.data
-          }
-
-          const newChannels = channelsData.map((c: any) => ({
-            ...c,
-            id: c.id || c._id,
-            workspace_id: c.workspace_id || workspaceId || '',
-            team_id: c.team_id || teamId || '',
-            members: c.members || []
-          }))
-
-          // 1. PRESERVE DMs! Keep direct messages, but swap out the team channels.
-          const existingDms = this.channels.filter(c => c.type === 'direct')
-          const combinedChannels = [...existingDms, ...newChannels]
-
-          // 2. DEDUPLICATE: Remove any duplicate channels/DMs using a Map based on the ID
-          const uniqueChannels = Array.from(
-            new Map(combinedChannels.map(c => [c.id, c])).values()
-          )
-
-          this.channels = uniqueChannels
-
-          // 3. Set a default channel if none is selected
-          if (
-            this.channels.length > 0
-            && (!this.currentChannelId
-              || !this.channels.find(c => c.id === this.currentChannelId))
-          ) {
-            // Try to default to a regular channel first, fallback to whatever is available
-            this.currentChannelId
-              = this.channels.find(c => c.type !== 'direct')?.id
-                || this.channels[0]?.id
-                || null
-          }
+      const request = (async () => {
+        const result = await getChannelsRequest(teamId, workspaceId)
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to fetch channels')
         }
+
+        const fetchedChannels = extractChannels(result.data?.data, { workspaceId, teamId })
+        const existingDms = this.channels.filter(channel => channel.type === 'direct')
+        const uniqueChannels = Array.from(new Map([...existingDms, ...fetchedChannels].map(channel => [channel.id, channel])).values())
+
+        this.channels = uniqueChannels
+
+        if (this.channels.length > 0 && (!this.currentChannelId || !this.channels.find(channel => channel.id === this.currentChannelId))) {
+          this.currentChannelId = this.channels.find(channel => channel.type !== 'direct')?.id || this.channels[0]?.id || null
+        }
+      })()
+
+      channelRequests.set(requestKey, request)
+
+      try {
+        await request
       } catch (error) {
         console.error('Failed to fetch channels:', error)
-        // If the API fails (e.g., 404 No channels in this team), clear the public channels but KEEP DMs
-        this.channels = this.channels.filter(c => c.type === 'direct')
+        this.channels = this.channels.filter(channel => channel.type === 'direct')
       } finally {
+        channelRequests.delete(requestKey)
         this.loading = false
       }
     },
@@ -112,154 +96,104 @@ export const useChannelStore = defineStore('channel-data', {
       description?: string
     }) {
       this.loading = true
+
       try {
-        // Pass the actual data so 'private' channels work properly
-        const response = await createChannel({
-          type: 'public', // Default fallback
-          ...data
+        const result = await createChannelRequest({
+          type: data.type === 'private' || data.type === 'direct' ? data.type : 'public',
+          name: data.name,
+          workspace_id: data.workspace_id,
+          team_id: data.team_id,
+          description: data.description
         })
 
-        const channelData = response.data
-
-        // Robust extraction (handles different backend response shapes)
-        const newChannel
-          = channelData.data?.channel
-            || channelData.channel
-            || channelData.data
-            || channelData
-
-        if (
-          channelData.success
-          && newChannel
-          && (newChannel.id || newChannel._id)
-        ) {
-          // Normalize the ID just like you do in fetchChannels
-          newChannel.id = newChannel.id || newChannel._id
-
-          // Push to state
-          this.channels.push(newChannel)
-
-          // Optional: automatically switch the user to the newly created channel
-          this.setCurrentChannel(newChannel.id)
-
-          return { success: true, channel: newChannel }
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to create channel' }
         }
 
-        return {
-          success: false,
-          error: channelData.message || 'Failed to create channel'
+        const payload = result.data?.data as ChannelPayload | undefined
+        const channel = extractChannel(result.data?.data, { workspaceId: data.workspace_id, teamId: data.team_id })
+
+        if (payload?.success && channel) {
+          this.channels.push(channel)
+          this.setCurrentChannel(channel.id)
+          return { success: true, channel }
         }
+
+        return { success: false, error: payload?.message || 'Failed to create channel' }
       } catch (error) {
-        const message
-          = error instanceof Error ? error.message : 'Failed to create channel'
-        return { success: false, error: message }
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to create channel' }
       } finally {
         this.loading = false
       }
     },
-    // RESTORED DIRECT MESSAGE ACTION WITH PROPER USER ID CHECK
-    async createDirectChannel(
-      workspaceId: string,
-      teamId: string,
-      targetUserId: string,
-      targetUserName: string
-    ) {
+
+    async createDirectChannel(workspaceId: string, teamId: string, targetUserId: string, targetUserName: string) {
       this.loading = true
+
       try {
-        // 1. Check if we already have a DM with this user
-        const existingDm = this.channels.find((c) => {
-          if (
-            c.type !== 'direct'
-            || c.workspace_id !== workspaceId
-            || c.team_id !== teamId
-          )
-            return false
-
-          // STRICT CHECK: Look at direct_user_id or user_id on the root object
-          if (
-            (c as any).direct_user_id === targetUserId
-            || (c as any).user_id === targetUserId
-          )
-            return true
-
-          // Fallback: Check inside members array
-          return c.members?.some(
-            m =>
-              m.user_id === targetUserId
-              || (m as any).id === targetUserId
-              || (m as any)._id === targetUserId
-          )
-        })
+        const existingDm = this.channels.find(channel =>
+          channel.type === 'direct'
+          && channel.workspace_id === workspaceId
+          && channel.team_id === teamId
+          && hasChannelUser(channel, targetUserId)
+        )
 
         if (existingDm) {
-          this.setCurrentChannel(existingDm.id || (existingDm as any)._id)
+          this.setCurrentChannel(existingDm.id)
           return { success: true, channel: existingDm }
         }
 
-        // 2. Ask the backend to create a new one (SENDING BOTH ID FORMATS)
-        const response = await createChannel({
+        const result = await createChannelRequest({
           name: `DM: ${targetUserName}`,
           workspace_id: workspaceId,
           team_id: teamId,
           type: 'direct',
           direct_user_id: targetUserId,
-          user_id: targetUserId, // Safely pass both depending on what the backend prefers
+          user_id: targetUserId,
           members: [targetUserId]
-        } as any)
+        })
 
-        const channelData = response.data
-        const newChannel
-          = channelData.data?.channel
-            || channelData.channel
-            || channelData.data
-            || channelData
-
-        // 3. Add to sidebar and open it
-        if (newChannel && (newChannel.id || newChannel._id)) {
-          newChannel.id = newChannel.id || newChannel._id
-          newChannel.team_id = newChannel.team_id || teamId
-
-          // Ensure the target user ID is attached to the object so our UI can read it
-          newChannel.direct_user_id = newChannel.direct_user_id || targetUserId
-
-          this.channels.push(newChannel)
-          this.setCurrentChannel(newChannel.id)
-          return { success: true, channel: newChannel }
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to start DM' }
         }
 
-        return {
-          success: false,
-          error: channelData.message || 'Failed to start DM'
+        const payload = result.data?.data as ChannelPayload | undefined
+        const channel = extractChannel(result.data?.data, { workspaceId, teamId })
+
+        if (payload?.success && channel) {
+          const normalizedChannel = normalizeChannel(channel, { workspaceId, teamId })
+          normalizedChannel.direct_user_id = normalizedChannel.direct_user_id || targetUserId
+          this.channels.push(normalizedChannel)
+          this.setCurrentChannel(normalizedChannel.id)
+          return { success: true, channel: normalizedChannel }
         }
+
+        return { success: false, error: payload?.message || 'Failed to start DM' }
       } catch (error) {
-        console.error('DM Creation Error:', error)
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to start DM'
-        }
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to start DM' }
       } finally {
         this.loading = false
       }
     },
+
     async deleteChannel(channelId: string) {
       this.loading = true
-      try {
-        const response = await deleteChannel({ channel_id: channelId })
-        const channelData = response.data
 
-        if (channelData.success) {
+      try {
+        const result = await deleteChannelRequest({ channel_id: channelId })
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to delete channel' }
+        }
+
+        const payload = result.data?.data as ChannelPayload | undefined
+        if (payload?.success) {
           this.removeChannel(channelId)
           return { success: true }
         }
 
-        return {
-          success: false,
-          error: channelData.message || 'Failed to delete channel'
-        }
+        return { success: false, error: payload?.message || 'Failed to delete channel' }
       } catch (error) {
-        const message
-          = error instanceof Error ? error.message : 'Failed to delete channel'
-        return { success: false, error: message }
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to delete channel' }
       } finally {
         this.loading = false
       }
@@ -267,31 +201,74 @@ export const useChannelStore = defineStore('channel-data', {
 
     async updateChannel(channelId: string, name: string) {
       this.loading = true
+
       try {
-        const response = await updateChannel({
-          channel_id: channelId,
-          name
-        })
-        const channelData = response.data
+        const result = await updateChannelRequest({ channel_id: channelId, name })
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to update channel' }
+        }
 
-        if (channelData.success && channelData.data?.channel) {
-          const index = this.channels.findIndex(c => c.id === channelId)
+        const payload = result.data?.data as ChannelPayload | undefined
+        const channel = extractChannel(result.data?.data)
+
+        if (payload?.success && channel) {
+          const index = this.channels.findIndex(item => item.id === channelId)
           if (index > -1) {
-            this.channels[index] = channelData.data.channel
+            this.channels[index] = { ...this.channels[index], ...channel }
           }
-          return { success: true, channel: channelData.data.channel }
+
+          return { success: true, channel }
         }
 
-        return {
-          success: false,
-          error: channelData.message || 'Failed to update channel'
-        }
+        return { success: false, error: payload?.message || 'Failed to update channel' }
       } catch (error) {
-        const message
-          = error instanceof Error ? error.message : 'Failed to update channel'
-        return { success: false, error: message }
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to update channel' }
       } finally {
         this.loading = false
+      }
+    },
+
+    async addMember(channelId: string, userId: string) {
+      try {
+        const result = await addChannelMemberRequest({
+          channel_id: channelId,
+          user_id: userId
+        })
+
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to add channel member' }
+        }
+
+        const channel = this.channels.find(item => item.id === channelId)
+        if (channel) {
+          await this.fetchChannels(channel.team_id, channel.workspace_id)
+        }
+
+        return { success: true, response: result.raw }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to add channel member' }
+      }
+    },
+
+    async removeMember(channelId: string, userId: string) {
+      try {
+        const result = await removeChannelMemberRequest({
+          channel_id: channelId,
+          user_id: userId
+        })
+
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to remove channel member' }
+        }
+
+        const channel = this.channels.find(item => item.id === channelId)
+        if (channel) {
+          await this.fetchChannels(channel.team_id, channel.workspace_id)
+        }
+
+        return { success: true, response: result.raw }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to remove channel member' }
       }
     },
 
@@ -313,7 +290,7 @@ export const useChannelStore = defineStore('channel-data', {
     },
 
     removeChannel(channelId: string) {
-      this.channels = this.channels.filter(c => c.id !== channelId)
+      this.channels = this.channels.filter(channel => channel.id !== channelId)
       if (this.currentChannelId === channelId) {
         this.currentChannelId = null
       }

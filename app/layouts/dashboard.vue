@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { navigateTo, useRoute } from '#app'
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 
 // 1. Explicitly importing the modals to bypass any Nuxt auto-prefixing issues
 import AppSidebar from '~/components/AppSidebar.vue'
@@ -27,10 +27,6 @@ const showWorkspaceMemberModal = ref(false)
 const showTeamMemberModal = ref(false)
 
 // --- Computed Member List ---
-const workspaceMembers = computed(() => workspaceStore.currentWorkspace?.members || [])
-const currentWorkspaceName = computed(() => workspaceStore.currentWorkspace?.name || 'No workspace selected')
-const currentTeamName = computed(() => teamStore.currentTeam?.name || 'Dashboard')
-
 // --- Logic ---
 async function handleLogout() {
   isMobileSidebarOpen.value = false
@@ -49,12 +45,10 @@ function closeMobilePanels() {
 
 // Added a quick diagnostic function to ensure the click is registering!
 function triggerWorkspaceModal() {
-  console.log('Opening Workspace Modal...')
   showWorkspaceMemberModal.value = true
 }
 
 function triggerTeamModal() {
-  console.log('Opening Team Modal...')
   showTeamMemberModal.value = true
 }
 

@@ -1,116 +1,47 @@
-import { useRuntimeConfig } from '#app'
 import type { AxiosResponse } from 'axios'
-import axios from 'axios'
-import { useUserStore } from '~/stores/useUserStore'
-import { handleApiError } from './useApiErrorHelper'
+import {
+  addTeamMemberRequest,
+  createTeamRequest,
+  deleteTeamRequest,
+  getTeamsRequest,
+  removeTeamMemberRequest,
+  teamApiClient as teamsApiClient,
+  updateTeamRequest
+} from '~/services/teamService'
+import type { CreateTeamParams, DeleteTeamParams, TeamMembersParams, UpdateTeamParams } from '~/types/team'
 
-const API_BASE = 'http://178.104.58.236/api'
+async function unwrapResponse(request: Promise<{ raw: AxiosResponse<unknown>, success: boolean, message: string }>): Promise<AxiosResponse<unknown>> {
+  const result = await request
 
-function makeClient() {
-  const client = axios.create({
-    baseURL: API_BASE,
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
-  })
-
-  client.interceptors.request.use((config) => {
-    const userStore = useUserStore()
-    const runtimeConfig = useRuntimeConfig()
-    const devToken = runtimeConfig.public?.devApiToken || ''
-    const token = userStore.token || devToken
-
-    if (token) {
-      config.headers.token = token
-      config.headers.Authorization = `Bearer ${token}`
-    }
-
-    return config
-  })
-
-  return client
-}
-
-const teamsApiClient = makeClient()
-
-/**
- * Read teams for a workspace.
- * GET /api/team/read?workspace_id={id}  (singular /team/read - confirmed via backend probe)
- */
-export async function getTeams(workspaceId: string): Promise<AxiosResponse> {
-  try {
-    console.log('[Teams API] Fetching teams for workspace:', workspaceId)
-    return await teamsApiClient.get('/team/read', {
-      params: { workspace_id: workspaceId }
-    })
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error('[Teams API] Failed:', (error as any).response?.status, (error as any).response?.data?.message)
-    }
-    handleApiError(error, { action: 'fetch-teams', entity: 'team' })
+  if (!result.success && result.message) {
+    throw new Error(result.message)
   }
-}
-/**
- * Create a team.
- * POST /api/team/create
- */
-export async function createTeam(data: {
-  workspace_id: string
-  name: string
-  description?: string
-  color?: string
-}): Promise<AxiosResponse> {
-  try {
-    return await teamsApiClient.post('/team/create', data)
-  } catch (error) {
-    handleApiError(error, { action: 'create-team', entity: 'team' })
-  }
+
+  return result.raw
 }
 
-/**
- * Update a team.
- * PUT /api/team
- */
-export async function updateTeam(data: {
-  team_id: string
-  name?: string
-  description?: string
-  color?: string
-}): Promise<AxiosResponse> {
-  try {
-    return await teamsApiClient.put('/team', data)
-  } catch (error) {
-    handleApiError(error, { action: 'update-team', entity: 'team' })
-  }
+export async function getTeams(workspaceId: string): Promise<AxiosResponse<unknown>> {
+  return await unwrapResponse(getTeamsRequest(workspaceId))
 }
 
-/**
- * Delete a team.
- * DELETE /api/team/delete
- */
-export async function deleteTeam(data: {
-  team_id: string
-}): Promise<AxiosResponse> {
-  try {
-    return await teamsApiClient.delete('/team/delete', { data })
-  } catch (error) {
-    handleApiError(error, { action: 'delete-team', entity: 'team' })
-  }
-}
-export async function addTeamMember(data: { team_id: string, workspace_id: string, user_ids: string[] }) {
-  try {
-    return await teamsApiClient.post('/team/add-member', data)
-  } catch (error) {
-    handleApiError(error, { action: 'add-member', entity: 'team' })
-  }
+export async function createTeam(data: CreateTeamParams): Promise<AxiosResponse<unknown>> {
+  return await unwrapResponse(createTeamRequest(data))
 }
 
-export async function removeTeamMember(data: { team_id: string, workspace_id: string, user_ids: string[] }) {
-  try {
-    return await teamsApiClient.post('/team/remove-member', data)
-  } catch (error) {
-    handleApiError(error, { action: 'remove-member', entity: 'team' })
-  }
+export async function updateTeam(data: UpdateTeamParams): Promise<AxiosResponse<unknown>> {
+  return await unwrapResponse(updateTeamRequest(data))
 }
+
+export async function deleteTeam(data: DeleteTeamParams): Promise<AxiosResponse<unknown>> {
+  return await unwrapResponse(deleteTeamRequest(data))
+}
+
+export async function addTeamMember(data: TeamMembersParams): Promise<AxiosResponse<unknown>> {
+  return await unwrapResponse(addTeamMemberRequest(data))
+}
+
+export async function removeTeamMember(data: TeamMembersParams): Promise<AxiosResponse<unknown>> {
+  return await unwrapResponse(removeTeamMemberRequest(data))
+}
+
 export { teamsApiClient }

@@ -1,5 +1,13 @@
 import { defineStore } from 'pinia'
-import { postApi, type ApiEnvelope } from '~/composables/useApi'
+import {
+  forgotPasswordRequest,
+  loginRequest,
+  logoutRequest,
+  registerRequest,
+  resetPasswordRequest,
+  verifySignupRequest
+} from '~/services/authService'
+import type { ApiEnvelope } from '~/types/api'
 
 export interface ApiUser {
   id: string
@@ -22,29 +30,6 @@ interface UserState {
   isLoading: boolean
 }
 
-interface UserGetters {
-  isLoggedIn: (state: UserState) => boolean
-}
-
-interface UserActions {
-  setAuth(user: ApiUser, authToken?: string): void
-  clearAuth(): void
-  login(email: string, password: string): Promise<{ success: boolean, error?: string, message?: string }>
-  register(form: {
-    name: string
-    email: string
-    workspace: string
-    password: string
-    password_confirmation: string
-  }): Promise<{ success: boolean, error?: string, message?: string, user?: ApiUser | null }>
-  verifySignup(email: string, token: string): Promise<{ success: boolean, error?: string, message?: string }>
-  forgotPassword(email: string): Promise<{ success: boolean, error?: string, message?: string }>
-  resetPassword(token: string, password: string, password_confirmation: string): Promise<{ success: boolean, error?: string, message?: string }>
-  logout(): Promise<{ success: boolean }>
-  validateAuth(): Promise<{ valid: boolean }>
-}
-
-const LOGIN_REQUEST_TIMEOUT_MS = 15000
 let activeLoginController: AbortController | null = null
 
 function extractMessage(error: unknown, fallback: string) {
@@ -55,7 +40,7 @@ function extractMessage(error: unknown, fallback: string) {
   return fallback
 }
 
-export const useUserStore = defineStore<'user', UserState, UserGetters, UserActions>('user', {
+export const useUserStore = defineStore('user', {
   state: (): UserState => ({
     user: null,
     token: null,
@@ -67,7 +52,6 @@ export const useUserStore = defineStore<'user', UserState, UserGetters, UserActi
   },
 
   persist: {
-    enabled: true,
     pick: ['user', 'token']
   },
 
@@ -93,15 +77,8 @@ export const useUserStore = defineStore<'user', UserState, UserGetters, UserActi
       this.isLoading = true
 
       try {
-        const response = await postApi<ApiEnvelope<AuthUserPayload>>(
-          '/login',
-          { email, password },
-          {
-            signal: controller.signal,
-            timeout: LOGIN_REQUEST_TIMEOUT_MS
-          }
-        )
-        const payload = response.data
+        const response = await loginRequest(email, password, controller.signal)
+        const payload = response.raw.data as unknown as ApiEnvelope<AuthUserPayload>
 
         if (!payload.success || !payload.data?.user) {
           return { success: false, error: payload.message || 'Login failed' }
@@ -109,9 +86,6 @@ export const useUserStore = defineStore<'user', UserState, UserGetters, UserActi
 
         const authToken = payload.data.access_token
         const user = payload.data.user
-
-        console.log('Login response - Auth token:', authToken ? `${authToken.slice(0, 20)}...` : 'NO TOKEN')
-        console.log('Login response - User:', user.name)
 
         this.setAuth(user, authToken)
         return { success: true, message: payload.message || 'Login successful' }
@@ -139,8 +113,8 @@ export const useUserStore = defineStore<'user', UserState, UserGetters, UserActi
       this.isLoading = true
 
       try {
-        const response = await postApi<ApiEnvelope<AuthUserPayload>>('/signup', form)
-        const payload = response.data
+        const response = await registerRequest(form)
+        const payload = response.raw.data as unknown as ApiEnvelope<AuthUserPayload>
 
         if (!payload.success) {
           return { success: false, error: payload.message || 'Registration failed' }
@@ -162,8 +136,8 @@ export const useUserStore = defineStore<'user', UserState, UserGetters, UserActi
       this.isLoading = true
 
       try {
-        const response = await postApi<ApiEnvelope<AuthUserPayload>>('/verify-signup', { email, token })
-        const payload = response.data
+        const response = await verifySignupRequest(email, token)
+        const payload = response.raw.data as unknown as ApiEnvelope<AuthUserPayload>
 
         if (!payload.success || !payload.data?.user) {
           return { success: false, error: payload.message || 'Verification failed' }
@@ -185,8 +159,8 @@ export const useUserStore = defineStore<'user', UserState, UserGetters, UserActi
       this.isLoading = true
 
       try {
-        const response = await postApi<ApiEnvelope<null>>('/forgot-password', { email })
-        const payload = response.data
+        const response = await forgotPasswordRequest(email)
+        const payload = response.raw.data as unknown as ApiEnvelope<null>
 
         if (!payload.success) {
           return { success: false, error: payload.message || 'Failed to send reset email' }
@@ -204,8 +178,8 @@ export const useUserStore = defineStore<'user', UserState, UserGetters, UserActi
       this.isLoading = true
 
       try {
-        const response = await postApi<ApiEnvelope<null>>('/reset-password', { token, password, password_confirmation })
-        const payload = response.data
+        const response = await resetPasswordRequest(token, password, password_confirmation)
+        const payload = response.raw.data as unknown as ApiEnvelope<null>
 
         if (!payload.success) {
           return { success: false, error: payload.message || 'Password reset failed' }
@@ -220,12 +194,12 @@ export const useUserStore = defineStore<'user', UserState, UserGetters, UserActi
     },
 
     async logout() {
-      // Always clear auth immediately for UI consistency, ignore API response
+      const authToken = this.token
       this.clearAuth()
 
-      if (this.token) {
+      if (authToken) {
         try {
-          await postApi<ApiEnvelope<null>>('/logout', {})
+          await logoutRequest()
         } catch {
           // Ignore logout API errors (e.g. 401 stale token)
         }

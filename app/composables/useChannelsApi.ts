@@ -1,137 +1,47 @@
-import { useRuntimeConfig } from '#app'
 import type { AxiosResponse } from 'axios'
-import axios from 'axios'
-import { useUserStore } from '~/stores/useUserStore'
+import {
+  addChannelMemberRequest,
+  channelApiClient as channelsApiClient,
+  createChannelRequest,
+  deleteChannelRequest,
+  getChannelsRequest,
+  removeChannelMemberRequest,
+  updateChannelRequest
+} from '~/services/channelService'
+import type { ChannelMemberParams, CreateChannelParams, DeleteChannelParams, UpdateChannelParams } from '~/types/channel'
 
-const API_BASE = 'http://178.104.58.236/api'
+async function unwrapResponse(request: Promise<{ raw: AxiosResponse<unknown>, success: boolean, message: string }>): Promise<AxiosResponse<unknown>> {
+  const result = await request
 
-function makeClient() {
-  const client = axios.create({
-    baseURL: API_BASE,
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
-  })
+  if (!result.success && result.message) {
+    throw new Error(result.message)
+  }
 
-  client.interceptors.request.use((config) => {
-    const userStore = useUserStore()
-    const runtimeConfig = useRuntimeConfig()
-    const devToken = runtimeConfig.public?.devApiToken || ''
-    const token = userStore.token || devToken
-
-    if (token) {
-      config.headers.token = token
-      config.headers.Authorization = `Bearer ${token}`
-    }
-
-    return config
-  })
-
-  return client
+  return result.raw
 }
 
-const channelsApiClient = makeClient()
-
-/**
- * Create a channel.
- * POST /api/channels/create  (from Postman "Create Channel")
- * Body: { workspace_id, name, type, team_id }
- */
-export async function createChannel(data: {
-  name: string
-  workspace_id: string
-  team_id?: string // Made optional for DMs
-  type: 'public' | 'private' | 'direct' // Added direct
-  direct_user_id?: string // Passed to backend to link the user
-  members?: string[] // Fallback array in case backend prefers this
-}): Promise<AxiosResponse> {
-  try {
-    return await channelsApiClient.post('/channels/create', data)
-  } catch (error) {
-    handleApiError(error, { action: 'create-channel', entity: 'channel' })
-  }
+export async function createChannel(data: CreateChannelParams): Promise<AxiosResponse<unknown>> {
+  return await unwrapResponse(createChannelRequest(data))
 }
 
-/**
- * Update a channel.
- * PUT /api/channels  (from Postman "Update Channel")
- */
-export async function updateChannel(data: {
-  channel_id: string
-  name?: string
-  type?: string
-}): Promise<AxiosResponse> {
-  try {
-    return await channelsApiClient.put('/channels', data)
-  } catch (error) {
-    handleApiError(error, { action: 'update-channel', entity: 'channel' })
-  }
+export async function updateChannel(data: UpdateChannelParams): Promise<AxiosResponse<unknown>> {
+  return await unwrapResponse(updateChannelRequest(data))
 }
 
-/**
- * Read channels for a team.
- * GET /api/channels/read?team_id={id}  (confirmed via backend probe)
- */
-export async function getChannels(teamId: string, workspaceId?: string): Promise<AxiosResponse> {
-  try {
-    const params: Record<string, string> = { team_id: teamId }
-    if (workspaceId) {
-      params.workspace_id = workspaceId
-    }
-
-    console.log('[Channels API] Fetching channels for team:', teamId)
-    return await channelsApiClient.get('/channels/read', { params })
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error('[Channels API] Failed:', (error as any).response?.status, (error as any).response?.data?.message)
-    }
-    handleApiError(error, { action: 'fetch-channels', entity: 'channel' })
-  }
+export async function getChannels(teamId: string, workspaceId?: string): Promise<AxiosResponse<unknown>> {
+  return await unwrapResponse(getChannelsRequest(teamId, workspaceId))
 }
 
-/**
- * Delete a channel.
- * DELETE /api/channels/delete  (from Postman "Delete Channel")
- */
-export async function deleteChannel(data: {
-  channel_id: string
-}): Promise<AxiosResponse> {
-  try {
-    return await channelsApiClient.delete('/channels/delete', { data })
-  } catch (error) {
-    handleApiError(error, { action: 'delete-channel', entity: 'channel' })
-  }
+export async function deleteChannel(data: DeleteChannelParams): Promise<AxiosResponse<unknown>> {
+  return await unwrapResponse(deleteChannelRequest(data))
 }
 
-/**
- * Add a member to a channel.
- * POST /api/channels/add-member  (from Postman "Add Member")
- */
-export async function addChannelMember(data: {
-  channel_id: string
-  user_id: string
-}): Promise<AxiosResponse> {
-  try {
-    return await channelsApiClient.post('/channels/add-member', data)
-  } catch (error) {
-    handleApiError(error, { action: 'add-member', entity: 'channel' })
-  }
+export async function addChannelMember(data: ChannelMemberParams): Promise<AxiosResponse<unknown>> {
+  return await unwrapResponse(addChannelMemberRequest(data))
 }
 
-/**
- * Remove a member from a channel.
- * DELETE /api/channels/remove-member  (from Postman "Remove Member")
- */
-export async function removeChannelMember(data: {
-  channel_id: string
-  user_id: string
-}): Promise<AxiosResponse> {
-  try {
-    return await channelsApiClient.delete('/channels/remove-member', { data })
-  } catch (error) {
-    handleApiError(error, { action: 'remove-member', entity: 'channel' })
-  }
+export async function removeChannelMember(data: ChannelMemberParams): Promise<AxiosResponse<unknown>> {
+  return await unwrapResponse(removeChannelMemberRequest(data))
 }
 
 export { channelsApiClient }

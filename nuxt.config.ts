@@ -42,6 +42,7 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
+      apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || 'http://178.104.58.236/api',
       // Dev-only override token for debugging API calls from the browser.
       // Set via `NUXT_PUBLIC_DEV_API_TOKEN` in `.env.local`.
       devApiToken: process.env.NUXT_PUBLIC_DEV_API_TOKEN || '',
@@ -61,25 +62,6 @@ export default defineNuxtConfig({
   nitro: {
     preset: 'node-server'
   },
-  vite: {
-    optimizeDeps: {
-      include: [
-        'lamejs',
-        'vue',
-        'vue-router',
-        'pinia',
-        '@vue/shared',
-        'axios',
-        '@tiptap/extension-code-block-lowlight',
-        '@tiptap/extension-link',
-        '@tiptap/extension-placeholder',
-        '@tiptap/starter-kit',
-        '@tiptap/vue-3',
-        'lowlight'
-      ]
-    }
-  },
-
   vite: {
     cacheDir: '.vite',
     optimizeDeps: {

@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useToast } from '#ui/composables/useToast'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
 import { useUserStore } from '~/stores/useUserStore'
-import { addWorkspaceMember, removeWorkspaceMember, fetchAvailableWorkspaceMembers } from '~/composables/useWorkspacesApi'
+import type { Workspace, WorkspaceMember } from '~/types/workspace'
 
 const props = defineProps<{
   workspaceId: string
@@ -22,14 +22,20 @@ const removingMemberId = ref<string | null>(null)
 const isLoadingUsers = ref(false)
 
 // We now store the list of specifically available users here
-const availableUsers = ref<Array<any>>([])
+const availableUsers = ref<Array<Pick<WorkspaceMember, 'id' | 'name' | 'email'>>>([])
 
-const currentUserId = computed(() => userStore.user?.id || (userStore.user as any)?._id || '')
+type LegacyUser = { _id?: string }
+type WorkspaceIdentity = Workspace & { created_id?: string, owner_id?: string, user_id?: string }
+
+const currentUserId = computed(() => {
+  const currentUser = userStore.user as (typeof userStore.user & LegacyUser)
+  return currentUser?.id || currentUser?._id || ''
+})
 
 function isCreator(userId: string) {
-  const w = workspaceStore.currentWorkspace
+  const w = workspaceStore.currentWorkspace as WorkspaceIdentity | undefined
   if (!w) return false
-  return w.creator_id === userId || (w as any).created_id === userId || (w as any).owner_id === userId || (w as any).user_id === userId
+  return w.creator_id === userId || w.created_id === userId || w.owner_id === userId || w.user_id === userId
 }
 
 const isCurrentUserCreator = computed(() => {
@@ -41,7 +47,7 @@ const currentMembers = computed(() => workspaceStore.currentWorkspace?.members |
 
 // === SMART LOCAL FILTERING ===
 const filteredAvailableUsers = computed(() => {
-  return availableUsers.value.filter((user: any) => {
+  return availableUsers.value.filter((user) => {
     // Local Search Filtering
     if (searchQuery.value) {
       const q = searchQuery.value.toLowerCase()
@@ -66,27 +72,12 @@ const getAvatarColor = (index: number) => {
 async function loadAvailableUsers() {
   isLoadingUsers.value = true
   try {
-    const response = await fetchAvailableWorkspaceMembers(props.workspaceId)
-    const responseData = response.data
-
-    // FIX: Look specifically for 'available_members' based on your API response!
-    let results: any[] = []
-    if (responseData?.data?.available_members && Array.isArray(responseData.data.available_members)) {
-      results = responseData.data.available_members
-    } else if (responseData?.available_members && Array.isArray(responseData.available_members)) {
-      results = responseData.available_members
-    } else if (Array.isArray(responseData?.data)) {
-      results = responseData.data
-    } else if (Array.isArray(responseData)) {
-      results = responseData
+    const result = await workspaceStore.fetchAvailableMembers(props.workspaceId)
+    if (!result.success) {
+      throw new Error(result.error || 'Could not load available users.')
     }
 
-    // Map safely
-    availableUsers.value = results.map((user: any) => ({
-      id: user.id || user._id || user.user_id,
-      name: user.name || 'Unknown User',
-      email: user.email || ''
-    }))
+    availableUsers.value = result.members
   } catch (error) {
     console.error('Failed to fetch available users:', error)
     toast.add({ title: 'Error', description: 'Could not load available users.', color: 'error' })
@@ -98,7 +89,11 @@ async function loadAvailableUsers() {
 async function handleAddMember(userId: string) {
   addingMemberId.value = userId
   try {
-    await addWorkspaceMember({ workspace_id: props.workspaceId, user_ids: [userId] })
+    const result = await workspaceStore.addMembers(props.workspaceId, [userId])
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to add member')
+    }
+
     toast.add({ title: 'Member added to workspace', color: 'success' })
 
     // Instantly remove them from the available list so the UI updates
@@ -107,8 +102,9 @@ async function handleAddMember(userId: string) {
 
     // Refresh the workspace members list to show them at the bottom
     await workspaceStore.refreshWorkspaceMembers(props.workspaceId)
-  } catch (error: any) {
-    toast.add({ title: 'Error', description: error.message || 'Failed to add member', color: 'error' })
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to add member'
+    toast.add({ title: 'Error', description: errorMessage, color: 'error' })
   } finally {
     addingMemberId.value = null
   }
@@ -117,14 +113,18 @@ async function handleAddMember(userId: string) {
 async function handleRemoveMember(userId: string) {
   removingMemberId.value = userId
   try {
-    await removeWorkspaceMember({ workspace_id: props.workspaceId, user_ids: [userId] })
+    const result = await workspaceStore.removeMembers(props.workspaceId, [userId])
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to remove member')
+    }
+
     toast.add({ title: 'Member removed from workspace', color: 'success' })
 
     // Refresh both lists to keep them perfectly synced
-    await workspaceStore.refreshWorkspaceMembers(props.workspaceId)
     await loadAvailableUsers()
-  } catch (error: any) {
-    toast.add({ title: 'Error', description: error.message || 'Failed to remove member', color: 'error' })
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to remove member'
+    toast.add({ title: 'Error', description: errorMessage, color: 'error' })
   } finally {
     removingMemberId.value = null
   }

@@ -1,32 +1,7 @@
-import type { AxiosRequestConfig, AxiosResponse } from 'axios'
-import axios from 'axios'
+import type { AxiosRequestConfig, AxiosResponse, Method } from 'axios'
 import { onUnmounted, ref } from 'vue'
-import { useUserStore } from '~/stores/useUserStore'
-import type { ApiErrorContext } from './useApiErrorHandler'
-import { getUserFriendlyError } from './useApiErrorHandler'
-
-const API_BASE = 'http://178.104.58.236/api/auth'
-
-const apiClient = axios.create({
-  baseURL: API_BASE,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
-
-apiClient.interceptors.request.use((config) => {
-  const userStore = useUserStore()
-  const token = userStore.token
-
-  if (token) {
-    // Primary: token header (as per API spec)
-    config.headers.token = token
-    // Secondary: Authorization header (standard)
-    config.headers.Authorization = `Bearer ${token}`
-  }
-
-  return config
-})
+import { apiService } from '~/api/apiService'
+import { getApiClient } from '~/api/client'
 
 export function useApi<T = unknown>(url: string, config?: AxiosRequestConfig) {
   const data = ref<T | null>(null)
@@ -44,26 +19,22 @@ export function useApi<T = unknown>(url: string, config?: AxiosRequestConfig) {
     data.value = null
 
     try {
-      const response = await axios.request<T>({
+      const response = await apiService<T>({
         url: overrideUrl ?? url,
-        method: overrideConfig?.method || config?.method || 'GET',
+        method: (overrideConfig?.method || config?.method || 'GET') as Method,
         params: overrideConfig?.params ?? config?.params,
         data: overrideConfig?.data ?? config?.data,
         headers: {
-          ...config?.headers,
-          ...overrideConfig?.headers
+          ...((config?.headers as Record<string, string>) || {}),
+          ...((overrideConfig?.headers as Record<string, string>) || {})
         },
-        signal: controller.signal
+        signal: controller.signal,
+        dedupe: false
       })
 
       data.value = response.data
     } catch (err) {
-      const context: ApiErrorContext = { action: 'fetch-data' }
-      if (axios.isCancel(err)) {
-        error.value = 'Request was cancelled.'
-      } else {
-        error.value = getUserFriendlyError(err, context)
-      }
+      error.value = err instanceof Error ? err.message : 'Request failed.'
     } finally {
       loading.value = false
     }
@@ -82,15 +53,18 @@ export function useApi<T = unknown>(url: string, config?: AxiosRequestConfig) {
 }
 
 export async function postApi<T = unknown>(url: string, data: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-  try {
-    return await apiClient.post<T>(url, data, config)
-  } catch (error) {
-    const context: ApiErrorContext = { action: 'post-' + (url.split('/')[0] || 'data') }
-    throw new Error(getUserFriendlyError(error, context))
-  }
+  const response = await apiService<T>({
+    url: url.startsWith('/auth') ? url : `/auth${url}`,
+    method: 'POST',
+    data,
+    headers: config?.headers as Record<string, string> | undefined,
+    dedupe: false
+  })
+
+  return response.raw
 }
 
-export { apiClient }
+export const apiClient = getApiClient()
 
 export interface ApiEnvelope<T> {
   success: boolean

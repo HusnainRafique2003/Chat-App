@@ -2,20 +2,22 @@
 import { useToast } from '#ui/composables/useToast'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import MessageList from '~/components/messages/MessageList.vue'
-import type { Message } from '~/composables/useMessagesApi'
 import { useScheduledMessages, type ScheduledMessageJob } from '~/composables/useScheduledMessages'
 import { useChannelStore } from '~/stores/useChannelStore'
 import { useMessageStore } from '~/stores/useMessageStore'
-import { useTeamStore } from '~/stores/useTeamStore'
 import { useUserStore } from '~/stores/useUserStore'
 import { useWorkspaceStore } from '~/stores/useWorkspaceStore'
+import type { Message } from '~/types/message'
+
+interface WorkspaceRecord {
+  _id?: string
+}
 
 definePageMeta({
   layout: 'dashboard'
 })
 
 const userStore = useUserStore()
-const teamStore = useTeamStore()
 const channelStore = useChannelStore()
 const messageStore = useMessageStore()
 const workspaceStore = useWorkspaceStore()
@@ -66,7 +68,8 @@ watch(
       stopPolling()
       showMessaging.value = false
     }
-  }
+  },
+  { immediate: true }
 )
 
 async function sendScheduledJob(job: ScheduledMessageJob) {
@@ -148,7 +151,7 @@ async function handleMessageSent(data: { content: string, file?: File, scheduled
       content: data.content,
       scheduledAt: data.scheduledAt.toISOString(),
       createdAt,
-      workspaceId: workspaceStore.currentWorkspace?.id || (workspaceStore.currentWorkspace as any)?._id || '',
+      workspaceId: workspaceStore.currentWorkspace?.id || (workspaceStore.currentWorkspace as WorkspaceRecord | null)?._id || '',
       senderId: userStore.user?.id || '',
       senderName: userStore.user?.name || 'You',
       senderEmail: userStore.user?.email || '',
@@ -218,47 +221,12 @@ async function handleMessageEdited(data: { messageId: string, content: string, f
   }
 }
 
-function looksLikeUserId(value?: string | null) {
-  return Boolean(value && /^[a-f0-9]{24}$/i.test(value))
-}
-
-function getCurrentChannelDisplayName() {
-  const channel = channelStore.currentChannel
-  if (!channel) return channelStore.currentChannelId || ''
-
-  if (channel.type !== 'direct') {
-    return channel.name || channel.id
-  }
-
-  const currentUserId = userStore.user?.id || (userStore.user as any)?._id
-  const otherMemberId = channel.members?.find(member => member.user_id && member.user_id !== currentUserId)?.user_id
-  const workspaceMembers = workspaceStore.currentWorkspace?.members || []
-
-  if (otherMemberId) {
-    const otherMember = workspaceMembers.find((member: any) =>
-      member?.id === otherMemberId || member?._id === otherMemberId || member?.user_id === otherMemberId
-    )
-
-    if (otherMember?.name) {
-      return otherMember.name
-    }
-  }
-
-  const fallbackName = channel.name?.replace('DM: ', '') || channel.id
-  return looksLikeUserId(fallbackName) ? channel.id : fallbackName
-}
-
 onMounted(() => {
   syncScheduledMessagesFromStorage()
   processDueScheduledMessages(sendScheduledJob)
   scheduledMessageInterval = setInterval(() => {
     processDueScheduledMessages(sendScheduledJob)
   }, 1000)
-
-  // If a channel is already selected on mount, start polling immediately
-  if (channelStore.currentChannelId) {
-    startPolling(channelStore.currentChannelId)
-  }
 })
 
 onUnmounted(() => {

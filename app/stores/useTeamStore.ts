@@ -1,22 +1,19 @@
 import { defineStore } from 'pinia'
-import { getTeams, createTeam, updateTeam, deleteTeam } from '~/composables/useTeamsApi'
+import {
+  addTeamMemberRequest,
+  createTeamRequest,
+  deleteTeamRequest,
+  getTeamsRequest,
+  removeTeamMemberRequest,
+  updateTeamRequest
+} from '~/services/teamService'
+import type { Team } from '~/types/team'
+import { extractTeam, extractTeams } from '~/utils/teamNormalizer'
 
-export interface TeamMember {
-  user_id: string
-  role: string
-}
-
-export interface Team {
-  id: string
-  _id?: string
-  name: string
-  description: string
-  workspace_id: string
-  creator_id: string
-  members_count: number
-  members: TeamMember[]
-  created_at: string
-  updated_at: string
+interface TeamMembersPayload {
+  data?: {
+    members?: Team['members']
+  }
 }
 
 interface State {
@@ -25,91 +22,86 @@ interface State {
   currentTeamId: string | null
 }
 
+interface TeamPayload {
+  success?: boolean
+  message?: string
+}
+
+const teamRequests = new Map<string, Promise<void>>()
+
 export const useTeamStore = defineStore('team-data', {
   state: (): State => ({
     teams: [],
     loading: false,
     currentTeamId: null
   }),
-  persist: { enabled: true, pick: ['currentTeamId'] },
+  persist: { pick: ['currentTeamId'] },
   getters: {
-    currentTeam: state => state.teams.find(t => t.id === state.currentTeamId)
+    currentTeam: state => state.teams.find(team => team.id === state.currentTeamId)
   },
 
   actions: {
     async fetchTeams(workspaceId: string) {
+      const existingRequest = teamRequests.get(workspaceId)
+      if (existingRequest) {
+        await existingRequest
+        return
+      }
+
       this.loading = true
-      try {
-        const response = await getTeams(workspaceId)
-        const data = response.data
 
-        console.log('Teams API response:', JSON.stringify(data).slice(0, 500))
-
-        if (data?.success) {
-          // Handle multiple response shapes
-          let teamsData: any[] = []
-
-          if (Array.isArray(data.data)) {
-            teamsData = data.data
-          } else if (data.data?.teams && Array.isArray(data.data.teams)) {
-            teamsData = data.data.teams
-          } else if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
-            teamsData = [data.data]
-          }
-
-          // Normalize id field
-          this.teams = teamsData.map((t: any) => ({
-            ...t,
-            id: t.id || t._id,
-            members: t.members || [],
-            members_count: t.members_count ?? (t.members?.length || 0)
-          }))
-
-          if (this.teams.length > 0 && !this.currentTeamId) {
-            this.currentTeamId = this.teams[0]?.id || null
-          }
-
-          console.log('Teams loaded:', this.teams.length)
-        } else {
-          this.teams = []
+      const request = (async () => {
+        const result = await getTeamsRequest(workspaceId)
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to fetch teams')
         }
+
+        this.teams = extractTeams(result.data?.data)
+
+        if (this.teams.length > 0 && !this.currentTeamId) {
+          this.currentTeamId = this.teams[0]?.id || null
+        }
+      })()
+
+      teamRequests.set(workspaceId, request)
+
+      try {
+        await request
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
-        // 404 just means this workspace has no teams yet - not a real error
         if (errorMessage.includes('404') || errorMessage.includes('not found')) {
-          console.log('[Team Store] No teams found for workspace:', workspaceId, '- This is normal if workspace is empty')
+          console.log('[Team Store] No teams found for workspace:', workspaceId)
         } else {
           console.error('[Team Store] Failed to fetch teams:', error)
         }
 
         this.teams = []
       } finally {
+        teamRequests.delete(workspaceId)
         this.loading = false
       }
     },
 
-    // --- NEW ACTIONS: Create, Update, Delete ---
-
     async createTeam(data: { workspace_id: string, name: string, description?: string, color?: string }) {
       this.loading = true
+
       try {
-        const response = await createTeam(data)
-        const responseData = response.data
-
-        if (responseData.success) {
-          const newTeam = responseData.data?.team || responseData.data || responseData.team
-          if (newTeam) {
-            newTeam.id = newTeam.id || newTeam._id
-            newTeam.members = newTeam.members || []
-            this.teams.push(newTeam)
-
-            // Switch to the newly created team
-            this.setCurrentTeam(newTeam.id)
-            return { success: true, team: newTeam }
-          }
+        const result = await createTeamRequest(data)
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to create team' }
         }
-        return { success: false, error: responseData.message || 'Failed to create team' }
+
+        const payload = result.data?.data as TeamPayload | undefined
+        const team = extractTeam(result.data?.data)
+
+        if (payload?.success && team) {
+          this.teams.push(team)
+          this.setCurrentTeam(team.id)
+          return { success: true, team }
+        }
+
+        return { success: false, error: payload?.message || 'Failed to create team' }
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to create team' }
       } finally {
@@ -119,22 +111,26 @@ export const useTeamStore = defineStore('team-data', {
 
     async updateTeam(teamId: string, data: { name?: string, description?: string, color?: string }) {
       this.loading = true
-      try {
-        const response = await updateTeam({ team_id: teamId, ...data })
-        const responseData = response.data
 
-        if (responseData.success) {
-          const updatedTeam = responseData.data?.team || responseData.data
-          if (updatedTeam) {
-            const index = this.teams.findIndex(t => t.id === teamId || t._id === teamId)
-            if (index > -1) {
-              // Merge the updated data into the existing state
-              this.teams[index] = { ...this.teams[index], ...updatedTeam }
-            }
-            return { success: true }
-          }
+      try {
+        const result = await updateTeamRequest({ team_id: teamId, ...data })
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to update team' }
         }
-        return { success: false, error: responseData.message || 'Failed to update team' }
+
+        const payload = result.data?.data as TeamPayload | undefined
+        const team = extractTeam(result.data?.data)
+
+        if (payload?.success && team) {
+          const index = this.teams.findIndex(item => item.id === teamId || item._id === teamId)
+          if (index > -1) {
+            this.teams[index] = { ...this.teams[index], ...team }
+          }
+
+          return { success: true }
+        }
+
+        return { success: false, error: payload?.message || 'Failed to update team' }
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to update team' }
       } finally {
@@ -144,21 +140,25 @@ export const useTeamStore = defineStore('team-data', {
 
     async deleteTeam(teamId: string) {
       this.loading = true
+
       try {
-        const response = await deleteTeam({ team_id: teamId })
-        const responseData = response.data
+        const result = await deleteTeamRequest({ team_id: teamId })
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to delete team' }
+        }
 
-        if (responseData.success) {
-          // Remove from local state
-          this.teams = this.teams.filter(t => t.id !== teamId && t._id !== teamId)
+        const payload = result.data?.data as TeamPayload | undefined
+        if (payload?.success) {
+          this.teams = this.teams.filter(item => item.id !== teamId && item._id !== teamId)
 
-          // If they deleted their active team, fallback to the first available one
           if (this.currentTeamId === teamId) {
-            this.currentTeamId = this.teams.length > 0 ? (this.teams[0].id || this.teams[0]._id as string) : null
+            this.currentTeamId = this.teams[0]?.id || this.teams[0]?._id || null
           }
+
           return { success: true }
         }
-        return { success: false, error: responseData.message || 'Failed to delete team' }
+
+        return { success: false, error: payload?.message || 'Failed to delete team' }
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to delete team' }
       } finally {
@@ -166,7 +166,55 @@ export const useTeamStore = defineStore('team-data', {
       }
     },
 
-    // --- State Management ---
+    async addMembers(teamId: string, workspaceId: string, userIds: string[]) {
+      try {
+        const result = await addTeamMemberRequest({
+          team_id: teamId,
+          workspace_id: workspaceId,
+          user_ids: userIds
+        })
+
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to add team member' }
+        }
+
+        const payload = result.data as TeamMembersPayload
+        const team = this.currentTeam
+        if (payload?.data?.members && team) {
+          team.members = payload.data.members
+        }
+
+        await this.fetchTeams(workspaceId)
+        return { success: true }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to add team member' }
+      }
+    },
+
+    async removeMembers(teamId: string, workspaceId: string, userIds: string[]) {
+      try {
+        const result = await removeTeamMemberRequest({
+          team_id: teamId,
+          workspace_id: workspaceId,
+          user_ids: userIds
+        })
+
+        if (!result.success) {
+          return { success: false, error: result.message || 'Failed to remove team member' }
+        }
+
+        const payload = result.data as TeamMembersPayload
+        const team = this.currentTeam
+        if (payload?.data?.members && team) {
+          team.members = payload.data.members
+        }
+
+        await this.fetchTeams(workspaceId)
+        return { success: true }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to remove team member' }
+      }
+    },
 
     setCurrentTeam(id: string) {
       this.currentTeamId = id

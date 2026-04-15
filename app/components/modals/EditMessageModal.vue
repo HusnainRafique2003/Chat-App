@@ -4,7 +4,8 @@ import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import type { Message } from '~/composables/useMessagesApi'
+import type { Message } from '~/types/message'
+import { simpleTrimStartEnd } from '~/utils/messageHelpers'
 
 interface Props {
   message?: Message
@@ -77,8 +78,13 @@ const getHTMLContent = (): string => {
   return simpleTrimStartEnd(html)
 }
 
-function insertBold() { editor.value?.chain().focus().toggleBold().run() }
-function insertItalic() { editor.value?.chain().focus().toggleItalic().run() }
+function insertBold() {
+  editor.value?.chain().focus().toggleBold().run()
+}
+
+function insertItalic() {
+  editor.value?.chain().focus().toggleItalic().run()
+}
 function openLinkDialog() {
   if (!editor.value) return
   const { from, to } = editor.value.state.selection
