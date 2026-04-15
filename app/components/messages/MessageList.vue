@@ -75,8 +75,20 @@ watch(
   { immediate: true }
 )
 
-// Remove the watcher that auto-scrolls on every message length change
-// We'll control scrolling explicitly instead
+// Watch for new incoming messages and always scroll to bottom
+watch(
+  () => sortedMessages.value.length,
+  async (newLength, oldLength) => {
+    // Only run if messages were added
+    if (newLength > oldLength && !messageStore.loadingMore) {
+      // New messages arrived (from polling or socket) - always scroll to bottom
+      await nextTick()
+      requestAnimationFrame(() => {
+        scrollToBottom()
+      })
+    }
+  }
+)
 
 function scrollToBottom() {
   if (messagesContainer.value) {
